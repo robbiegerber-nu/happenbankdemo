@@ -467,7 +467,44 @@ function columnTip(key) {
   const h = COLUMN_HELP[key]; if (!h) return '';
   return `<div class="t-title">${esc(key)}: ${esc(h.q)}</div><p>${esc(h.body)}</p>
     <p class="t-strong">For example:</p><ul>${h.ex.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
-    ${h.note ? `<p>${esc(h.note)}</p>` : ''}`;
+    ${h.note ? `<p>${esc(h.note)}</p>` : ''}
+    ${key === 'Table score' ? tableScoreExample() : ''}`;
+}
+
+// Worked example built from the run being viewed: a small table that has a warning or failure,
+// with every check's points, so the reader can add them up and land on the number in the scorecard.
+const IMPORTANCE = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' };
+const pts = n => n.toLocaleString('en-US', { maximumFractionDigits: 1 });
+function tableScoreExample() {
+  const byTable = {};
+  S.data.checks.forEach(c => (byTable[c.table] ??= []).push(c));
+  // small, real tables only (skip the schema-wide row); best example = some checks pass and some don't
+  const candidates = Object.entries(byTable).filter(([t, list]) => list.length <= 8 && list.length >= 3 && AREA[t] && t !== 'cc (all tables)');
+  const mixed = ([t, list]) => list.some(c => c.status !== 'Pass') && list.some(c => c.status === 'Pass');
+  const pick = candidates.find(mixed) || candidates.find(([t, list]) => list.some(c => c.status !== 'Pass')) || candidates[0];
+  if (!pick) return '';
+  const [table, list] = pick;
+  let earned = 0, possible = 0;
+  const rows = list.map(c => {
+    const w = WEIGHT[c.severity] || 1, got = w * (c.status === 'Pass' ? 1 : c.status === 'Warn' ? 0.5 : 0);
+    earned += got; possible += w;
+    const label = c.status === 'Warn' ? 'Warning' : c.status === 'Pass' ? 'Pass' : 'Failure';
+    return `<div class="t-row" style="margin:3px 0"><span>${badge(c.status === 'Error' ? 'Fail' : c.status, label)}
+      <span style="color:var(--text-primary)">${esc(c.status === 'Pass' ? c.rule : findingTitle(c.rule))}</span>
+      <span style="font-size:0.76rem">· ${IMPORTANCE[c.severity] || 'low'}</span></span>
+      <span class="t-strong" style="white-space:nowrap">${pts(got)} of ${w}</span></div>`;
+  }).join('');
+  const exact = 100 * earned / possible;
+  const shown = Math.round(exact);
+  const lost = list.filter(c => c.status !== 'Pass');
+  return `<div class="t-sep"></div>
+    <p class="t-strong">Worked example: ${esc(table)} (${esc(AREA[table] || table)})</p>
+    <p>This row has ${list.length} checks. Each is worth points by importance (critical 4, high 3, medium 2, low 1) and earns all, half or none of them:</p>
+    ${rows}
+    <div class="t-sep"></div>
+    <p><span class="t-strong">Total: ${pts(earned)} of ${pts(possible)} points.</span>
+      ${pts(earned)} ÷ ${pts(possible)} = ${exact.toFixed(1)}%, shown in the scorecard as <span class="t-strong">${shown}</span>.</p>
+    ${lost.length ? `<p>The missing ${pts(possible - earned)} ${possible - earned === 1 ? 'point comes' : 'points come'} from ${lost.length === 1 ? 'one check' : `${lost.length} checks`} that did not fully pass.</p>` : ''}`;
 }
 
 /* ---------- trend: all runs, selected run ringed (single series: title names it, no legend) ---------- */
