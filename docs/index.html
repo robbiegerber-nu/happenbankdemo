@@ -110,6 +110,25 @@
   .runs .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .runs .run-note { color: var(--text-secondary); font-size: 0.8rem; }
   .runs tr.current td { background: var(--surface-2); }
+  .runs tbody tr { cursor: pointer; }
+  .runs tbody tr:hover td { background: var(--surface-2); }
+  .runs .run-btn { font: inherit; font-weight: 700; color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+  .runs tr.current .run-btn { color: var(--text-primary); text-decoration: none; }
+  .runs .run-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+  .viewing { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-top: 2px; }
+  svg.trend .hit { cursor: pointer; }
+  svg.trend .ring { fill: none; stroke: var(--text-primary); stroke-width: 2; }
+
+  /* ---- Run picker ---- */
+  .runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+  .runbar label { font-size: 0.85rem; font-weight: 600; }
+  .runbar select { font: inherit; font-size: 0.9rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
+                   background: var(--surface); color: var(--text-primary); max-width: 100%; }
+  .runbar select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  .older { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: var(--warning-wash); border: 1px solid var(--border);
+           border-left: 3px solid var(--warning); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 0.88rem; }
+  .older[hidden] { display: none; }
+  .loading { opacity: 0.55; transition: opacity 0.1s; }
 
   /* ---- Changes ---- */
   .changes { padding: 4px 0; }
@@ -191,7 +210,15 @@
   <header>
     <h1>Data Product Health</h1>
     <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions, tracked run over run.</p>
+    <div class="runbar" id="runbar" hidden>
+      <label for="run-select">Viewing</label>
+      <select id="run-select"></select>
+    </div>
     <div class="meta" id="meta">Loading…</div>
+    <div class="older" id="older" hidden role="status">
+      <span id="older-text"></span>
+      <button type="button" class="btn" id="to-latest"></button>
+    </div>
     <div class="notice">All data is <strong>synthetic</strong>, generated for demonstration. It is not real Happen Bank data.
       Definitions: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary">Data Dictionary</a> ·
       How this was built: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery">Data Discovery</a> ·
@@ -204,7 +231,7 @@
 
   <section aria-labelledby="h-trend">
     <h2 id="h-trend">Health over time</h2>
-    <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data.</p>
+    <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data. Click a point or a run to view it.</p>
     <div class="trend-grid">
       <figure class="card chart-card" style="margin:0">
         <figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
@@ -248,7 +275,7 @@
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
   </section>
 
-  <footer>Data product health dashboard · v2 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <footer>Data product health dashboard · v2.1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -257,6 +284,7 @@
 const DIMS = ['Completeness', 'Uniqueness', 'Validity', 'Consistency', 'Volume', 'Timeliness'];
 const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕', New: '+' };
 const UNIT_SINGULAR = { rows: 'row', days: 'day', columns: 'column', products: 'product' };
+const $ = id => document.getElementById(id);
 const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
 const fmtNum = (v, unit) => {
   if (v == null) return '—';
@@ -269,15 +297,20 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const badge = (st, label = st) => `<span class="badge ${st}"><span class="dot" aria-hidden="true">${ICON[st]}</span>${label}</span>`;
 const fmtDate = d => new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 const shortDate = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const shortNote = n => (n || '').replace(/^Run \d+:\s*/, '');
 
-async function load(name) {
-  const r = await fetch(`data/${name}`, { cache: 'no-cache' });
-  if (!r.ok) throw new Error(`${name}: ${r.status}`);
+async function load(path) {
+  const r = await fetch(`data/${path}`, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`${path}: ${r.status}`);
   return r.json();
 }
 
+/* ---------- state ---------- */
+const S = { runs: [], latest: null, selected: null, data: null, reqId: 0 };
+const runById = id => S.runs.find(r => r.run_id === id);
+
 /* ---------- tooltip (shared) ---------- */
-const tip = document.getElementById('tip');
+const tip = $('tip');
 function showTip(html, x, y) {
   tip.innerHTML = html; tip.classList.add('show');
   const r = tip.getBoundingClientRect();
@@ -286,14 +319,30 @@ function showTip(html, x, y) {
 }
 const hideTip = () => tip.classList.remove('show');
 
-function renderMeta(s) {
-  document.getElementById('meta').innerHTML =
+/* ---------- header: run picker, meta, "older run" banner ---------- */
+function renderPicker() {
+  const sel = $('run-select');
+  sel.innerHTML = S.runs.slice().reverse().map(r =>
+    `<option value="${r.run_id}">Run #${r.run_id}${r.run_id === S.latest ? ' (latest)' : ''} · ${Number(r.score).toFixed(1)} · ${r.status} · ${shortDate(r.started_at)}</option>`).join('');
+  $('runbar').hidden = S.runs.length < 2;
+}
+function renderHeader() {
+  const s = S.data.summary;
+  $('run-select').value = String(S.selected);
+  $('meta').innerHTML =
     `<span>Run #${s.run.run_id} · ${fmtDate(s.run.finished_at || s.run.started_at)}</span>` +
     `<span>Data period ${s.period.start} → ${s.period.end}</span><span>${esc(s.run.notes || '')}</span>`;
+  const older = S.selected !== S.latest;
+  $('older').hidden = !older;
+  if (older) {
+    $('older-text').innerHTML = `<strong>You're viewing an earlier run (#${S.selected}).</strong> The latest is run #${S.latest}.`;
+    $('to-latest').textContent = `Back to latest (run #${S.latest})`;
+  }
+  document.title = older ? `Data Product Health · Run #${S.selected}` : 'Data Product Health';
 }
 
-function renderTiles(s) {
-  const o = s.overall, prev = (s.history || []).find(h => h.run_id === s.previous_run_id);
+function renderTiles() {
+  const s = S.data.summary, o = s.overall, prev = runById(s.previous_run_id);
   let delta = '';
   if (prev) {
     const d = Number(o.score) - Number(prev.score);
@@ -301,7 +350,7 @@ function renderTiles(s) {
     const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '■';
     delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${d >= 0 ? '+' : ''}${d.toFixed(1)} vs run #${prev.run_id}</span>`;
   }
-  document.getElementById('tiles').innerHTML = `
+  $('tiles').innerHTML = `
     <div class="card tile hero"><div class="label">Overall health score</div>
       <div class="value">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
       <div class="note">${badge(o.status)} ${delta}</div></div>
@@ -313,64 +362,61 @@ function renderTiles(s) {
       <div class="note">${fmtInt(s.rows_monitored)} rows</div></div>`;
 }
 
-/* ---------- trend line (single series: no legend, title names it) ---------- */
-function renderTrend(s) {
-  const h = s.history || [];
-  // Draw at the container's real width so text stays at its true size on phones (no viewBox shrinking)
-  const W = Math.max(280, Math.round(document.getElementById('trend').clientWidth || 560)), H = 230,
-        m = { t: 22, r: 28, b: 44, l: 40 };
+/* ---------- trend: all runs, selected run ringed (single series: title names it, no legend) ---------- */
+function renderTrend() {
+  const h = S.runs;
+  const W = Math.max(280, Math.round($('trend').clientWidth || 560)), H = 230, m = { t: 22, r: 28, b: 44, l: 40 };
   const lo = Math.max(0, Math.floor((Math.min(...h.map(r => +r.score)) - 2) / 2) * 2), hi = 100;
   const x = i => h.length === 1 ? (m.l + W - m.r) / 2 : m.l + i * (W - m.l - m.r) / (h.length - 1);
   const y = v => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
   const ticks = []; for (let v = lo; v <= hi; v += (hi - lo) > 10 ? 5 : 2) ticks.push(v);
   const path = h.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(+r.score).toFixed(1)}`).join('');
-  const last = h.length - 1;
-  document.getElementById('trend').innerHTML = `
-    <svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
+  const si = h.findIndex(r => r.run_id === S.selected);
+  $('trend').innerHTML = `
+    <svg class="trend" viewBox="0 0 ${W} ${H}" role="group" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
       <g class="grid">${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>
         <text class="axis-label" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
       <path class="line" d="${path}"></path>
+      ${si >= 0 ? `<circle class="ring" cx="${x(si)}" cy="${y(+h[si].score)}" r="10"></circle>` : ''}
       ${h.map((r, i) => `<g data-i="${i}">
-          <circle class="hit" cx="${x(i)}" cy="${y(+r.score)}" r="16" tabindex="0" aria-label="Run ${r.run_id}: score ${r.score}, ${r.status}"></circle>
+          <circle class="hit" cx="${x(i)}" cy="${y(+r.score)}" r="16" tabindex="0" role="button"
+            aria-label="Run ${r.run_id}: score ${r.score}, ${r.status}${i === si ? ', currently viewing' : '. View this run'}"></circle>
           <circle class="pt" cx="${x(i)}" cy="${y(+r.score)}" r="5" pointer-events="none"></circle>
-          <text class="x-label" x="${x(i)}" y="${H - m.b + 20}" text-anchor="middle">Run #${r.run_id}</text>
+          <text class="x-label" x="${x(i)}" y="${H - m.b + 20}" text-anchor="middle"${i === si ? ' font-weight="700"' : ''}>Run #${r.run_id}</text>
           <text class="axis-label" x="${x(i)}" y="${H - m.b + 34}" text-anchor="middle">${shortDate(r.started_at)}</text>
         </g>`).join('')}
-      ${last >= 0 ? `<text class="pt-label" x="${x(last)}" y="${y(+h[last].score) - 12}" text-anchor="middle">${Number(h[last].score).toFixed(1)}</text>` : ''}
+      ${si >= 0 ? `<text class="pt-label" x="${x(si)}" y="${y(+h[si].score) - 15}" text-anchor="middle">${Number(h[si].score).toFixed(1)}</text>` : ''}
     </svg>`;
-  const svg = document.querySelector('svg.trend');
-  const tipFor = i => { const r = h[i];
-    return `<div class="t-title">Run #${r.run_id} · ${fmtDate(r.started_at)}</div>
-      <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
-      <div class="t-row"><span>Status</span><span>${r.status}</span></div>
-      <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>
-      <div class="t-sep"></div><div>${esc(r.notes || '')}</div>`; };
-  svg.addEventListener('mousemove', e => { const g = e.target.closest('[data-i]');
-    svg.querySelectorAll('.hover').forEach(n => n.classList.remove('hover'));
-    if (g && e.target.classList.contains('hit')) { g.classList.add('hover'); showTip(tipFor(+g.dataset.i), e.clientX, e.clientY); } else hideTip(); });
-  svg.addEventListener('mouseleave', () => { hideTip(); svg.querySelectorAll('.hover').forEach(n => n.classList.remove('hover')); });
-  svg.addEventListener('focusin', e => { const g = e.target.closest('[data-i]'); if (g) { const b = e.target.getBoundingClientRect(); showTip(tipFor(+g.dataset.i), b.right, b.top); } });
-  svg.addEventListener('focusout', hideTip);
+}
+const trendTip = i => { const r = S.runs[i];
+  return `<div class="t-title">Run #${r.run_id} · ${fmtDate(r.started_at)}</div>
+    <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
+    <div class="t-row"><span>Status</span><span>${r.status}</span></div>
+    <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>
+    <div class="t-sep"></div><div>${esc(r.notes || '')}</div>
+    ${r.run_id === S.selected ? '' : '<div class="t-hint">Click to view this run</div>'}`; };
 
-  // table twin of the chart
-  document.getElementById('runs').innerHTML = `<thead><tr><th>Run</th><th>What changed</th><th class="num">Score</th><th>Status</th><th class="num">Pass / Warn / Fail</th></tr></thead><tbody>` +
-    h.slice().reverse().map(r => `<tr class="${r.run_id === s.run.run_id ? 'current' : ''}">
-      <td><strong>#${r.run_id}</strong><div class="run-note">${shortDate(r.started_at)}</div></td>
-      <td class="run-note">${esc((r.notes || '').replace(/^Run \d+:\s*/, ''))}</td>
+function renderRunsTable() {
+  $('runs').innerHTML = `<thead><tr><th>Run</th><th>What changed</th><th class="num">Score</th><th>Status</th><th class="num">Pass / Warn / Fail</th></tr></thead><tbody>` +
+    S.runs.slice().reverse().map(r => `<tr class="${r.run_id === S.selected ? 'current' : ''}" data-run="${r.run_id}">
+      <td><button type="button" class="run-btn" data-run="${r.run_id}" ${r.run_id === S.selected ? 'aria-current="true"' : ''}
+            aria-label="View run ${r.run_id}">#${r.run_id}</button>
+        <div class="run-note">${shortDate(r.started_at)}</div>${r.run_id === S.selected ? '<div class="viewing">Viewing</div>' : ''}</td>
+      <td class="run-note">${esc(shortNote(r.notes))}</td>
       <td class="num">${Number(r.score).toFixed(1)}</td><td>${badge(r.status)}</td>
       <td class="num">${r.passed} / ${r.warned} / ${r.failed}</td></tr>`).join('') + '</tbody>';
 }
 
-/* ---------- what changed ---------- */
-function renderChanges(s, checks) {
-  const prevId = s.previous_run_id;
-  const sub = document.getElementById('changes-sub'), box = document.getElementById('changes');
-  if (!prevId) { sub.textContent = 'This is the first run, so there is nothing to compare yet.'; box.innerHTML = ''; return; }
+/* ---------- what changed (selected run vs its previous run) ---------- */
+function renderChanges() {
+  const s = S.data.summary, checks = S.data.checks, prevId = s.previous_run_id;
+  $('h-changes').textContent = prevId ? `What changed in run #${s.run.run_id} (vs run #${prevId})` : 'What changed since the previous run';
+  if (!prevId) { $('changes-sub').textContent = 'This is the first run, so there is nothing to compare yet.'; $('changes').innerHTML = ''; return; }
   const rank = { Pass: 0, Warn: 1, Fail: 2, Error: 2 };
   const changed = checks.filter(c => !c.prev_status || c.prev_status !== c.status || (c.prev_rule && c.prev_rule !== c.rule))
     .sort((a, b) => (rank[b.status] - rank[a.status]) || a.rule_id.localeCompare(b.rule_id));
-  sub.textContent = `Comparing run #${s.run.run_id} with run #${prevId}: ${changed.length} rule${changed.length === 1 ? '' : 's'} changed status or definition. ${checks.length - changed.length} unchanged.`;
-  box.innerHTML = changed.length ? changed.map(c => {
+  $('changes-sub').textContent = `${changed.length} rule${changed.length === 1 ? '' : 's'} changed status or definition; ${checks.length - changed.length} unchanged.`;
+  $('changes').innerHTML = changed.length ? changed.map(c => {
     const kind = !c.prev_status ? 'New rule' : c.prev_status !== c.status
       ? (rank[c.status] < rank[c.prev_status] ? 'Improved' : 'Worse') : 'Rule redefined';
     const flow = !c.prev_status ? `${badge('New', 'New')} <span class="arrow">→</span> ${badge(c.status)}`
@@ -382,15 +428,15 @@ function renderChanges(s, checks) {
   }).join('') : `<div class="empty">No rule changed status since run #${prevId}.</div>`;
 }
 
-/* ---------- scorecard with drill-down ---------- */
-let applyFilter = () => {};
-function renderHeat(score, hist) {
+/* ---------- scorecard ---------- */
+function renderHeat() {
+  const score = S.data.score, hist = S.data.hist || [];
   const byTable = {};
   score.filter(r => r.table !== '(all tables)').forEach(r => { (byTable[r.table] ??= {})[r.dimension] = r; });
   const tables = Object.keys(byTable).sort((a, b) =>
     (byTable[a]['(all dimensions)'].score - byTable[b]['(all dimensions)'].score) || ((byTable[b]['(all dimensions)'].rows || 0) - (byTable[a]['(all dimensions)'].rows || 0)));
   const dimTotals = {}; score.filter(r => r.table === '(all tables)').forEach(r => dimTotals[r.dimension] = r);
-  const histBy = {}; (hist || []).forEach(r => (histBy[r.table] ??= []).push(r));
+  S.histBy = {}; hist.forEach(r => (S.histBy[r.table] ??= []).push(r));
   const cell = (r, table, dim) => {
     if (!r) return `<div class="cell None"><span aria-hidden="true">—</span><span class="sr-only">No checks</span></div>`;
     const label = `${table === '' ? 'All tables' : table} · ${dim === '' ? 'all dimensions' : dim}`;
@@ -407,76 +453,128 @@ function renderHeat(score, hist) {
   }
   h += `<tr><th scope="row"><strong>All tables</strong></th>` + DIMS.map(d => `<td>${cell(dimTotals[d], '', d)}</td>`).join('') +
        `<td class="total">${cell(dimTotals['(all dimensions)'], '', '')}</td></tr></tbody>`;
-  const heat = document.getElementById('heat'); heat.innerHTML = h;
+  $('heat').innerHTML = h;
+}
+const heatTip = d => {
+  let html = `<div class="t-title">${esc(d.t)}</div>
+    <div class="t-row"><span>Score</span><span>${Number(d.score).toFixed(1)}</span></div>
+    <div class="t-row"><span>Checks</span><span>${d.checks}</span></div>
+    <div class="t-row"><span>Passed / Warn / Fail</span><span>${d.passed} / ${d.warned} / ${d.failed}</span></div>`;
+  const runs = d.dimension === '(all dimensions)' ? (S.histBy || {})[d.table || '(all tables)'] : null;
+  if (runs && runs.length > 1) html += `<div class="t-sep"></div>` + runs.map(r =>
+    `<div class="t-row"><span>Run #${r.run_id}</span><span>${Number(r.score).toFixed(1)} · ${r.status}</span></div>`).join('');
+  return html + `<div class="t-hint">Click to see these checks</div>`;
+};
 
-  const tipHtml = d => {
-    let html = `<div class="t-title">${esc(d.t)}</div>
-      <div class="t-row"><span>Score</span><span>${Number(d.score).toFixed(1)}</span></div>
-      <div class="t-row"><span>Checks</span><span>${d.checks}</span></div>
-      <div class="t-row"><span>Passed / Warn / Fail</span><span>${d.passed} / ${d.warned} / ${d.failed}</span></div>`;
-    const runs = d.dimension === '(all dimensions)' ? histBy[d.table || '(all tables)'] : null;
-    if (runs && runs.length > 1) html += `<div class="t-sep"></div>` + runs.map(r =>
-      `<div class="t-row"><span>Run #${r.run_id}</span><span>${Number(r.score).toFixed(1)} · ${r.status}</span></div>`).join('');
-    return html + `<div class="t-hint">Click to see these checks</div>`;
-  };
-  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(tipHtml(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
+/* ---------- checks table ---------- */
+const F = { s: $('f-status'), d: $('f-dim'), t: $('f-table'), x: $('f-text') };
+function refreshTableOptions() {
+  const keep = F.t.value, tables = [...new Set(S.data.checks.map(c => c.table))].sort();
+  F.t.innerHTML = '<option value="">All</option>' + tables.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  F.t.value = tables.includes(keep) ? keep : '';
+}
+function drawChecks() {
+  const checks = S.data.checks, q = F.x.value.trim().toLowerCase();
+  const rows = checks.filter(c => (!F.s.value || c.status === F.s.value) && (!F.d.value || c.dimension === F.d.value) &&
+    (!F.t.value || c.table === F.t.value) &&
+    (!q || [c.rule_id, c.rule, c.column, c.description, c.table].join(' ').toLowerCase().includes(q)));
+  $('f-count').textContent = `${rows.length} of ${checks.length} checks`;
+  $('checks').innerHTML = `<thead><tr><th>Status</th><th>Rule</th><th>Check</th><th>Table · column</th>
+    <th>Dimension</th><th>Severity</th><th class="num">Measured</th><th class="num">Warn / fail above</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(c => `<tr>
+      <td>${badge(c.status)}${c.prev_status && c.prev_status !== c.status ? `<div class="prev">was ${esc(c.prev_status)}</div>` : !c.prev_status && S.data.summary.previous_run_id ? '<div class="prev">new rule</div>' : ''}</td>
+      <td><code>${esc(c.rule_id)}</code></td>
+      <td><strong>${esc(c.rule)}</strong><div class="desc">${esc(c.description)}</div>
+        ${c.expected_note ? `<div class="note">Note: ${esc(c.expected_note)}</div>` : ''}
+        ${c.error ? `<div class="note">Error: ${esc(c.error)}</div>` : ''}</td>
+      <td><code>${esc(c.table)}</code>${c.column ? `<br><code>${esc(c.column)}</code>` : ''}</td>
+      <td>${esc(c.dimension)}</td><td>${esc(c.severity)}</td>
+      <td class="num">${fmtNum(c.value, c.unit)}${c.prev_status && Number(c.prev_value) !== Number(c.value) ? `<div class="prev">was ${fmtNum(c.prev_value, c.unit)}</div>` : ''}</td>
+      <td class="num">${fmtNum(c.warn_above, c.unit)} / ${fmtNum(c.fail_above, c.unit)}</td></tr>`).join('')
+     : `<tr><td colspan="8" class="empty">No checks match these filters.</td></tr>`) + '</tbody>';
+}
+
+/* ---------- switching runs ---------- */
+function renderAll() {
+  renderHeader(); renderTiles(); renderTrend(); renderRunsTable(); renderChanges(); renderHeat();
+  refreshTableOptions(); drawChecks();
+}
+async function showRun(id, { push = true } = {}) {
+  if (!runById(id)) id = S.latest;
+  const req = ++S.reqId;
+  document.querySelector('.wrap').classList.add('loading');
+  try {
+    const base = `runs/${id}/`;
+    const [summary, score, checks, hist] = await Promise.all([
+      load(base + 'summary.json'), load(base + 'scorecard.json'), load(base + 'checks.json'), load(base + 'scorecard_history.json').catch(() => [])]);
+    if (req !== S.reqId) return;                                  // a newer selection won
+    S.selected = id; S.data = { summary, score, checks, hist };
+    renderAll(); hideTip();
+    const url = new URL(location.href);
+    if (id === S.latest) url.searchParams.delete('run'); else url.searchParams.set('run', id);
+    if (push && url.href !== location.href) history.pushState({ run: id }, '', url);
+  } catch (e) {
+    $('meta').textContent = `Could not load run #${id}: ${e.message}`;
+  } finally {
+    if (req === S.reqId) document.querySelector('.wrap').classList.remove('loading');
+  }
+}
+
+/* ---------- wire events once ---------- */
+function wire() {
+  $('run-select').addEventListener('change', e => showRun(+e.target.value));
+  $('to-latest').addEventListener('click', () => showRun(S.latest));
+  addEventListener('popstate', () => showRun(+(new URL(location.href).searchParams.get('run')) || S.latest, { push: false }));
+
+  const trend = $('trend');
+  trend.addEventListener('mousemove', e => { const g = e.target.closest('[data-i]');
+    trend.querySelectorAll('.hover').forEach(n => n.classList.remove('hover'));
+    if (g && e.target.classList.contains('hit')) { g.classList.add('hover'); showTip(trendTip(+g.dataset.i), e.clientX, e.clientY); } else hideTip(); });
+  trend.addEventListener('mouseleave', () => { hideTip(); trend.querySelectorAll('.hover').forEach(n => n.classList.remove('hover')); });
+  trend.addEventListener('focusin', e => { const g = e.target.closest('[data-i]'); if (g) { const b = e.target.getBoundingClientRect(); showTip(trendTip(+g.dataset.i), b.right, b.top); } });
+  trend.addEventListener('focusout', hideTip);
+  const pick = e => { const g = e.target.closest('[data-i]'); if (g && e.target.classList.contains('hit')) showRun(S.runs[+g.dataset.i].run_id); };
+  trend.addEventListener('click', pick);
+  trend.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } });
+
+  $('runs').addEventListener('click', e => { const tr = e.target.closest('[data-run]'); if (tr) showRun(+tr.dataset.run); });
+
+  const heat = $('heat');
+  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
   heat.addEventListener('mouseleave', hideTip);
-  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(tipHtml(JSON.parse(c.dataset.tip)), b.right, b.top); } });
+  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(heatTip(JSON.parse(c.dataset.tip)), b.right, b.top); } });
   heat.addEventListener('focusout', hideTip);
   heat.addEventListener('click', e => {
     const c = e.target.closest('button.cell'); if (!c) return;
     heat.querySelectorAll('.selected').forEach(n => n.classList.remove('selected')); c.classList.add('selected');
-    hideTip(); applyFilter({ table: c.dataset.table, dim: c.dataset.dim });
-    document.getElementById('h-checks').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    hideTip(); F.s.value = ''; F.x.value = ''; F.t.value = c.dataset.table || ''; F.d.value = c.dataset.dim || ''; drawChecks();
+    $('h-checks').scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-}
 
-/* ---------- checks table ---------- */
-function renderChecks(checks) {
-  const fs = document.getElementById('f-status'), fd = document.getElementById('f-dim'),
-        ft = document.getElementById('f-table'), fx = document.getElementById('f-text');
-  ['Fail', 'Warn', 'Pass', 'Error'].filter(s => checks.some(c => c.status === s)).forEach(s => fs.add(new Option(s, s)));
-  DIMS.forEach(d => fd.add(new Option(d, d)));
-  [...new Set(checks.map(c => c.table))].sort().forEach(t => ft.add(new Option(t, t)));
-  const draw = () => {
-    const q = fx.value.trim().toLowerCase();
-    const rows = checks.filter(c => (!fs.value || c.status === fs.value) && (!fd.value || c.dimension === fd.value) &&
-      (!ft.value || c.table === ft.value) &&
-      (!q || [c.rule_id, c.rule, c.column, c.description, c.table].join(' ').toLowerCase().includes(q)));
-    document.getElementById('f-count').textContent = `${rows.length} of ${checks.length} checks`;
-    document.getElementById('checks').innerHTML = `<thead><tr><th>Status</th><th>Rule</th><th>Check</th><th>Table · column</th>
-      <th>Dimension</th><th>Severity</th><th class="num">Measured</th><th class="num">Warn / fail above</th></tr></thead><tbody>` +
-      (rows.length ? rows.map(c => `<tr>
-        <td>${badge(c.status)}${c.prev_status && c.prev_status !== c.status ? `<div class="prev">was ${esc(c.prev_status)}</div>` : !c.prev_status ? '<div class="prev">new rule</div>' : ''}</td>
-        <td><code>${esc(c.rule_id)}</code></td>
-        <td><strong>${esc(c.rule)}</strong><div class="desc">${esc(c.description)}</div>
-          ${c.expected_note ? `<div class="note">Note: ${esc(c.expected_note)}</div>` : ''}
-          ${c.error ? `<div class="note">Error: ${esc(c.error)}</div>` : ''}</td>
-        <td><code>${esc(c.table)}</code>${c.column ? `<br><code>${esc(c.column)}</code>` : ''}</td>
-        <td>${esc(c.dimension)}</td><td>${esc(c.severity)}</td>
-        <td class="num">${fmtNum(c.value, c.unit)}${c.prev_status && Number(c.prev_value) !== Number(c.value) ? `<div class="prev">was ${fmtNum(c.prev_value, c.unit)}</div>` : ''}</td>
-        <td class="num">${fmtNum(c.warn_above, c.unit)} / ${fmtNum(c.fail_above, c.unit)}</td></tr>`).join('')
-       : `<tr><td colspan="8" class="empty">No checks match these filters.</td></tr>`) + '</tbody>';
-  };
-  [fs, fd, ft].forEach(el => el.addEventListener('change', draw));
-  fx.addEventListener('input', draw);
-  document.getElementById('f-clear').addEventListener('click', () => {
-    fs.value = fd.value = ft.value = fx.value = '';
-    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); draw();
+  ['Fail', 'Warn', 'Pass'].forEach(s => F.s.add(new Option(s, s)));
+  DIMS.forEach(d => F.d.add(new Option(d, d)));
+  [F.s, F.d, F.t].forEach(el => el.addEventListener('change', drawChecks));
+  F.x.addEventListener('input', drawChecks);
+  $('f-clear').addEventListener('click', () => {
+    F.s.value = F.d.value = F.t.value = F.x.value = '';
+    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); drawChecks();
   });
-  applyFilter = ({ table, dim }) => { fs.value = ''; fx.value = ''; ft.value = table || ''; fd.value = dim || ''; draw(); };
-  draw();
+
+  let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(renderTrend, 150); });
 }
 
 (async () => {
   try {
-    const [summary, score, checks, hist] = await Promise.all([
-      load('summary.json'), load('scorecard.json'), load('checks.json'), load('scorecard_history.json').catch(() => [])]);
-    renderMeta(summary); renderTiles(summary); renderTrend(summary); renderChanges(summary, checks);
-    renderChecks(checks); renderHeat(score, hist);
-    let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => renderTrend(summary), 150); });
+    const index = await load('runs/index.json');
+    S.runs = index.runs; S.latest = index.latest_run_id;
+    renderPicker(); wire();
+    const url = new URL(location.href), asked = +url.searchParams.get('run');
+    if (url.searchParams.has('run') && !runById(asked)) {           // unknown run: fall back to latest and tidy the address
+      url.searchParams.delete('run'); history.replaceState(null, '', url);
+    }
+    await showRun(runById(asked) ? asked : S.latest, { push: false });
   } catch (e) {
-    document.getElementById('meta').textContent = 'Could not load data: ' + e.message;
+    $('meta').textContent = 'Could not load data: ' + e.message;
   }
 })();
 </script>

@@ -2,7 +2,8 @@
 #   powershell -File sql\discovery\run_discovery.ps1 [-Notes "why this run"]
 #   -ResumeRunId N   finish an interrupted run from the rule-check step (keeps its catalog, profiles and volume)
 #   -ExportOnly      skip all checks; re-export JSON for the latest run (or -ResumeRunId N)
-param([string]$Notes = 'Scheduled discovery run', [int]$ResumeRunId = 0, [switch]$ExportOnly)
+#   -AllRuns         also re-export every earlier run's folder (docs/data/runs/<run_id>/)
+param([string]$Notes = 'Scheduled discovery run', [int]$ResumeRunId = 0, [switch]$ExportOnly, [switch]$AllRuns)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -51,15 +52,19 @@ Invoke-Scalar "UPDATE discovery.dq_run SET finished_at = now() WHERE run_id = $r
 }
 
 # ---------------- JSON export for the dashboard ----------------
-function Export-Json([string]$name, [string]$sql) {
+# Latest run -> docs/data/*.json ; every run -> docs/data/runs/<run_id>/ ; list of runs -> docs/data/runs/index.json
+function Export-Json([string]$name, [string]$sql, [string]$dir = $out) {
+    New-Item -ItemType Directory -Force $dir | Out-Null
     $json = (& $psql @conn -At -v ON_ERROR_STOP=1 -c $sql) -join "`n"
     if ($LASTEXITCODE -ne 0) { throw "export $name failed" }
-    $path = Join-Path $out $name
+    $path = Join-Path $dir $name
     [System.IO.File]::WriteAllText($path, $json, [System.Text.UTF8Encoding]::new($false))
-    "{0,-26} {1,8:N0} bytes" -f $name, (Get-Item $path).Length
+    "{0,-34} {1,8:N0} bytes" -f ((Split-Path $dir -Leaf) + '/' + $name), (Get-Item $path).Length
 }
 
-Export-Json 'summary.json' @"
+# The four files the dashboard needs to show one run (written for the latest run and for every run's folder)
+function Export-RunFiles([int]$run, [string]$dir) {
+Export-Json 'summary.json' -dir $dir -sql @"
 SELECT json_build_object(
   'run', (SELECT json_build_object('run_id', run_id, 'started_at', started_at, 'finished_at', finished_at, 'notes', notes) FROM discovery.dq_run WHERE run_id = $run),
   'overall', (SELECT json_build_object('score', score, 'status', status, 'checks', checks, 'passed', passed, 'warned', warned, 'failed', failed)
@@ -75,7 +80,7 @@ SELECT json_build_object(
               WHERE r.run_id <= $run));
 "@
 
-Export-Json 'scorecard.json' @"
+Export-Json 'scorecard.json' -dir $dir -sql @"
 SELECT json_agg(json_build_object('table', s.table_name, 'table_type', c.table_type, 'rows', c.row_count, 'dimension', s.dimension,
        'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed, 'score', s.score, 'status', s.status)
        ORDER BY s.table_name, s.dimension)
@@ -83,7 +88,7 @@ FROM discovery.dq_scorecard s LEFT JOIN discovery.dq_table_catalog c ON c.run_id
 WHERE s.run_id = $run;
 "@
 
-Export-Json 'checks.json' @"
+Export-Json 'checks.json' -dir $dir -sql @"
 SELECT json_agg(json_build_object('rule_id', c.rule_id, 'table', c.table_name, 'column', c.column_name, 'dimension', c.dimension, 'rule', c.rule_name,
        'severity', c.severity, 'value', c.measured_value, 'unit', c.unit, 'warn_above', c.warn_above, 'fail_above', c.fail_above, 'status', c.status,
        'description', c.description, 'expected_note', c.expected_note, 'error', c.error_message, 'duration_ms', c.duration_ms,
@@ -96,10 +101,29 @@ WHERE c.run_id = $run;
 "@
 
 # Per-run, per-table scores for history drill-down
-Export-Json 'scorecard_history.json' @"
+Export-Json 'scorecard_history.json' -dir $dir -sql @"
 SELECT json_agg(json_build_object('run_id', run_id, 'table', table_name, 'dimension', dimension, 'score', score, 'status', status,
        'passed', passed, 'warned', warned, 'failed', failed) ORDER BY run_id, table_name, dimension)
 FROM discovery.dq_scorecard WHERE run_id <= $run AND dimension = '(all dimensions)';
+"@
+}
+
+# Latest run at the top level (what the dashboard opens by default), plus its own run folder
+Export-RunFiles -run $run -dir $out
+Export-RunFiles -run $run -dir (Join-Path $out "runs\$run")
+
+# -AllRuns: (re)write every earlier run's folder too (used to backfill runs recorded before per-run export existed)
+if ($AllRuns) {
+    $ids = & $psql @conn -At -c "SELECT DISTINCT run_id FROM discovery.dq_scorecard WHERE run_id < $run ORDER BY 1;"
+    foreach ($id in $ids) { Export-RunFiles -run ([int]$id) -dir (Join-Path $out "runs\$id") }
+}
+
+# Index of all runs for the dashboard's run picker and trend chart
+Export-Json 'index.json' -dir (Join-Path $out 'runs') -sql @"
+SELECT json_build_object('latest_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard), 'runs',
+  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'score', s.score, 'status', s.status,
+          'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
+   FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
 "@
 
 Export-Json 'catalog.json' @"
