@@ -430,6 +430,46 @@ function statusListTip(status) {
 }
 const tileTip = key => key === 'score' ? scoreTip() : statusListTip(key);
 
+/* ---------- scorecard column explanations: plain English for business users ---------- */
+const COLUMN_HELP = {
+  Completeness: {
+    q: 'Is anything missing?',
+    body: 'Checks that information we expect to be filled in actually is.',
+    ex: ['Every answered call shows which agent took it', 'No business days are missing from the records'],
+    note: 'Some blanks are normal, such as no agent on a call the customer hung up on before it was answered. Those are not counted as problems.' },
+  Uniqueness: {
+    q: 'Is anything counted twice?',
+    body: 'Checks that each record appears only once, so totals are not inflated.',
+    ex: ['A customer call is not recorded twice', 'Each survey belongs to just one call'] },
+  Validity: {
+    q: 'Does the information make sense?',
+    body: 'Checks that the information follows real-world rules.',
+    ex: ['A call cannot end before it starts', 'Satisfaction scores are between 1 and 5', 'Calls only come in while the contact center is open'] },
+  Consistency: {
+    q: 'Do the numbers agree with each other?',
+    body: 'Checks that related information lines up across the data.',
+    ex: ['Daily and 15-minute totals match the individual calls', 'An agent is never on two calls at the same time'] },
+  Volume: {
+    q: 'Is the amount of data normal?',
+    body: 'Compares how many records arrive each day with the same weekday in previous weeks.',
+    ex: ['A sudden drop can mean data went missing', 'A spike is often a real event, such as a holiday rush or a system outage'],
+    note: 'That is why volume checks often show a warning: something unusual happened, and it is worth a quick look.' },
+  Timeliness: {
+    q: 'Is the data up to date?',
+    body: 'Checks that the latest records reach the end of the reporting period, so recent days are not missing.',
+    ex: ['Calls are recorded right up to the last day of the period'] },
+  'Table score': {
+    q: 'How healthy is this area of data overall?',
+    body: 'Combines every check for this row into one score out of 100.',
+    ex: ['A pass earns full credit, a warning half credit and a failure none', 'More important checks count more'] }
+};
+function columnTip(key) {
+  const h = COLUMN_HELP[key]; if (!h) return '';
+  return `<div class="t-title">${esc(key)}: ${esc(h.q)}</div><p>${esc(h.body)}</p>
+    <p class="t-strong">For example:</p><ul>${h.ex.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+    ${h.note ? `<p>${esc(h.note)}</p>` : ''}`;
+}
+
 /* ---------- trend: all runs, selected run ringed (single series: title names it, no legend) ---------- */
 function renderTrend() {
   const h = S.runs;
@@ -501,7 +541,10 @@ function renderHeat() {
       data-tip='${esc(JSON.stringify({ t: label, table, ...r }))}' aria-label="${esc(label)}: ${r.status}, score ${Number(r.score).toFixed(0)}. Show checks.">
       ${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></button>`;
   };
-  let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => `<th scope="col">${d}</th>`).join('')}<th scope="col" class="total">Table score</th></tr></thead><tbody>`;
+  const colHead = (key, label, cls = '') =>
+    `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-htip="${key}" tabindex="0"
+      aria-label="${label}: what does this check?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
+  let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => colHead(d, d)).join('')}${colHead('Table score', 'Table score', 'total')}</tr></thead><tbody>`;
   for (const t of tables) {
     const tot = byTable[t]['(all dimensions)'];
     const sub = tot.rows == null ? 'Checks that span every table' : `${fmtInt(tot.rows)} rows · ${esc(tot.table_type || '')}`;
@@ -604,10 +647,18 @@ function wire() {
   tiles.addEventListener('focusout', tileHide);
 
   const heat = $('heat');
-  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
-  heat.addEventListener('mouseleave', hideTip);
-  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(heatTip(JSON.parse(c.dataset.tip)), b.right, b.top); } });
-  heat.addEventListener('focusout', hideTip);
+  const colShow = (el, x, y) => { tip.classList.add('wide'); showTip(columnTip(el.dataset.htip), x, y); };
+  const heatHide = () => { hideTip(); tip.classList.remove('wide'); };
+  heat.addEventListener('mousemove', e => {
+    const h = e.target.closest('[data-htip]'); if (h) return colShow(h, e.clientX, e.clientY);
+    tip.classList.remove('wide');
+    const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
+  heat.addEventListener('mouseleave', heatHide);
+  heat.addEventListener('focusin', e => {
+    const h = e.target.closest('[data-htip]'); if (h) { const b = h.getBoundingClientRect(); return colShow(h, b.left, b.bottom); }
+    tip.classList.remove('wide');
+    const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(heatTip(JSON.parse(c.dataset.tip)), b.right, b.top); } });
+  heat.addEventListener('focusout', heatHide);
   heat.addEventListener('click', e => {
     const c = e.target.closest('button.cell'); if (!c) return;
     heat.querySelectorAll('.selected').forEach(n => n.classList.remove('selected')); c.classList.add('selected');
