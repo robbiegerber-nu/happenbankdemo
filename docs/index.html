@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Product Health</title>
+<meta name="description" content="Data quality health of the synthetic Happen Bank contact center demo dataset: completeness, uniqueness, validity, consistency, volume and timeliness checks.">
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --surface-2: #f3f3f0;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #6f6d68;
+    --grid: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --accent: #2a78d6;
+    --good: #0ca30c;     --good-ink: #006300;   --good-wash: #e6f4e6;
+    --warning: #fab219;  --warning-ink: #7a5200; --warning-wash: #fdf3dc;
+    --critical: #d03b3b; --critical-ink: #a32424; --critical-wash: #fbe6e6;
+    --none-wash: #f0efec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
+      --grid: #2c2c2a; --border: rgba(255,255,255,0.10); --accent: #3987e5;
+      --good-ink: #3fc23f; --good-wash: #15301a;
+      --warning-ink: #fab219; --warning-wash: #3a2f12;
+      --critical-ink: #ef7070; --critical-wash: #3a1a1a;
+      --none-wash: #232321;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
+    --grid: #2c2c2a; --border: rgba(255,255,255,0.10); --accent: #3987e5;
+    --good-ink: #3fc23f; --good-wash: #15301a;
+    --warning-ink: #fab219; --warning-wash: #3a2f12;
+    --critical-ink: #ef7070; --critical-wash: #3a1a1a;
+    --none-wash: #232321;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--text-primary);
+         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
+  a { color: var(--accent); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  header { padding: 28px 0 8px; }
+  h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+  .sub { margin: 4px 0 0; color: var(--text-secondary); }
+  .meta { margin: 10px 0 0; color: var(--text-muted); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+  .notice { margin: 16px 0 0; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border);
+            border-left: 3px solid var(--accent); border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+  section { margin: 28px 0; }
+  h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .section-sub { margin: 0 0 12px; color: var(--text-secondary); font-size: 0.9rem; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+
+  /* ---- Stat tiles ---- */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .tile { padding: 16px 18px; }
+  .tile .label { color: var(--text-secondary); font-size: 0.82rem; }
+  .tile .value { font-size: 1.9rem; font-weight: 650; line-height: 1.15; margin-top: 4px; }
+  .tile .note { color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; }
+  .tile.hero .value { font-size: 2.6rem; }
+  .counts { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+
+  /* ---- Status badges (icon + label, never colour alone) ---- */
+  .badge { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: 0.82rem; white-space: nowrap; }
+  .badge .dot { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center;
+                font-size: 11px; font-weight: 800; color: #fff; flex: none; }
+  .badge.Pass .dot { background: var(--good); }
+  .badge.Warn .dot { background: var(--warning); color: #0b0b0b; }
+  .badge.Fail .dot, .badge.Error .dot { background: var(--critical); }
+  .badge.Pass { color: var(--good-ink); } .badge.Warn { color: var(--warning-ink); }
+  .badge.Fail, .badge.Error { color: var(--critical-ink); }
+
+  /* ---- Heatmap ---- */
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; }
+  .heat { min-width: 760px; }
+  .heat th, .heat td { padding: 0; border-bottom: 1px solid var(--grid); }
+  .heat thead th { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); text-align: center; padding: 10px 6px; }
+  .heat thead th:first-child { text-align: left; padding-left: 16px; }
+  .heat tbody th { text-align: left; font-weight: 500; font-size: 0.88rem; padding: 6px 12px 6px 16px; white-space: nowrap; }
+  .heat tbody th .rows { display: block; color: var(--text-muted); font-size: 0.75rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+  .heat td { text-align: center; padding: 4px; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+          min-height: 48px; border-radius: 6px; padding: 4px 6px; cursor: default; outline-offset: 2px; }
+  .cell.Pass { background: var(--good-wash); } .cell.Warn { background: var(--warning-wash); }
+  .cell.Fail, .cell.Error { background: var(--critical-wash); } .cell.None { background: var(--none-wash); color: var(--text-muted); font-size: 0.8rem; }
+  .cell .score { font-size: 0.75rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .heat td.total { border-left: 2px solid var(--grid); }
+  .heat tr:last-child th, .heat tr:last-child td { border-bottom: none; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 16px; border-top: 1px solid var(--grid);
+            font-size: 0.8rem; color: var(--text-secondary); }
+
+  /* ---- Tooltip ---- */
+  .tip { position: fixed; z-index: 10; pointer-events: none; max-width: 280px; padding: 10px 12px; border-radius: 8px;
+         background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+         font-size: 0.82rem; color: var(--text-primary); opacity: 0; transition: opacity 0.08s; }
+  .tip.show { opacity: 1; }
+  .tip .t-title { font-weight: 650; margin-bottom: 4px; }
+  .tip .t-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  /* ---- Filters + checks table ---- */
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
+  .filters label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--text-secondary); gap: 3px; }
+  .filters select, .filters input { font: inherit; font-size: 0.88rem; padding: 6px 8px; border-radius: 6px;
+            border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); min-width: 150px; }
+  .filters .count { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
+  .checks { min-width: 860px; font-size: 0.86rem; }
+  .checks th { text-align: left; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px;
+               border-bottom: 1px solid var(--grid); background: var(--surface-2); position: sticky; top: 0; }
+  .checks td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .checks tr:last-child td { border-bottom: none; }
+  .checks .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .checks .desc { color: var(--text-secondary); font-size: 0.8rem; margin-top: 2px; }
+  .checks .note { color: var(--text-muted); font-size: 0.78rem; margin-top: 4px; font-style: italic; }
+  .checks code { font-size: 0.8rem; white-space: nowrap; }
+  .table-wrap { max-height: 640px; overflow: auto; }
+  .empty { padding: 24px; text-align: center; color: var(--text-muted); }
+  footer { padding: 24px 0 40px; color: var(--text-muted); font-size: 0.8rem; }
+  @media (max-width: 600px) { .tile.hero .value { font-size: 2.2rem; } .filters .count { margin-left: 0; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Data Product Health</h1>
+    <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions.</p>
+    <div class="meta" id="meta">Loading…</div>
+    <div class="notice">All data is <strong>synthetic</strong>, generated for demonstration. It is not real Happen Bank data.
+      Definitions: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary">Data Dictionary</a> ·
+      Project story: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki">wiki</a></div>
+  </header>
+
+  <section aria-labelledby="h-summary">
+    <h2 id="h-summary" class="visually-hidden" hidden>Summary</h2>
+    <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section aria-labelledby="h-score">
+    <h2 id="h-score">Health scorecard</h2>
+    <p class="section-sub">Each cell scores one table on one data quality dimension. Hover a cell for its checks.</p>
+    <div class="card">
+      <div class="scroll"><table class="heat" id="heat"></table></div>
+      <div class="legend">
+        <span class="badge Pass"><span class="dot" aria-hidden="true">✓</span>Pass: all checks pass</span>
+        <span class="badge Warn"><span class="dot" aria-hidden="true">!</span>Warn: review, often explained</span>
+        <span class="badge Fail"><span class="dot" aria-hidden="true">✕</span>Fail: needs fixing</span>
+        <span>Score = severity-weighted % of checks passing (Warn counts half) · — = no checks for this dimension</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-checks">
+    <h2 id="h-checks">Check results</h2>
+    <p class="section-sub">Every rule, what it measured and why it matters. Failures and warnings are listed first.</p>
+    <div class="filters">
+      <label>Status <select id="f-status"><option value="">All</option></select></label>
+      <label>Dimension <select id="f-dim"><option value="">All</option></select></label>
+      <label>Table <select id="f-table"><option value="">All</option></select></label>
+      <label>Search <input id="f-text" type="search" placeholder="Rule, column, description"></label>
+      <span class="count" id="f-count"></span>
+    </div>
+    <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
+  </section>
+
+  <footer>Data product health dashboard · v1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+    <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+const DIMS = ['Completeness', 'Uniqueness', 'Validity', 'Consistency', 'Volume', 'Timeliness'];
+const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕' };
+const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
+const fmtNum = (v, unit) => {
+  if (v == null) return '—';
+  const n = Number(v);
+  const s = unit === '%' ? n.toFixed(n < 1 && n !== 0 ? 3 : 2) + '%' : (Number.isInteger(n) ? fmtInt(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 }));
+  return unit === '%' ? s : s + ' ' + unit;
+};
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const badge = st => `<span class="badge ${st}"><span class="dot" aria-hidden="true">${ICON[st]}</span>${st}</span>`;
+
+async function load(name) {
+  const r = await fetch(`data/${name}`, { cache: 'no-cache' });
+  if (!r.ok) throw new Error(`${name}: ${r.status}`);
+  return r.json();
+}
+
+function renderMeta(s) {
+  const d = new Date(s.run.finished_at || s.run.started_at);
+  document.getElementById('meta').innerHTML =
+    `<span>Run #${s.run.run_id} · ${d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>` +
+    `<span>Data period ${s.period.start} → ${s.period.end}</span><span>${esc(s.run.notes || '')}</span>`;
+}
+
+function renderTiles(s) {
+  const o = s.overall;
+  document.getElementById('tiles').innerHTML = `
+    <div class="card tile hero"><div class="label">Overall health score</div>
+      <div class="value">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
+      <div class="note">${badge(o.status)}</div></div>
+    <div class="card tile"><div class="label">Checks run</div><div class="value">${fmtInt(o.checks)}</div>
+      <div class="counts">${badge('Pass')} ${fmtInt(o.passed)} ${badge('Warn')} ${fmtInt(o.warned)} ${badge('Fail')} ${fmtInt(o.failed)}</div></div>
+    <div class="card tile"><div class="label">Tables monitored</div><div class="value">${fmtInt(s.tables_monitored)}</div>
+      <div class="note">${fmtInt(s.columns_profiled)} columns profiled</div></div>
+    <div class="card tile"><div class="label">Rows monitored</div><div class="value">${(s.rows_monitored / 1e6).toFixed(1)}M</div>
+      <div class="note">${fmtInt(s.rows_monitored)} rows</div></div>`;
+}
+
+function renderHeat(score) {
+  const byTable = {};
+  score.filter(r => r.table !== '(all tables)').forEach(r => { (byTable[r.table] ??= {})[r.dimension] = r; });
+  const tables = Object.keys(byTable).sort((a, b) =>
+    (byTable[a]['(all dimensions)'].score - byTable[b]['(all dimensions)'].score) || ((byTable[b]['(all dimensions)'].rows || 0) - (byTable[a]['(all dimensions)'].rows || 0)));
+  const dimTotals = {}; score.filter(r => r.table === '(all tables)').forEach(r => dimTotals[r.dimension] = r);
+  const cell = (r, label) => r
+    ? `<div class="cell ${r.status}" tabindex="0" data-tip='${esc(JSON.stringify({ t: label, ...r }))}'>${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></div>`
+    : `<div class="cell None" aria-label="No checks">—</div>`;
+  let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => `<th scope="col">${d}</th>`).join('')}<th scope="col" class="total">Table score</th></tr></thead><tbody>`;
+  for (const t of tables) {
+    const tot = byTable[t]['(all dimensions)'];
+    h += `<tr><th scope="row">${esc(t)}<span class="rows">${fmtInt(tot.rows)} rows · ${esc(tot.table_type || '')}</span></th>` +
+         DIMS.map(d => `<td>${cell(byTable[t][d], `${t} · ${d}`)}</td>`).join('') +
+         `<td class="total">${cell(tot, `${t} · all dimensions`)}</td></tr>`;
+  }
+  h += `<tr><th scope="row"><strong>All tables</strong></th>` +
+       DIMS.map(d => `<td>${cell(dimTotals[d], `All tables · ${d}`)}</td>`).join('') +
+       `<td class="total">${cell(dimTotals['(all dimensions)'], 'Overall')}</td></tr></tbody>`;
+  document.getElementById('heat').innerHTML = h;
+}
+
+function wireTooltip() {
+  const tip = document.getElementById('tip');
+  const show = (el, x, y) => {
+    const d = JSON.parse(el.dataset.tip);
+    tip.innerHTML = `<div class="t-title">${esc(d.t)}</div>
+      <div class="t-row"><span>Score</span><span>${Number(d.score).toFixed(1)}</span></div>
+      <div class="t-row"><span>Checks</span><span>${d.checks}</span></div>
+      <div class="t-row"><span>Passed</span><span>${d.passed}</span></div>
+      <div class="t-row"><span>Warnings</span><span>${d.warned}</span></div>
+      <div class="t-row"><span>Failed</span><span>${d.failed}</span></div>`;
+    const r = tip.getBoundingClientRect();
+    tip.style.left = Math.min(x + 14, innerWidth - r.width - 8) + 'px';
+    tip.style.top = Math.min(y + 14, innerHeight - r.height - 8) + 'px';
+    tip.classList.add('show');
+  };
+  const heat = document.getElementById('heat');
+  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? show(c, e.clientX, e.clientY) : tip.classList.remove('show'); });
+  heat.addEventListener('mouseleave', () => tip.classList.remove('show'));
+  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); show(c, b.right, b.top); } });
+  heat.addEventListener('focusout', () => tip.classList.remove('show'));
+}
+
+function renderChecks(checks) {
+  const fs = document.getElementById('f-status'), fd = document.getElementById('f-dim'),
+        ft = document.getElementById('f-table'), fx = document.getElementById('f-text');
+  ['Fail', 'Warn', 'Pass', 'Error'].filter(s => checks.some(c => c.status === s)).forEach(s => fs.add(new Option(s, s)));
+  DIMS.forEach(d => fd.add(new Option(d, d)));
+  [...new Set(checks.map(c => c.table))].sort().forEach(t => ft.add(new Option(t, t)));
+  const draw = () => {
+    const q = fx.value.trim().toLowerCase();
+    const rows = checks.filter(c => (!fs.value || c.status === fs.value) && (!fd.value || c.dimension === fd.value) &&
+      (!ft.value || c.table === ft.value) &&
+      (!q || [c.rule_id, c.rule, c.column, c.description, c.table].join(' ').toLowerCase().includes(q)));
+    document.getElementById('f-count').textContent = `${rows.length} of ${checks.length} checks`;
+    document.getElementById('checks').innerHTML = `<thead><tr><th>Status</th><th>Rule</th><th>Check</th><th>Table · column</th>
+      <th>Dimension</th><th>Severity</th><th class="num">Measured</th><th class="num">Warn / fail above</th></tr></thead><tbody>` +
+      (rows.length ? rows.map(c => `<tr>
+        <td>${badge(c.status)}</td><td><code>${esc(c.rule_id)}</code></td>
+        <td><strong>${esc(c.rule)}</strong><div class="desc">${esc(c.description)}</div>
+          ${c.expected_note ? `<div class="note">Note: ${esc(c.expected_note)}</div>` : ''}
+          ${c.error ? `<div class="note">Error: ${esc(c.error)}</div>` : ''}</td>
+        <td><code>${esc(c.table)}</code>${c.column ? `<br><code>${esc(c.column)}</code>` : ''}</td>
+        <td>${esc(c.dimension)}</td><td>${esc(c.severity)}</td>
+        <td class="num">${fmtNum(c.value, c.unit)}</td>
+        <td class="num">${fmtNum(c.warn_above, c.unit)} / ${fmtNum(c.fail_above, c.unit)}</td></tr>`).join('')
+       : `<tr><td colspan="8" class="empty">No checks match these filters.</td></tr>`) + '</tbody>';
+  };
+  [fs, fd, ft].forEach(el => el.addEventListener('change', draw));
+  fx.addEventListener('input', draw);
+  draw();
+}
+
+(async () => {
+  try {
+    const [summary, score, checks] = await Promise.all([load('summary.json'), load('scorecard.json'), load('checks.json')]);
+    renderMeta(summary); renderTiles(summary); renderHeat(score); wireTooltip(); renderChecks(checks);
+  } catch (e) {
+    document.getElementById('meta').textContent = 'Could not load data: ' + e.message;
+  }
+})();
+</script>
+</body>
+</html>
