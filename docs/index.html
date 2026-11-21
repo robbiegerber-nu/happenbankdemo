@@ -173,6 +173,19 @@
   .tip .t-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .tip .t-sep { border-top: 1px solid var(--grid); margin: 6px 0 4px; }
   .tip .t-hint { color: var(--text-muted); font-size: 0.76rem; margin-top: 6px; }
+  .tip.wide { max-width: min(380px, calc(100vw - 16px)); }
+  .tip p { margin: 4px 0; color: var(--text-secondary); }
+  .tip ul { margin: 6px 0 2px; padding-left: 18px; }
+  .tip li { margin: 4px 0; }
+  .tip li .sub { display: block; color: var(--text-secondary); font-size: 0.78rem; }
+  .tip .t-strong { color: var(--text-primary); font-weight: 600; }
+
+  /* ---- Tile tooltips (score explanation, warning / failure lists) ---- */
+  .has-tip { cursor: help; border-radius: 6px; }
+  .has-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .info { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%;
+          border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 10px; font-weight: 700; font-style: normal;
+          vertical-align: 1px; line-height: 1; }
 
   /* ---- Filters + checks table ---- */
   .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
@@ -350,16 +363,72 @@ function renderTiles() {
     delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${d >= 0 ? '+' : ''}${d.toFixed(1)} vs run #${prev.run_id}</span>`;
   }
   $('tiles').innerHTML = `
-    <div class="card tile hero"><div class="label">Overall health score</div>
-      <div class="value">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
+    <div class="card tile hero"><div class="label has-tip" data-ktip="score">Overall health score<i class="info" aria-hidden="true">i</i></div>
+      <div class="value has-tip" data-ktip="score" tabindex="0" aria-label="Overall health score ${Number(o.score).toFixed(1)} out of 100. How is this calculated?">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
       <div class="note">${badge(o.status)} ${delta}</div></div>
     <div class="card tile"><div class="label">Checks run</div><div class="value">${fmtInt(o.checks)}</div>
-      <div class="counts"><span>${badge('Pass')} ${fmtInt(o.passed)}</span><span>${badge('Warn')} ${fmtInt(o.warned)}</span><span>${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
+      <div class="counts"><span>${badge('Pass')} ${fmtInt(o.passed)}</span>
+        <span class="has-tip" data-ktip="Warn" tabindex="0" aria-label="${o.warned} warnings. Show which checks">${badge('Warn')} ${fmtInt(o.warned)}</span>
+        <span class="has-tip" data-ktip="Fail" tabindex="0" aria-label="${o.failed} failures. Show which checks">${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
     <div class="card tile"><div class="label">Tables monitored</div><div class="value">${fmtInt(s.tables_monitored)}</div>
       <div class="note">${fmtInt(s.columns_profiled)} columns profiled</div></div>
     <div class="card tile"><div class="label">Rows monitored</div><div class="value">${(s.rows_monitored / 1e6).toFixed(1)}M</div>
       <div class="note">${fmtInt(s.rows_monitored)} rows</div></div>`;
 }
+
+/* ---------- tile tooltips: written for business users ---------- */
+const AREA = {
+  contact: 'Customer contacts', ivr_session: 'Phone menu (IVR) calls', complaint: 'Complaints', survey_response: 'Customer surveys',
+  customer: 'Customers', customer_product: 'Customer products', agent_activity: 'Agent logins and activity',
+  agent_schedule: 'Agent schedules', agent_daily: 'Daily agent summaries', interval_volume: '15-minute volume summaries',
+  dim_date: 'Calendar', dim_agent: 'Agent list', 'cc (all tables)': 'All data'
+};
+const PLAIN_UNIT = { rows: ['record', 'records'], days: ['day', 'days'], columns: ['data field', 'data fields'], products: ['product', 'products'] };
+const plainFound = (v, unit) => {
+  if (v == null) return '';
+  const n = Number(v);
+  if (unit === '%') return `${fmtNum(n, '%')} affected`;
+  const u = PLAIN_UNIT[unit] || [unit, unit];
+  return `${fmtInt(n)} ${n === 1 ? u[0] : u[1]} flagged`;
+};
+const WEIGHT = { Critical: 4, High: 3, Medium: 2, Low: 1 };
+// Rules are named as the requirement ("No duplicate contact events"); when one warns or fails, say what was found instead.
+const findingTitle = rule => /^No /i.test(rule) ? rule.replace(/^No (\w)/i, (_, c) => c.toUpperCase()) + ' found' : rule;
+
+function scoreTip() {
+  const o = S.data.summary.overall, checks = S.data.checks;
+  const possible = checks.reduce((t, c) => t + (WEIGHT[c.severity] || 1), 0);
+  const earned = checks.reduce((t, c) => t + (WEIGHT[c.severity] || 1) * (c.status === 'Pass' ? 1 : c.status === 'Warn' ? 0.5 : 0), 0);
+  const why = o.status === 'Fail' ? 'at least one check failed and needs fixing.'
+            : o.status === 'Warn' ? 'nothing failed, but some checks raised a warning worth reviewing.'
+            : 'every check passed.';
+  return `<div class="t-title">How the health score works</div>
+    <p>We run ${fmtInt(checks.length)} automatic checks on the data. Each check earns:</p>
+    <div class="t-row"><span>${badge('Pass')}</span><span>full credit</span></div>
+    <div class="t-row"><span>${badge('Warn', 'Warning')}</span><span>half credit</span></div>
+    <div class="t-row"><span>${badge('Fail', 'Failure')}</span><span>no credit</span></div>
+    <p>Some checks matter more than others, so they count more: critical checks count 4×, high 3×, medium 2× and low 1×.</p>
+    <div class="t-sep"></div>
+    <p><span class="t-strong">This run:</span> ${fmtInt(o.passed)} passed, ${fmtInt(o.warned)} ${o.warned === 1 ? 'warning' : 'warnings'}, ${fmtInt(o.failed)} ${o.failed === 1 ? 'failure' : 'failures'}.</p>
+    <p>The data earned <span class="t-strong">${earned.toLocaleString('en-US', { maximumFractionDigits: 1 })}</span> of
+      <span class="t-strong">${fmtInt(possible)}</span> possible points, which is <span class="t-strong">${Number(o.score).toFixed(1)} out of 100</span>.</p>
+    <p>The status shows <span class="t-strong">${o.status === 'Warn' ? 'Warning' : o.status === 'Fail' ? 'Failure' : 'Pass'}</span> because ${why}</p>`;
+}
+
+function statusListTip(status) {
+  const list = S.data.checks.filter(c => status === 'Fail' ? (c.status === 'Fail' || c.status === 'Error') : c.status === status);
+  const word = status === 'Fail' ? ['failure', 'failures'] : ['warning', 'warnings'];
+  if (!list.length) return `<div class="t-title">No ${word[1]}</div>
+    <p>${status === 'Fail' ? 'Nothing in this run needs fixing.' : 'No checks raised a warning in this run.'}</p>`;
+  const intro = status === 'Fail'
+    ? 'These checks found a problem that needs fixing before the data can be fully trusted.'
+    : 'These checks spotted something unusual that is worth a look. Warnings are often explained by real events, such as holidays or a product launch.';
+  return `<div class="t-title">${list.length} ${list.length === 1 ? word[0] : word[1]}</div><p>${intro}</p>
+    <ul>${list.map(c => `<li><span class="t-strong">${esc(findingTitle(c.rule))}</span>
+      <span class="sub">${esc(AREA[c.table] || c.table)}${c.value != null ? ' · ' + plainFound(c.value, c.unit) : ''}</span></li>`).join('')}</ul>
+    <div class="t-hint">Full details are in Check results below.</div>`;
+}
+const tileTip = key => key === 'score' ? scoreTip() : statusListTip(key);
 
 /* ---------- trend: all runs, selected run ringed (single series: title names it, no legend) ---------- */
 function renderTrend() {
@@ -525,6 +594,14 @@ function wire() {
   trend.addEventListener('click', pick);
   trend.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } });
 
+
+  const tiles = $('tiles');
+  const tileShow = (el, x, y) => { tip.classList.add('wide'); showTip(tileTip(el.dataset.ktip), x, y); };
+  const tileHide = () => { hideTip(); tip.classList.remove('wide'); };
+  tiles.addEventListener('mousemove', e => { const el = e.target.closest('[data-ktip]'); el ? tileShow(el, e.clientX, e.clientY) : tileHide(); });
+  tiles.addEventListener('mouseleave', tileHide);
+  tiles.addEventListener('focusin', e => { const el = e.target.closest('[data-ktip]'); if (el) { const b = el.getBoundingClientRect(); tileShow(el, b.left, b.bottom); } });
+  tiles.addEventListener('focusout', tileHide);
 
   const heat = $('heat');
   heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
