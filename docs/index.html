@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Product Health</title>
+<title>Data Quality Dashboard</title>
 <meta name="description" content="Data quality health of the synthetic Happen Bank contact center demo dataset: completeness, uniqueness, validity, consistency, volume and timeliness checks, tracked run over run.">
 <style>
   :root {
@@ -222,7 +222,7 @@
 <body>
 <div class="wrap">
   <header>
-    <h1>Data Product Health</h1>
+    <h1>Data Quality Dashboard</h1>
     <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions, tracked run over run.</p>
     <div class="runbar" id="runbar" hidden>
       <label for="run-select">Viewing</label>
@@ -288,7 +288,7 @@
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
   </section>
 
-  <footer>Data product health dashboard · v2.1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <footer>Data Quality Dashboard · v2.3 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -351,7 +351,7 @@ function renderHeader() {
     $('older-text').innerHTML = `<strong>You're viewing an earlier run (#${S.selected}).</strong> The latest is run #${S.latest}.`;
     $('to-latest').textContent = `Back to latest (run #${S.latest})`;
   }
-  document.title = older ? `Data Product Health · Run #${S.selected}` : 'Data Product Health';
+  document.title = older ? `Data Quality Dashboard · Run #${S.selected}` : 'Data Quality Dashboard';
 }
 
 function renderTiles() {
