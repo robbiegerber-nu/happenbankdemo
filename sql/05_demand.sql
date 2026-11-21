@@ -8,16 +8,21 @@ SELECT setseed(0.44);
 -- Baseline handle seconds used for capacity math (per lane for chat)
 CREATE TABLE gen.grp_param AS SELECT * FROM (VALUES (1, 480.0), (2, 760.0), (3, 520.0)) v(grp, h_sec);
 
--- Logged-in "Available" segments: the only time contacts can be handled
+-- Logged-in "Available" segments: the only time contacts can be handled.
+-- Clipped to opening hours: agents who log in early or out late cannot take contacts offered while the phones
+-- are closed (fix for discovery runs 1-2 finding VAL-005).
 CREATE TABLE gen.seg AS
 SELECT a.activity_id AS seg_id, a.agent_id, a.date_key, d.full_date AS work_date, r.grp, r.site_id, r.hire_date,
-       a.state_start_ts AS s, a.state_end_ts AS e,
+       greatest(a.state_start_ts, (d.full_date + CASE WHEN d.day_of_week = 6 THEN time '08:00' ELSE time '07:00' END)::timestamptz) AS s,
+       least(a.state_end_ts, (d.full_date + CASE WHEN d.day_of_week = 6 THEN time '17:00' ELSE time '21:00' END)::timestamptz) AS e,
        CASE WHEN r.grp = 2 THEN CASE WHEN d.full_date - r.hire_date < 90 THEN 2 ELSE sh.lanes_max END ELSE 1 END AS lanes
 FROM cc.agent_activity a
 JOIN gen.roster r USING (agent_id)
 JOIN gen.agent_shift sh USING (agent_id)
 JOIN cc.dim_date d USING (date_key)
-WHERE a.state = 'Available' AND a.state_end_ts > a.state_start_ts + interval '1 min';
+WHERE a.state = 'Available'
+  AND least(a.state_end_ts, (d.full_date + CASE WHEN d.day_of_week = 6 THEN time '17:00' ELSE time '21:00' END)::timestamptz)
+    > greatest(a.state_start_ts, (d.full_date + CASE WHEN d.day_of_week = 6 THEN time '08:00' ELSE time '07:00' END)::timestamptz) + interval '1 min';
 
 -- Actual staffing per 15-minute interval
 CREATE TABLE gen.seg_iv AS

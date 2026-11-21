@@ -108,6 +108,12 @@ BEGIN
       FROM cc.dim_date d LEFT JOIN (SELECT %3$s AS day, count(*) AS n FROM cc.%2$I GROUP BY 1) x ON x.day = d.full_date$q$,
       p_run, t, discovery.date_expr(t));
   END LOOP;
+  -- Derived series: distinct agents logged in per day (a steadier signal of a complete activity feed than record counts)
+  INSERT INTO discovery.dq_daily_volume (run_id, table_name, day, row_count, is_center_closed)
+  SELECT p_run, 'agents_logged_in', d.full_date, coalesce(x.n, 0), d.is_center_closed
+  FROM cc.dim_date d
+  LEFT JOIN (SELECT to_date(date_key::text, 'YYYYMMDD') AS day, count(DISTINCT agent_id) AS n FROM cc.agent_activity GROUP BY 1) x
+         ON x.day = d.full_date;
   UPDATE discovery.dq_daily_volume v SET baseline = b.med, ratio = v.row_count / nullif(b.med, 0),
          is_outlier = coalesce(NOT v.is_center_closed AND b.med > 0 AND (v.row_count / b.med > 1.35 OR v.row_count / b.med < 0.65), false)
   FROM (SELECT v1.table_name, v1.day,

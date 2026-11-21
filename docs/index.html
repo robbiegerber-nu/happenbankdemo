@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Data Product Health</title>
-<meta name="description" content="Data quality health of the synthetic Happen Bank contact center demo dataset: completeness, uniqueness, validity, consistency, volume and timeliness checks.">
+<meta name="description" content="Data quality health of the synthetic Happen Bank contact center demo dataset: completeness, uniqueness, validity, consistency, volume and timeliness checks, tracked run over run.">
 <style>
   :root {
     color-scheme: light;
@@ -15,34 +15,37 @@
     --text-secondary: #52514e;
     --text-muted: #6f6d68;
     --grid: #e1e0d9;
+    --axis: #c3c2b7;
     --border: rgba(11,11,11,0.10);
     --accent: #2a78d6;
+    --series-1: #2a78d6;
     --good: #0ca30c;     --good-ink: #006300;   --good-wash: #e6f4e6;
     --warning: #fab219;  --warning-ink: #7a5200; --warning-wash: #fdf3dc;
     --critical: #d03b3b; --critical-ink: #a32424; --critical-wash: #fbe6e6;
     --none-wash: #f0efec;
+    --focus: #2a78d6;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
       color-scheme: dark;
       --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
       --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
-      --grid: #2c2c2a; --border: rgba(255,255,255,0.10); --accent: #3987e5;
+      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --accent: #3987e5; --series-1: #3987e5;
       --good-ink: #3fc23f; --good-wash: #15301a;
       --warning-ink: #fab219; --warning-wash: #3a2f12;
       --critical-ink: #ef7070; --critical-wash: #3a1a1a;
-      --none-wash: #232321;
+      --none-wash: #232321; --focus: #3987e5;
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
     --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
     --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
-    --grid: #2c2c2a; --border: rgba(255,255,255,0.10); --accent: #3987e5;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --accent: #3987e5; --series-1: #3987e5;
     --good-ink: #3fc23f; --good-wash: #15301a;
     --warning-ink: #fab219; --warning-wash: #3a2f12;
     --critical-ink: #ef7070; --critical-wash: #3a1a1a;
-    --none-wash: #232321;
+    --none-wash: #232321; --focus: #3987e5;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--page); color: var(--text-primary);
@@ -59,15 +62,19 @@
   h2 { font-size: 1.05rem; margin: 0 0 4px; }
   .section-sub { margin: 0 0 12px; color: var(--text-secondary); font-size: 0.9rem; }
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
   /* ---- Stat tiles ---- */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
   .tile { padding: 16px 18px; }
   .tile .label { color: var(--text-secondary); font-size: 0.82rem; }
   .tile .value { font-size: 1.9rem; font-weight: 650; line-height: 1.15; margin-top: 4px; }
-  .tile .note { color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; }
+  .tile .note { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
   .tile.hero .value { font-size: 2.6rem; }
-  .counts { display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; font-size: 0.9rem; }
+  .delta { font-size: 0.82rem; font-weight: 600; }
+  .delta.up { color: var(--good-ink); } .delta.down { color: var(--critical-ink); } .delta.flat { color: var(--text-muted); }
+  .counts { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 14px; margin-top: 8px; font-size: 0.9rem; }
+  .counts > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   /* ---- Status badges (icon + label, never colour alone) ---- */
   .badge { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: 0.82rem; white-space: nowrap; }
@@ -78,9 +85,44 @@
   .badge.Fail .dot, .badge.Error .dot { background: var(--critical); }
   .badge.Pass { color: var(--good-ink); } .badge.Warn { color: var(--warning-ink); }
   .badge.Fail, .badge.Error { color: var(--critical-ink); }
+  .badge.New .dot { background: var(--accent); }
+  .badge.New { color: var(--accent); }
+
+  /* ---- Trend + runs ---- */
+  .trend-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 860px) { .trend-grid { grid-template-columns: 1fr; } }
+  .chart-card { padding: 14px 16px 8px; }
+  .chart-title { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 4px; }
+  svg.trend { width: 100%; height: auto; display: block; overflow: visible; }
+  svg.trend .grid line { stroke: var(--grid); stroke-width: 1; }
+  svg.trend .axis-label { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  svg.trend .x-label { fill: var(--text-secondary); font-size: 11.5px; }
+  svg.trend .line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  svg.trend .pt { fill: var(--series-1); stroke: var(--surface); stroke-width: 2; }
+  svg.trend .pt-label { fill: var(--text-primary); font-size: 12px; font-weight: 650; }
+  svg.trend .hit { fill: transparent; cursor: default; }
+  svg.trend .hit:focus { outline: none; }
+  svg.trend .hit:focus + .pt, svg.trend .hover .pt { r: 7; }
+  .runs { font-size: 0.85rem; min-width: 460px; }
+  .runs th { text-align: left; font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--grid); }
+  .runs td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .runs tr:last-child td { border-bottom: none; }
+  .runs .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .runs .run-note { color: var(--text-secondary); font-size: 0.8rem; }
+  .runs tr.current td { background: var(--surface-2); }
+
+  /* ---- Changes ---- */
+  .changes { padding: 4px 0; }
+  .change { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--grid); }
+  .change:last-child { border-bottom: none; }
+  .change .what { font-size: 0.88rem; }
+  .change .what .desc { color: var(--text-secondary); font-size: 0.8rem; }
+  .change .vals { font-size: 0.82rem; color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .arrow { color: var(--text-muted); margin: 0 2px; }
+  .change .flow { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 
   /* ---- Heatmap ---- */
-  .scroll { overflow-x: auto; }
+  .scroll { overflow-x: auto; position: relative; }
   table { border-collapse: collapse; width: 100%; }
   .heat { min-width: 760px; }
   .heat th, .heat td { padding: 0; border-bottom: 1px solid var(--grid); }
@@ -89,8 +131,12 @@
   .heat tbody th { text-align: left; font-weight: 500; font-size: 0.88rem; padding: 6px 12px 6px 16px; white-space: nowrap; }
   .heat tbody th .rows { display: block; color: var(--text-muted); font-size: 0.75rem; font-weight: 400; font-variant-numeric: tabular-nums; }
   .heat td { text-align: center; padding: 4px; }
-  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-          min-height: 48px; border-radius: 6px; padding: 4px 6px; cursor: default; outline-offset: 2px; }
+  .cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 100%;
+          min-height: 48px; border-radius: 6px; padding: 4px 6px; border: 2px solid transparent; font: inherit; color: inherit; }
+  button.cell { cursor: pointer; }
+  button.cell:hover { border-color: var(--axis); }
+  button.cell:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+  button.cell.selected { border-color: var(--text-primary); }
   .cell.Pass { background: var(--good-wash); } .cell.Warn { background: var(--warning-wash); }
   .cell.Fail, .cell.Error { background: var(--critical-wash); } .cell.None { background: var(--none-wash); color: var(--text-muted); font-size: 0.8rem; }
   .cell .score { font-size: 0.75rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
@@ -100,53 +146,83 @@
             font-size: 0.8rem; color: var(--text-secondary); }
 
   /* ---- Tooltip ---- */
-  .tip { position: fixed; z-index: 10; pointer-events: none; max-width: 280px; padding: 10px 12px; border-radius: 8px;
+  .tip { position: fixed; z-index: 10; pointer-events: none; max-width: 300px; padding: 10px 12px; border-radius: 8px;
          background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(0,0,0,0.18);
          font-size: 0.82rem; color: var(--text-primary); opacity: 0; transition: opacity 0.08s; }
   .tip.show { opacity: 1; }
   .tip .t-title { font-weight: 650; margin-bottom: 4px; }
   .tip .t-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .tip .t-sep { border-top: 1px solid var(--grid); margin: 6px 0 4px; }
+  .tip .t-hint { color: var(--text-muted); font-size: 0.76rem; margin-top: 6px; }
 
   /* ---- Filters + checks table ---- */
   .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
   .filters label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--text-secondary); gap: 3px; }
   .filters select, .filters input { font: inherit; font-size: 0.88rem; padding: 6px 8px; border-radius: 6px;
             border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); min-width: 150px; }
+  .btn { font: inherit; font-size: 0.85rem; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
+         background: var(--surface); color: var(--text-primary); cursor: pointer; }
+  .btn:hover { background: var(--surface-2); }
+  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   .filters .count { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
   .checks { min-width: 860px; font-size: 0.86rem; }
   .checks th { text-align: left; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px;
-               border-bottom: 1px solid var(--grid); background: var(--surface-2); position: sticky; top: 0; }
+               border-bottom: 1px solid var(--grid); background: var(--surface-2); position: sticky; top: 0; z-index: 1; }
   .checks td { padding: 10px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
   .checks tr:last-child td { border-bottom: none; }
   .checks .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .checks .desc { color: var(--text-secondary); font-size: 0.8rem; margin-top: 2px; }
   .checks .note { color: var(--text-muted); font-size: 0.78rem; margin-top: 4px; font-style: italic; }
+  .checks .prev { color: var(--text-muted); font-size: 0.76rem; margin-top: 3px; white-space: nowrap; }
   .checks code { font-size: 0.8rem; white-space: nowrap; }
   .table-wrap { max-height: 640px; overflow: auto; }
   .empty { padding: 24px; text-align: center; color: var(--text-muted); }
   footer { padding: 24px 0 40px; color: var(--text-muted); font-size: 0.8rem; }
-  @media (max-width: 600px) { .tile.hero .value { font-size: 2.2rem; } .filters .count { margin-left: 0; width: 100%; } }
+  @media (max-width: 600px) {
+    .tile.hero .value { font-size: 2.2rem; }
+    .filters .count { margin-left: 0; width: 100%; }
+    .change { grid-template-columns: 1fr; }
+    .change .vals { text-align: left; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <h1>Data Product Health</h1>
-    <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions.</p>
+    <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions, tracked run over run.</p>
     <div class="meta" id="meta">Loading…</div>
     <div class="notice">All data is <strong>synthetic</strong>, generated for demonstration. It is not real Happen Bank data.
       Definitions: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary">Data Dictionary</a> ·
-      Project story: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki">wiki</a></div>
+      How this was built: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery">Data Discovery</a> ·
+      <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/3b-Iteration-Log">Iteration Log</a></div>
   </header>
 
-  <section aria-labelledby="h-summary">
-    <h2 id="h-summary" class="visually-hidden" hidden>Summary</h2>
+  <section aria-label="Summary">
     <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section aria-labelledby="h-trend">
+    <h2 id="h-trend">Health over time</h2>
+    <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data.</p>
+    <div class="trend-grid">
+      <figure class="card chart-card" style="margin:0">
+        <figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
+        <div id="trend"></div>
+      </figure>
+      <div class="card scroll"><table class="runs" id="runs"></table></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-changes">
+    <h2 id="h-changes">What changed since the previous run</h2>
+    <p class="section-sub" id="changes-sub"></p>
+    <div class="card changes" id="changes"></div>
   </section>
 
   <section aria-labelledby="h-score">
     <h2 id="h-score">Health scorecard</h2>
-    <p class="section-sub">Each cell scores one table on one data quality dimension. Hover a cell for its checks.</p>
+    <p class="section-sub">Each cell scores one table on one data quality dimension. Hover for details; click a cell to see its checks below.</p>
     <div class="card">
       <div class="scroll"><table class="heat" id="heat"></table></div>
       <div class="legend">
@@ -166,28 +242,33 @@
       <label>Dimension <select id="f-dim"><option value="">All</option></select></label>
       <label>Table <select id="f-table"><option value="">All</option></select></label>
       <label>Search <input id="f-text" type="search" placeholder="Rule, column, description"></label>
-      <span class="count" id="f-count"></span>
+      <button class="btn" id="f-clear" type="button">Clear filters</button>
+      <span class="count" id="f-count" aria-live="polite"></span>
     </div>
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
   </section>
 
-  <footer>Data product health dashboard · v1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <footer>Data product health dashboard · v2 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
 
 <script>
 const DIMS = ['Completeness', 'Uniqueness', 'Validity', 'Consistency', 'Volume', 'Timeliness'];
-const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕' };
+const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕', New: '+' };
+const UNIT_SINGULAR = { rows: 'row', days: 'day', columns: 'column', products: 'product' };
 const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
 const fmtNum = (v, unit) => {
   if (v == null) return '—';
   const n = Number(v);
-  const s = unit === '%' ? n.toFixed(n < 1 && n !== 0 ? 3 : 2) + '%' : (Number.isInteger(n) ? fmtInt(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 }));
-  return unit === '%' ? s : s + ' ' + unit;
+  if (unit === '%') return n.toFixed(n < 1 && n !== 0 ? 3 : 2) + '%';
+  const s = Number.isInteger(n) ? fmtInt(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  return `${s} ${n === 1 && UNIT_SINGULAR[unit] ? UNIT_SINGULAR[unit] : unit}`;
 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const badge = st => `<span class="badge ${st}"><span class="dot" aria-hidden="true">${ICON[st]}</span>${st}</span>`;
+const badge = (st, label = st) => `<span class="badge ${st}"><span class="dot" aria-hidden="true">${ICON[st]}</span>${label}</span>`;
+const fmtDate = d => new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+const shortDate = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
 async function load(name) {
   const r = await fetch(`data/${name}`, { cache: 'no-cache' });
@@ -195,71 +276,162 @@ async function load(name) {
   return r.json();
 }
 
+/* ---------- tooltip (shared) ---------- */
+const tip = document.getElementById('tip');
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.classList.add('show');
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(x + 14, innerWidth - r.width - 8)) + 'px';
+  tip.style.top = Math.max(8, Math.min(y + 14, innerHeight - r.height - 8)) + 'px';
+}
+const hideTip = () => tip.classList.remove('show');
+
 function renderMeta(s) {
-  const d = new Date(s.run.finished_at || s.run.started_at);
   document.getElementById('meta').innerHTML =
-    `<span>Run #${s.run.run_id} · ${d.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}</span>` +
+    `<span>Run #${s.run.run_id} · ${fmtDate(s.run.finished_at || s.run.started_at)}</span>` +
     `<span>Data period ${s.period.start} → ${s.period.end}</span><span>${esc(s.run.notes || '')}</span>`;
 }
 
 function renderTiles(s) {
-  const o = s.overall;
+  const o = s.overall, prev = (s.history || []).find(h => h.run_id === s.previous_run_id);
+  let delta = '';
+  if (prev) {
+    const d = Number(o.score) - Number(prev.score);
+    const cls = d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'flat';
+    const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '■';
+    delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${d >= 0 ? '+' : ''}${d.toFixed(1)} vs run #${prev.run_id}</span>`;
+  }
   document.getElementById('tiles').innerHTML = `
     <div class="card tile hero"><div class="label">Overall health score</div>
       <div class="value">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
-      <div class="note">${badge(o.status)}</div></div>
+      <div class="note">${badge(o.status)} ${delta}</div></div>
     <div class="card tile"><div class="label">Checks run</div><div class="value">${fmtInt(o.checks)}</div>
-      <div class="counts">${badge('Pass')} ${fmtInt(o.passed)} ${badge('Warn')} ${fmtInt(o.warned)} ${badge('Fail')} ${fmtInt(o.failed)}</div></div>
+      <div class="counts"><span>${badge('Pass')} ${fmtInt(o.passed)}</span><span>${badge('Warn')} ${fmtInt(o.warned)}</span><span>${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
     <div class="card tile"><div class="label">Tables monitored</div><div class="value">${fmtInt(s.tables_monitored)}</div>
       <div class="note">${fmtInt(s.columns_profiled)} columns profiled</div></div>
     <div class="card tile"><div class="label">Rows monitored</div><div class="value">${(s.rows_monitored / 1e6).toFixed(1)}M</div>
       <div class="note">${fmtInt(s.rows_monitored)} rows</div></div>`;
 }
 
-function renderHeat(score) {
+/* ---------- trend line (single series: no legend, title names it) ---------- */
+function renderTrend(s) {
+  const h = s.history || [];
+  // Draw at the container's real width so text stays at its true size on phones (no viewBox shrinking)
+  const W = Math.max(280, Math.round(document.getElementById('trend').clientWidth || 560)), H = 230,
+        m = { t: 22, r: 28, b: 44, l: 40 };
+  const lo = Math.max(0, Math.floor((Math.min(...h.map(r => +r.score)) - 2) / 2) * 2), hi = 100;
+  const x = i => h.length === 1 ? (m.l + W - m.r) / 2 : m.l + i * (W - m.l - m.r) / (h.length - 1);
+  const y = v => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
+  const ticks = []; for (let v = lo; v <= hi; v += (hi - lo) > 10 ? 5 : 2) ticks.push(v);
+  const path = h.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(+r.score).toFixed(1)}`).join('');
+  const last = h.length - 1;
+  document.getElementById('trend').innerHTML = `
+    <svg class="trend" viewBox="0 0 ${W} ${H}" role="img" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
+      <g class="grid">${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>
+        <text class="axis-label" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
+      <path class="line" d="${path}"></path>
+      ${h.map((r, i) => `<g data-i="${i}">
+          <circle class="hit" cx="${x(i)}" cy="${y(+r.score)}" r="16" tabindex="0" aria-label="Run ${r.run_id}: score ${r.score}, ${r.status}"></circle>
+          <circle class="pt" cx="${x(i)}" cy="${y(+r.score)}" r="5" pointer-events="none"></circle>
+          <text class="x-label" x="${x(i)}" y="${H - m.b + 20}" text-anchor="middle">Run #${r.run_id}</text>
+          <text class="axis-label" x="${x(i)}" y="${H - m.b + 34}" text-anchor="middle">${shortDate(r.started_at)}</text>
+        </g>`).join('')}
+      ${last >= 0 ? `<text class="pt-label" x="${x(last)}" y="${y(+h[last].score) - 12}" text-anchor="middle">${Number(h[last].score).toFixed(1)}</text>` : ''}
+    </svg>`;
+  const svg = document.querySelector('svg.trend');
+  const tipFor = i => { const r = h[i];
+    return `<div class="t-title">Run #${r.run_id} · ${fmtDate(r.started_at)}</div>
+      <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
+      <div class="t-row"><span>Status</span><span>${r.status}</span></div>
+      <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>
+      <div class="t-sep"></div><div>${esc(r.notes || '')}</div>`; };
+  svg.addEventListener('mousemove', e => { const g = e.target.closest('[data-i]');
+    svg.querySelectorAll('.hover').forEach(n => n.classList.remove('hover'));
+    if (g && e.target.classList.contains('hit')) { g.classList.add('hover'); showTip(tipFor(+g.dataset.i), e.clientX, e.clientY); } else hideTip(); });
+  svg.addEventListener('mouseleave', () => { hideTip(); svg.querySelectorAll('.hover').forEach(n => n.classList.remove('hover')); });
+  svg.addEventListener('focusin', e => { const g = e.target.closest('[data-i]'); if (g) { const b = e.target.getBoundingClientRect(); showTip(tipFor(+g.dataset.i), b.right, b.top); } });
+  svg.addEventListener('focusout', hideTip);
+
+  // table twin of the chart
+  document.getElementById('runs').innerHTML = `<thead><tr><th>Run</th><th>What changed</th><th class="num">Score</th><th>Status</th><th class="num">Pass / Warn / Fail</th></tr></thead><tbody>` +
+    h.slice().reverse().map(r => `<tr class="${r.run_id === s.run.run_id ? 'current' : ''}">
+      <td><strong>#${r.run_id}</strong><div class="run-note">${shortDate(r.started_at)}</div></td>
+      <td class="run-note">${esc((r.notes || '').replace(/^Run \d+:\s*/, ''))}</td>
+      <td class="num">${Number(r.score).toFixed(1)}</td><td>${badge(r.status)}</td>
+      <td class="num">${r.passed} / ${r.warned} / ${r.failed}</td></tr>`).join('') + '</tbody>';
+}
+
+/* ---------- what changed ---------- */
+function renderChanges(s, checks) {
+  const prevId = s.previous_run_id;
+  const sub = document.getElementById('changes-sub'), box = document.getElementById('changes');
+  if (!prevId) { sub.textContent = 'This is the first run, so there is nothing to compare yet.'; box.innerHTML = ''; return; }
+  const rank = { Pass: 0, Warn: 1, Fail: 2, Error: 2 };
+  const changed = checks.filter(c => !c.prev_status || c.prev_status !== c.status || (c.prev_rule && c.prev_rule !== c.rule))
+    .sort((a, b) => (rank[b.status] - rank[a.status]) || a.rule_id.localeCompare(b.rule_id));
+  sub.textContent = `Comparing run #${s.run.run_id} with run #${prevId}: ${changed.length} rule${changed.length === 1 ? '' : 's'} changed status or definition. ${checks.length - changed.length} unchanged.`;
+  box.innerHTML = changed.length ? changed.map(c => {
+    const kind = !c.prev_status ? 'New rule' : c.prev_status !== c.status
+      ? (rank[c.status] < rank[c.prev_status] ? 'Improved' : 'Worse') : 'Rule redefined';
+    const flow = !c.prev_status ? `${badge('New', 'New')} <span class="arrow">→</span> ${badge(c.status)}`
+                                : `${badge(c.prev_status)} <span class="arrow" aria-label="to">→</span> ${badge(c.status)}`;
+    return `<div class="change"><span class="flow">${flow}</span>
+      <div class="what"><strong>${esc(kind)}:</strong> <code>${esc(c.rule_id)}</code> ${esc(c.rule)}
+        <div class="desc">${esc(c.table)}${c.column ? '.' + esc(c.column) : ''} · ${esc(c.dimension)}</div></div>
+      <div class="vals">${c.prev_status ? `${fmtNum(c.prev_value, c.unit)} <span class="arrow">→</span> ` : ''}${fmtNum(c.value, c.unit)}</div></div>`;
+  }).join('') : `<div class="empty">No rule changed status since run #${prevId}.</div>`;
+}
+
+/* ---------- scorecard with drill-down ---------- */
+let applyFilter = () => {};
+function renderHeat(score, hist) {
   const byTable = {};
   score.filter(r => r.table !== '(all tables)').forEach(r => { (byTable[r.table] ??= {})[r.dimension] = r; });
   const tables = Object.keys(byTable).sort((a, b) =>
     (byTable[a]['(all dimensions)'].score - byTable[b]['(all dimensions)'].score) || ((byTable[b]['(all dimensions)'].rows || 0) - (byTable[a]['(all dimensions)'].rows || 0)));
   const dimTotals = {}; score.filter(r => r.table === '(all tables)').forEach(r => dimTotals[r.dimension] = r);
-  const cell = (r, label) => r
-    ? `<div class="cell ${r.status}" tabindex="0" data-tip='${esc(JSON.stringify({ t: label, ...r }))}'>${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></div>`
-    : `<div class="cell None" aria-label="No checks">—</div>`;
+  const histBy = {}; (hist || []).forEach(r => (histBy[r.table] ??= []).push(r));
+  const cell = (r, table, dim) => {
+    if (!r) return `<div class="cell None"><span aria-hidden="true">—</span><span class="sr-only">No checks</span></div>`;
+    const label = `${table === '' ? 'All tables' : table} · ${dim === '' ? 'all dimensions' : dim}`;
+    return `<button type="button" class="cell ${r.status}" data-table="${esc(table)}" data-dim="${esc(dim)}"
+      data-tip='${esc(JSON.stringify({ t: label, table, ...r }))}' aria-label="${esc(label)}: ${r.status}, score ${Number(r.score).toFixed(0)}. Show checks.">
+      ${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></button>`;
+  };
   let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => `<th scope="col">${d}</th>`).join('')}<th scope="col" class="total">Table score</th></tr></thead><tbody>`;
   for (const t of tables) {
     const tot = byTable[t]['(all dimensions)'];
-    h += `<tr><th scope="row">${esc(t)}<span class="rows">${fmtInt(tot.rows)} rows · ${esc(tot.table_type || '')}</span></th>` +
-         DIMS.map(d => `<td>${cell(byTable[t][d], `${t} · ${d}`)}</td>`).join('') +
-         `<td class="total">${cell(tot, `${t} · all dimensions`)}</td></tr>`;
+    const sub = tot.rows == null ? 'Checks that span every table' : `${fmtInt(tot.rows)} rows · ${esc(tot.table_type || '')}`;
+    h += `<tr><th scope="row">${esc(t)}<span class="rows">${sub}</span></th>` +
+         DIMS.map(d => `<td>${cell(byTable[t][d], t, d)}</td>`).join('') + `<td class="total">${cell(tot, t, '')}</td></tr>`;
   }
-  h += `<tr><th scope="row"><strong>All tables</strong></th>` +
-       DIMS.map(d => `<td>${cell(dimTotals[d], `All tables · ${d}`)}</td>`).join('') +
-       `<td class="total">${cell(dimTotals['(all dimensions)'], 'Overall')}</td></tr></tbody>`;
-  document.getElementById('heat').innerHTML = h;
-}
+  h += `<tr><th scope="row"><strong>All tables</strong></th>` + DIMS.map(d => `<td>${cell(dimTotals[d], '', d)}</td>`).join('') +
+       `<td class="total">${cell(dimTotals['(all dimensions)'], '', '')}</td></tr></tbody>`;
+  const heat = document.getElementById('heat'); heat.innerHTML = h;
 
-function wireTooltip() {
-  const tip = document.getElementById('tip');
-  const show = (el, x, y) => {
-    const d = JSON.parse(el.dataset.tip);
-    tip.innerHTML = `<div class="t-title">${esc(d.t)}</div>
+  const tipHtml = d => {
+    let html = `<div class="t-title">${esc(d.t)}</div>
       <div class="t-row"><span>Score</span><span>${Number(d.score).toFixed(1)}</span></div>
       <div class="t-row"><span>Checks</span><span>${d.checks}</span></div>
-      <div class="t-row"><span>Passed</span><span>${d.passed}</span></div>
-      <div class="t-row"><span>Warnings</span><span>${d.warned}</span></div>
-      <div class="t-row"><span>Failed</span><span>${d.failed}</span></div>`;
-    const r = tip.getBoundingClientRect();
-    tip.style.left = Math.min(x + 14, innerWidth - r.width - 8) + 'px';
-    tip.style.top = Math.min(y + 14, innerHeight - r.height - 8) + 'px';
-    tip.classList.add('show');
+      <div class="t-row"><span>Passed / Warn / Fail</span><span>${d.passed} / ${d.warned} / ${d.failed}</span></div>`;
+    const runs = d.dimension === '(all dimensions)' ? histBy[d.table || '(all tables)'] : null;
+    if (runs && runs.length > 1) html += `<div class="t-sep"></div>` + runs.map(r =>
+      `<div class="t-row"><span>Run #${r.run_id}</span><span>${Number(r.score).toFixed(1)} · ${r.status}</span></div>`).join('');
+    return html + `<div class="t-hint">Click to see these checks</div>`;
   };
-  const heat = document.getElementById('heat');
-  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? show(c, e.clientX, e.clientY) : tip.classList.remove('show'); });
-  heat.addEventListener('mouseleave', () => tip.classList.remove('show'));
-  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); show(c, b.right, b.top); } });
-  heat.addEventListener('focusout', () => tip.classList.remove('show'));
+  heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(tipHtml(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
+  heat.addEventListener('mouseleave', hideTip);
+  heat.addEventListener('focusin', e => { const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(tipHtml(JSON.parse(c.dataset.tip)), b.right, b.top); } });
+  heat.addEventListener('focusout', hideTip);
+  heat.addEventListener('click', e => {
+    const c = e.target.closest('button.cell'); if (!c) return;
+    heat.querySelectorAll('.selected').forEach(n => n.classList.remove('selected')); c.classList.add('selected');
+    hideTip(); applyFilter({ table: c.dataset.table, dim: c.dataset.dim });
+    document.getElementById('h-checks').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
+/* ---------- checks table ---------- */
 function renderChecks(checks) {
   const fs = document.getElementById('f-status'), fd = document.getElementById('f-dim'),
         ft = document.getElementById('f-table'), fx = document.getElementById('f-text');
@@ -275,25 +447,34 @@ function renderChecks(checks) {
     document.getElementById('checks').innerHTML = `<thead><tr><th>Status</th><th>Rule</th><th>Check</th><th>Table · column</th>
       <th>Dimension</th><th>Severity</th><th class="num">Measured</th><th class="num">Warn / fail above</th></tr></thead><tbody>` +
       (rows.length ? rows.map(c => `<tr>
-        <td>${badge(c.status)}</td><td><code>${esc(c.rule_id)}</code></td>
+        <td>${badge(c.status)}${c.prev_status && c.prev_status !== c.status ? `<div class="prev">was ${esc(c.prev_status)}</div>` : !c.prev_status ? '<div class="prev">new rule</div>' : ''}</td>
+        <td><code>${esc(c.rule_id)}</code></td>
         <td><strong>${esc(c.rule)}</strong><div class="desc">${esc(c.description)}</div>
           ${c.expected_note ? `<div class="note">Note: ${esc(c.expected_note)}</div>` : ''}
           ${c.error ? `<div class="note">Error: ${esc(c.error)}</div>` : ''}</td>
         <td><code>${esc(c.table)}</code>${c.column ? `<br><code>${esc(c.column)}</code>` : ''}</td>
         <td>${esc(c.dimension)}</td><td>${esc(c.severity)}</td>
-        <td class="num">${fmtNum(c.value, c.unit)}</td>
+        <td class="num">${fmtNum(c.value, c.unit)}${c.prev_status && Number(c.prev_value) !== Number(c.value) ? `<div class="prev">was ${fmtNum(c.prev_value, c.unit)}</div>` : ''}</td>
         <td class="num">${fmtNum(c.warn_above, c.unit)} / ${fmtNum(c.fail_above, c.unit)}</td></tr>`).join('')
        : `<tr><td colspan="8" class="empty">No checks match these filters.</td></tr>`) + '</tbody>';
   };
   [fs, fd, ft].forEach(el => el.addEventListener('change', draw));
   fx.addEventListener('input', draw);
+  document.getElementById('f-clear').addEventListener('click', () => {
+    fs.value = fd.value = ft.value = fx.value = '';
+    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); draw();
+  });
+  applyFilter = ({ table, dim }) => { fs.value = ''; fx.value = ''; ft.value = table || ''; fd.value = dim || ''; draw(); };
   draw();
 }
 
 (async () => {
   try {
-    const [summary, score, checks] = await Promise.all([load('summary.json'), load('scorecard.json'), load('checks.json')]);
-    renderMeta(summary); renderTiles(summary); renderHeat(score); wireTooltip(); renderChecks(checks);
+    const [summary, score, checks, hist] = await Promise.all([
+      load('summary.json'), load('scorecard.json'), load('checks.json'), load('scorecard_history.json').catch(() => [])]);
+    renderMeta(summary); renderTiles(summary); renderTrend(summary); renderChanges(summary, checks);
+    renderChecks(checks); renderHeat(score, hist);
+    let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => renderTrend(summary), 150); });
   } catch (e) {
     document.getElementById('meta').textContent = 'Could not load data: ' + e.message;
   }

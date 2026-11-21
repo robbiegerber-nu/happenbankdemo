@@ -1,7 +1,8 @@
 # Runs a full data discovery / data quality pass as a new run, then exports JSON for the health dashboard.
 #   powershell -File sql\discovery\run_discovery.ps1 [-Notes "why this run"]
 #   -ResumeRunId N   finish an interrupted run from the rule-check step (keeps its catalog, profiles and volume)
-param([string]$Notes = 'Scheduled discovery run', [int]$ResumeRunId = 0)
+#   -ExportOnly      skip all checks; re-export JSON for the latest run (or -ResumeRunId N)
+param([string]$Notes = 'Scheduled discovery run', [int]$ResumeRunId = 0, [switch]$ExportOnly)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -24,6 +25,10 @@ function Step([string]$name, [scriptblock]$body) {
     $t = Get-Date; & $body; "{0,-34} {1,6:N0}s" -f $name, ((Get-Date) - $t).TotalSeconds
 }
 
+if ($ExportOnly) {
+    $run = if ($ResumeRunId -gt 0) { $ResumeRunId } else { [int](Invoke-Scalar "SELECT max(run_id) FROM discovery.dq_run;") }
+    "export only: run_id = $run"
+} else {
 Step 'setup, engine, rules' { Invoke-File 'D00_setup.sql'; Invoke-File 'D01_functions.sql'; Invoke-File 'D02_rules.sql' }
 if ($ResumeRunId -gt 0) {
     $run = $ResumeRunId
@@ -43,6 +48,7 @@ if ($ResumeRunId -gt 0) {
 Step 'rule checks'    { Invoke-Scalar "SELECT discovery.run_checks($run);" | Out-Null }
 Step 'scorecard'      { Invoke-Scalar "SELECT discovery.build_scorecard($run);" | Out-Null }
 Invoke-Scalar "UPDATE discovery.dq_run SET finished_at = now() WHERE run_id = $run;" | Out-Null
+}
 
 # ---------------- JSON export for the dashboard ----------------
 function Export-Json([string]$name, [string]$sql) {
@@ -62,8 +68,11 @@ SELECT json_build_object(
   'rows_monitored', (SELECT sum(row_count) FROM discovery.dq_table_catalog WHERE run_id = $run),
   'columns_profiled', (SELECT count(*) FROM discovery.dq_column_profile WHERE run_id = $run),
   'period', json_build_object('start', '2024-01-01', 'end', '2026-10-31'),
-  'history', (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'score', s.score, 'failed', s.failed, 'warned', s.warned) ORDER BY r.run_id)
-              FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
+  'previous_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard WHERE run_id < $run),
+  'history', (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'score', s.score, 'status', s.status,
+                     'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
+              FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'
+              WHERE r.run_id <= $run));
 "@
 
 Export-Json 'scorecard.json' @"
@@ -75,11 +84,22 @@ WHERE s.run_id = $run;
 "@
 
 Export-Json 'checks.json' @"
-SELECT json_agg(json_build_object('rule_id', rule_id, 'table', table_name, 'column', column_name, 'dimension', dimension, 'rule', rule_name,
-       'severity', severity, 'value', measured_value, 'unit', unit, 'warn_above', warn_above, 'fail_above', fail_above, 'status', status,
-       'description', description, 'expected_note', expected_note, 'error', error_message, 'duration_ms', duration_ms)
-       ORDER BY CASE status WHEN 'Fail' THEN 0 WHEN 'Error' THEN 0 WHEN 'Warn' THEN 1 ELSE 2 END, rule_id)
-FROM discovery.dq_check_result WHERE run_id = $run;
+SELECT json_agg(json_build_object('rule_id', c.rule_id, 'table', c.table_name, 'column', c.column_name, 'dimension', c.dimension, 'rule', c.rule_name,
+       'severity', c.severity, 'value', c.measured_value, 'unit', c.unit, 'warn_above', c.warn_above, 'fail_above', c.fail_above, 'status', c.status,
+       'description', c.description, 'expected_note', c.expected_note, 'error', c.error_message, 'duration_ms', c.duration_ms,
+       'prev_status', p.status, 'prev_value', p.measured_value, 'prev_rule', p.rule_name)
+       ORDER BY CASE c.status WHEN 'Fail' THEN 0 WHEN 'Error' THEN 0 WHEN 'Warn' THEN 1 ELSE 2 END, c.rule_id)
+FROM discovery.dq_check_result c
+LEFT JOIN discovery.dq_check_result p ON p.rule_id = c.rule_id
+      AND p.run_id = (SELECT max(run_id) FROM discovery.dq_check_result WHERE run_id < $run)
+WHERE c.run_id = $run;
+"@
+
+# Per-run, per-table scores for history drill-down
+Export-Json 'scorecard_history.json' @"
+SELECT json_agg(json_build_object('run_id', run_id, 'table', table_name, 'dimension', dimension, 'score', score, 'status', status,
+       'passed', passed, 'warned', warned, 'failed', failed) ORDER BY run_id, table_name, dimension)
+FROM discovery.dq_scorecard WHERE run_id <= $run AND dimension = '(all dimensions)';
 "@
 
 Export-Json 'catalog.json' @"

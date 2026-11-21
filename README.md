@@ -32,5 +32,7 @@ This takes about 75 minutes. It drops and recreates the `happen_demo` database, 
 | Path | Contents |
 |---|---|
 | [`sql/`](sql/) | Numbered scripts that build the database (`00`–`12`), the validation suite (`99_validate.sql`) and `run_all.ps1` |
+| [`sql/discovery/`](sql/discovery/) | Data discovery & data quality toolkit: column profiling, 99 rules stored as data, run history, JSON export ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery)) |
+| [`sql/remediation/`](sql/remediation/) | Documented, re-runnable fixes for data defects found by discovery |
 | [`tools/`](tools/) | `generate_data_dictionary.ps1`: rebuilds the wiki's column pages from the database's own documentation |
-| `docs/` | The GitHub Pages dashboards *(in progress)* |
+| [`docs/`](docs/) | GitHub Pages site: the [Data Product Health dashboard](https://robbiegerber-nu.github.io/happenbankdemo/) and its JSON data |

@@ -62,6 +62,13 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  '% of IVR sessions where the caller did not authenticate.',
  $$SELECT 100.0 * avg((customer_id IS NULL)::int) FROM cc.ivr_session$$,'%',10,15,'Low','About 8% expected, matching anonymous phone contacts.'),
 
+-- Profile-driven rules (added after run 3: profiling showed customer_product.close_date 100% empty and
+-- customer_product.status constant, a generation defect no row-level rule had caught)
+('CMP-018','cc (all tables)',NULL,'Completeness','No unexpectedly empty columns',
+ 'Columns that are 100% NULL in this run''s column profile: the field is never populated.',
+ $$SELECT count(*) FROM discovery.dq_column_profile WHERE run_id = {run_id} AND row_count > 0 AND null_pct = 100$$,'columns',0,0,'High',
+ 'Profile-driven rule. Reads the column profile built earlier in the same run.'),
+
 -- ======================= UNIQUENESS =======================
 ('UNQ-001','contact','contact_id','Uniqueness','Contact ID unique',
  'Duplicate primary keys in contact.', $$SELECT count(*) - count(DISTINCT contact_id) FROM cc.contact$$,'rows',0,0,'Critical',NULL),
@@ -114,12 +121,18 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
 ('VAL-004','contact','offered_ts','Validity','Contacts inside the reporting period',
  'Contacts offered before 1 Jan 2024 or after 31 Oct 2026.',
  $$SELECT count(*) FROM cc.contact WHERE offered_ts < '2024-01-01' OR offered_ts >= '2026-11-01'$$,'rows',0,0,'High',NULL),
-('VAL-005','contact','answered_ts','Validity','Phone and chat answered only in opening hours',
- 'Phone and chat answered outside Mon-Fri 7:00-21:00, Sat 8:00-17:00, or on a closed day.',
+('VAL-005','contact','offered_ts','Validity','Phone and chat offered only in opening hours',
+ 'Customers can only join the phone or chat queue Mon-Fri 7:00-21:00 and Sat 8:00-17:00, never on a closed day.',
+ $$SELECT count(*) FROM cc.contact c JOIN cc.dim_date d ON d.full_date = c.offered_ts::date
+   WHERE c.channel_id IN (1, 2) AND (d.is_center_closed
+     OR (d.day_of_week = 6 AND NOT c.offered_ts::time BETWEEN '08:00' AND '17:00')
+     OR (d.day_of_week < 6 AND NOT c.offered_ts::time BETWEEN '07:00' AND '21:00'))$$,'rows',0,0,'High',
+ 'Run 1 found 6,039 contacts offered before opening (agents logging in early); run 2 found 8 offered after closing (agents logging out late). Fixed at source and removed by remediation R01.'),
+('VAL-023','contact','answered_ts','Validity','Queued calls answered promptly after closing',
+ 'Phone and chat contacts still being answered more than 15 minutes after closing time (calls waiting at close are answered, but not long after).',
  $$SELECT count(*) FROM cc.contact c JOIN cc.dim_date d ON d.full_date = c.answered_ts::date
-   WHERE c.channel_id IN (1, 2) AND c.answered AND (d.is_center_closed
-     OR (d.day_of_week = 6 AND NOT c.answered_ts::time BETWEEN '08:00' AND '17:00')
-     OR (d.day_of_week < 6 AND NOT c.answered_ts::time BETWEEN '07:00' AND '21:00'))$$,'rows',0,0,'High',NULL),
+   WHERE c.channel_id IN (1, 2) AND c.answered AND NOT d.is_center_closed
+     AND c.answered_ts::time > CASE WHEN d.day_of_week = 6 THEN time '17:15' ELSE time '21:15' END$$,'rows',0,0,'Medium',NULL),
 ('VAL-006','contact','talk_sec','Validity','Implausibly long contacts',
  '% of answered contacts with more than 2 hours of talk time.',
  $$SELECT 100.0 * avg((talk_sec > 7200)::int) FROM cc.contact WHERE answered$$,'%',0.01,0.1,'Low',NULL),
@@ -173,6 +186,18 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
 ('VAL-022','agent_schedule','scheduled_min','Validity','Schedule blocks have positive length',
  'Schedule blocks with zero or negative minutes.',
  $$SELECT count(*) FROM cc.agent_schedule WHERE scheduled_min <= 0 OR scheduled_end_ts <= scheduled_start_ts$$,'rows',0,0,'Medium',NULL),
+
+('VAL-024','cc (all tables)',NULL,'Validity','No unexpectedly constant columns',
+ 'Columns with a single distinct value across many rows: a flag or category that never varies usually means a broken feed or generator.',
+ $$SELECT count(*) FROM discovery.dq_column_profile WHERE run_id = {run_id} AND row_count > 1 AND distinct_count = 1
+     AND (table_name, column_name) NOT IN (('dim_site', 'timezone'))$$,'columns',0,0,'High',
+ 'Profile-driven rule. Allow-listed: dim_site.timezone (all sites are in Central time by design).'),
+('VAL-025','customer_product','open_date','Validity','Launch product openings spread over time',
+ 'Products launched in the period whose openings fall on fewer than half of the days the product has been available (capped at 100 days): real customers do not all open accounts on the same few dates.',
+ $$SELECT count(*) FROM (SELECT cp.product_id, min(p.introduced_date) AS intro FROM cc.customer_product cp JOIN cc.dim_product p USING (product_id)
+     WHERE p.is_new_in_period GROUP BY 1
+     HAVING count(DISTINCT cp.open_date) < 0.5 * least(100, date '2026-10-31' - min(p.introduced_date))) x$$,'products',0,0,'Medium',
+ 'Run 4: P2P Payments, High-Yield Savings and others opened on as few as 4 distinct days (generator defect, fixed by 07b_customer_products.sql).'),
 
 -- ======================= CONSISTENCY =======================
 ('CON-001','interval_volume','offered','Consistency','Interval offered total = contact count',
@@ -263,10 +288,10 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  'Open days with IVR volume more than 35% above or below the same weekday''s recent median.',
  $$SELECT count(*) FROM discovery.dq_daily_volume WHERE run_id = {run_id} AND table_name = 'ivr_session' AND is_outlier$$,'days',0,20,'Low',
  'Follows contact volume; spikes on the same days are expected.'),
-('VOL-013','agent_activity','state_start_ts','Volume','Unusual agent activity days',
- 'Open days where the number of agent state records swings more than 35% (missing or duplicated activity feeds).',
- $$SELECT count(*) FROM discovery.dq_daily_volume WHERE run_id = {run_id} AND table_name = 'agent_activity' AND is_outlier$$,'days',0,20,'Medium',
- 'Holiday weeks and the summer 2025 headcount drop can legitimately move this.'),
+('VOL-013','agent_activity','agent_id','Volume','Unusual number of agents logged in',
+ 'Open days where the number of agents who logged in is more than 35% above or below the same weekday''s recent median (a missing or partial activity feed).',
+ $$SELECT count(*) FROM discovery.dq_daily_volume WHERE run_id = {run_id} AND table_name = 'agents_logged_in' AND is_outlier$$,'days',0,10,'Medium',
+ 'Refined after run 1: counting state records per day (58 flagged days) reacted to coaching, training and break patterns, not feed problems. Expected: early Sep 2025, when post-freeze hiring classes finished training and headcount jumped 35-47%.'),
 ('VOL-014','complaint','opened_ts','Volume','Unusual complaint volume days',
  'Open days with complaint volume more than 35% above or below normal.',
  $$SELECT count(*) FROM discovery.dq_daily_volume WHERE run_id = {run_id} AND table_name = 'complaint' AND is_outlier$$,'days',5,30,'Low',

@@ -52,7 +52,11 @@ FROM (
   FROM gen.r_seg s
   JOIN gen.agent_day ad ON ad.agent_id = s.agent_id AND ad.date_key = s.date_key
   LEFT JOIN gen.r_gap g ON g.activity_id = s.activity_id
-  CROSS JOIN LATERAL (SELECT random() r1, random() r2, random() r3, random() r4, random() r5, random() r6) r
+  -- The WHERE clause references the outer row so PostgreSQL draws fresh random numbers per segment.
+  -- (An uncorrelated LATERAL subquery is evaluated once and repeats the same values for every row:
+  --  the defect found by discovery run 3.)
+  CROSS JOIN LATERAL (SELECT random() r1, random() r2, random() r3, random() r4, random() r5, random() r6
+                      WHERE s.activity_id IS NOT NULL) r
   CROSS JOIN LATERAL (SELECT (CASE WHEN ad.offender THEN 2.5 ELSE 1 END) * (CASE WHEN ad.crunch THEN 1.4 ELSE 1 END)
                            * (CASE WHEN ad.tenure_days < 90 THEN 1.3 ELSE 1 END) * (CASE WHEN ad.site_id = 3 THEN 1.3 ELSE 1 END)
                            * (CASE WHEN ad.dow = 1 OR ad.post_holiday THEN 1.2 ELSE 1 END) AS m) m

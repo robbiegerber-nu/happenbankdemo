@@ -4,6 +4,8 @@ SET client_min_messages = warning;
 SET max_parallel_workers_per_gather = 0;
 SET work_mem = '1GB';
 SELECT setseed(0.48);
+-- Keep existing quality evaluations so re-running this script (e.g. after a remediation) doesn't re-randomise them
+CREATE TEMP TABLE keep_quality AS SELECT agent_id, date_key, quality_score FROM cc.agent_daily WHERE quality_score IS NOT NULL;
 TRUNCATE cc.interval_volume, cc.agent_daily;
 
 -- ================= interval_volume =================
@@ -23,9 +25,9 @@ FROM cc.contact c GROUP BY 1, 2, 3;
 
 -- Scheduled FTE per interval x channel group (planned "Open Shift" time)
 CREATE TEMP TABLE sched_iv AS
-SELECT gen.dk(it) AS date_key, gen.iv(it) AS interval_id, r.grp,
+SELECT gen.dk(it) AS date_key, gen.iv(it) AS interval_id, r.primary_channel_id AS grp,
        sum(extract(epoch FROM least(s.scheduled_end_ts, it + interval '15 min') - greatest(s.scheduled_start_ts, it))) / 900.0 AS fte
-FROM cc.agent_schedule s JOIN gen.roster r USING (agent_id)
+FROM cc.agent_schedule s JOIN cc.dim_agent r USING (agent_id)
 CROSS JOIN LATERAL generate_series(s.scheduled_start_ts, s.scheduled_end_ts - interval '1 ms', interval '15 min') it
 WHERE s.activity = 'Open Shift'
 GROUP BY 1, 2, 3;
@@ -72,6 +74,21 @@ LEFT JOIN sched_iv s ON s.date_key = f.date_key AND s.interval_id = f.interval_i
 WHERE f.offered > 0 OR coalesce(f.fc, 0) > 0.05;
 
 -- ================= agent_daily =================
+-- One row per scheduled agent-day, derived only from permanent cc tables (no generator scratch tables needed)
+CREATE TEMP TABLE ad AS
+SELECT s.agent_id, s.date_key,
+       bool_or(s.activity = 'PTO') AS is_pto,
+       bool_and(s.activity IN ('Training', 'Lunch')) AND bool_or(s.activity = 'Training') AS nh_training,
+       a.primary_channel_id AS grp, (d.full_date - a.hire_date) AS tenure_days, a.max_concurrent_chats AS lanes_max,
+       t.site_id, false AS is_absent
+FROM cc.agent_schedule s
+JOIN cc.dim_agent a USING (agent_id)
+JOIN cc.dim_team t ON t.team_id = a.team_id
+JOIN cc.dim_date d ON d.date_key = s.date_key
+GROUP BY s.agent_id, s.date_key, a.primary_channel_id, d.full_date, a.hire_date, a.max_concurrent_chats, t.site_id;
+UPDATE ad SET is_absent = true
+WHERE NOT is_pto AND NOT EXISTS (SELECT 1 FROM cc.agent_activity x WHERE x.agent_id = ad.agent_id AND x.date_key = ad.date_key);
+
 CREATE TEMP TABLE sch AS
 SELECT agent_id, date_key,
        sum(scheduled_min) FILTER (WHERE activity <> 'PTO') AS scheduled_min,
@@ -132,10 +149,40 @@ SELECT ad.agent_id, ad.date_key, ad.is_pto, ad.is_absent, ad.nh_training,
        CASE WHEN ad.is_absent THEN coalesce(s.scheduled_min, 0) ELSE 0 END,
        coalesce(c.n, 0), coalesce(c.n1, 0), coalesce(c.n2, 0), coalesce(c.n3, 0), coalesce(c.n4, 0), coalesce(c.n5, 0),
        round(c.w, 1), round(c.t, 1), round(c.h, 1), round(c.wr, 1), round(c.ht, 1), round(100 * c.fcr, 2),
-       CASE WHEN c.n > 0 AND random() < .2 THEN least(100, greatest(50, round(86 + 4 * ad.skill_z - 8 * exp(-ad.tenure_days / 90.0)
-                 - CASE WHEN ad.site_id = 3 THEN 3 ELSE 0 END + random_normal(0, 5))))::smallint END
-FROM gen.agent_day ad
+       NULL::smallint   -- quality_score: filled below
+FROM ad
 LEFT JOIN sch s USING (agent_id, date_key)
 LEFT JOIN act a USING (agent_id, date_key)
 LEFT JOIN adh h USING (agent_id, date_key)
 LEFT JOIN ctc c USING (agent_id, date_key);
+
+-- Quality evaluations: restore previous scores on a re-run; on a fresh build, sample ~1 in 5 worked days per agent
+UPDATE cc.agent_daily d SET quality_score = k.quality_score
+FROM keep_quality k WHERE k.agent_id = d.agent_id AND k.date_key = d.date_key AND d.contacts_handled > 0;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM keep_quality) AND to_regclass('gen.agent_trait') IS NOT NULL THEN
+    EXECUTE $q$
+      UPDATE cc.agent_daily d SET quality_score = least(100, greatest(50, round(86 + 4 * t.skill_z
+               - 8 * exp(-(to_date(d.date_key::text, 'YYYYMMDD') - a.hire_date) / 90.0)
+               - CASE WHEN tm.site_id = 3 THEN 3 ELSE 0 END + random_normal(0, 5))))::smallint
+      FROM gen.agent_trait t, cc.dim_agent a, cc.dim_team tm
+      WHERE t.agent_id = d.agent_id AND a.agent_id = d.agent_id AND tm.team_id = a.team_id
+        AND d.contacts_handled > 0 AND random() < .2$q$;
+  ELSIF NOT EXISTS (SELECT 1 FROM keep_quality) THEN
+    -- No generator traits available (scratch tables cleaned up): use each agent's first-contact-resolution
+    -- rate relative to peers on the same channel as the skill signal.
+    EXECUTE $q$
+      WITH perf AS (
+        SELECT c.agent_id, a.primary_channel_id AS ch, avg(c.first_contact_resolved::int) AS fcr
+        FROM cc.contact c JOIN cc.dim_agent a USING (agent_id) WHERE c.answered GROUP BY 1, 2),
+      z AS (
+        SELECT agent_id, (fcr - avg(fcr) OVER (PARTITION BY ch)) / nullif(stddev_samp(fcr) OVER (PARTITION BY ch), 0) AS skill_z FROM perf)
+      UPDATE cc.agent_daily d SET quality_score = least(100, greatest(50, round(86 + 4 * coalesce(z.skill_z, 0)
+               - 8 * exp(-(to_date(d.date_key::text, 'YYYYMMDD') - a.hire_date) / 90.0)
+               - CASE WHEN tm.site_id = 3 THEN 3 ELSE 0 END + random_normal(0, 5))))::smallint
+      FROM z, cc.dim_agent a, cc.dim_team tm
+      WHERE z.agent_id = d.agent_id AND a.agent_id = d.agent_id AND tm.team_id = a.team_id
+        AND d.contacts_handled > 0 AND random() < .2$q$;
+  END IF;
+END $$;
