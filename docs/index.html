@@ -183,6 +183,7 @@
   /* ---- Tile tooltips (score explanation, warning / failure lists) ---- */
   .has-tip { cursor: help; border-radius: 6px; }
   .has-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+  .checks th .has-tip, .heat th .has-tip { white-space: nowrap; }
   .info { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%;
           border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 10px; font-weight: 700; font-style: normal;
           vertical-align: 1px; line-height: 1; }
@@ -471,6 +472,48 @@ function columnTip(key) {
     ${key === 'Table score' ? tableScoreExample() : ''}`;
 }
 
+/* ---------- check results column explanations: plain English for business users ---------- */
+const CHECKS_HEADER_HELP = {
+  'Status': {
+    what: 'The result of this check in the run you are viewing.',
+    list: ['<b>Pass</b>: all good', '<b>Warning</b>: something unusual that is worth a look', '<b>Failure</b>: a problem that needs fixing'],
+    note: 'If the result changed since the previous run, the earlier result is shown underneath (for example "was Fail").' },
+  'Rule': {
+    what: 'A short reference code for the check, so people can refer to it precisely in conversations and tickets.',
+    list: ['The letters show the kind of check: CMP missing information, UNQ counted twice, VAL makes sense, CON numbers agree, VOL normal amount, TML up to date',
+           'The number simply identifies the check'] },
+  'Check': {
+    what: 'What the check looks at, in plain words, and why it matters.',
+    note: 'Some checks also have a note in italics, for example a known reason a warning is expected, or a fix that was made in an earlier run.' },
+  'Table · column': {
+    what: 'Where in the data the check looks.',
+    list: ['The first name is the set of data, for example <b>contact</b> holds customer contacts and <b>complaint</b> holds complaints',
+           'The second name, when shown, is the specific piece of information inside it, for example the time a call was answered'],
+    note: 'These are the names used in the database, so the data team can find the exact place quickly.' },
+  'Dimension': {
+    what: 'The kind of question the check answers:',
+    list: ['<b>Completeness</b>: is anything missing?', '<b>Uniqueness</b>: is anything counted twice?', '<b>Validity</b>: does the information make sense?',
+           '<b>Consistency</b>: do the numbers agree with each other?', '<b>Volume</b>: is the amount of data normal?', '<b>Timeliness</b>: is the data up to date?'] },
+  'Severity': {
+    what: 'How much the check matters if it does not pass.',
+    list: ['<b>Critical</b> and <b>high</b> checks protect the numbers people rely on most', '<b>Medium</b> and <b>low</b> checks catch smaller issues'],
+    note: 'More important checks count more toward the health score: critical 4×, high 3×, medium 2×, low 1×.' },
+  'Measured': {
+    what: 'What the check actually found in this run, for example how many records or days were flagged.',
+    note: 'If the number changed since the previous run, the earlier number is shown underneath (for example "was 8 rows").' },
+  'Warn / fail above': {
+    what: 'The limits for this check, written as two numbers: warning limit / failure limit.',
+    list: ['If the measured number goes above the <b>first</b> number, the check shows a warning',
+           'If it goes above the <b>second</b> number, the check fails'],
+    note: 'Example: "0 days / 10 days" means even one flagged day is a warning, and more than 10 flagged days is a failure.' }
+};
+function checksHeaderTip(key) {
+  const h = CHECKS_HEADER_HELP[key]; if (!h) return '';
+  return `<div class="t-title">${esc(key)}</div><p>${esc(h.what)}</p>
+    ${h.list ? `<ul>${h.list.map(x => `<li>${x}</li>`).join('')}</ul>` : ''}
+    ${h.note ? `<p>${esc(h.note)}</p>` : ''}`;
+}
+
 // Worked example built from the run being viewed: a small table that has a warning or failure,
 // with every check's points, so the reader can add them up and land on the number in the scorecard.
 const IMPORTANCE = { Critical: 'critical', High: 'high', Medium: 'medium', Low: 'low' };
@@ -616,8 +659,10 @@ function drawChecks() {
     (!F.t.value || c.table === F.t.value) &&
     (!q || [c.rule_id, c.rule, c.column, c.description, c.table].join(' ').toLowerCase().includes(q)));
   $('f-count').textContent = `${rows.length} of ${checks.length} checks`;
-  $('checks').innerHTML = `<thead><tr><th>Status</th><th>Rule</th><th>Check</th><th>Table · column</th>
-    <th>Dimension</th><th>Severity</th><th class="num">Measured</th><th class="num">Warn / fail above</th></tr></thead><tbody>` +
+  const hd = (label, cls = '') => `<th${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-chtip="${label}" tabindex="0"
+      aria-label="${label}: what is in this column?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
+  $('checks').innerHTML = `<thead><tr>${hd('Status')}${hd('Rule')}${hd('Check')}${hd('Table · column')}
+    ${hd('Dimension')}${hd('Severity')}${hd('Measured', 'num')}${hd('Warn / fail above', 'num')}</tr></thead><tbody>` +
     (rows.length ? rows.map(c => `<tr>
       <td>${badge(c.status)}${c.prev_status && c.prev_status !== c.status ? `<div class="prev">was ${esc(c.prev_status)}</div>` : !c.prev_status && S.data.summary.previous_run_id ? '<div class="prev">new rule</div>' : ''}</td>
       <td><code>${esc(c.rule_id)}</code></td>
@@ -707,6 +752,14 @@ function wire() {
   DIMS.forEach(d => F.d.add(new Option(d, d)));
   [F.s, F.d, F.t].forEach(el => el.addEventListener('change', drawChecks));
   F.x.addEventListener('input', drawChecks);
+
+  const checksTable = $('checks');
+  const chShow = (el, x, y) => { tip.classList.add('wide'); showTip(checksHeaderTip(el.dataset.chtip), x, y); };
+  const chHide = () => { hideTip(); tip.classList.remove('wide'); };
+  checksTable.addEventListener('mousemove', e => { const el = e.target.closest('[data-chtip]'); el ? chShow(el, e.clientX, e.clientY) : chHide(); });
+  checksTable.addEventListener('mouseleave', chHide);
+  checksTable.addEventListener('focusin', e => { const el = e.target.closest('[data-chtip]'); if (el) { const b = el.getBoundingClientRect(); chShow(el, b.left, b.bottom); } });
+  checksTable.addEventListener('focusout', chHide);
   $('f-clear').addEventListener('click', () => {
     F.s.value = F.d.value = F.t.value = F.x.value = '';
     document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); drawChecks();
