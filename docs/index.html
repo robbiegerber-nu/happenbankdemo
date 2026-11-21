@@ -89,7 +89,7 @@
   .badge.New { color: var(--accent); }
 
   /* ---- Trend + runs ---- */
-  .trend-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
+  .trend-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
   @media (max-width: 860px) { .trend-grid { grid-template-columns: 1fr; } }
   .chart-card { padding: 14px 16px 8px; }
   .chart-title { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 4px; }
@@ -231,13 +231,12 @@
 
   <section aria-labelledby="h-trend">
     <h2 id="h-trend">Health over time</h2>
-    <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data. Click a point or a run to view it.</p>
+    <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data. Click a point to view that run.</p>
     <div class="trend-grid">
       <figure class="card chart-card" style="margin:0">
         <figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
         <div id="trend"></div>
       </figure>
-      <div class="card scroll"><table class="runs" id="runs"></table></div>
     </div>
   </section>
 
@@ -396,17 +395,6 @@ const trendTip = i => { const r = S.runs[i];
     <div class="t-sep"></div><div>${esc(r.notes || '')}</div>
     ${r.run_id === S.selected ? '' : '<div class="t-hint">Click to view this run</div>'}`; };
 
-function renderRunsTable() {
-  $('runs').innerHTML = `<thead><tr><th>Run</th><th>What changed</th><th class="num">Score</th><th>Status</th><th class="num">Pass / Warn / Fail</th></tr></thead><tbody>` +
-    S.runs.slice().reverse().map(r => `<tr class="${r.run_id === S.selected ? 'current' : ''}" data-run="${r.run_id}">
-      <td><button type="button" class="run-btn" data-run="${r.run_id}" ${r.run_id === S.selected ? 'aria-current="true"' : ''}
-            aria-label="View run ${r.run_id}">#${r.run_id}</button>
-        <div class="run-note">${shortDate(r.started_at)}</div>${r.run_id === S.selected ? '<div class="viewing">Viewing</div>' : ''}</td>
-      <td class="run-note">${esc(shortNote(r.notes))}</td>
-      <td class="num">${Number(r.score).toFixed(1)}</td><td>${badge(r.status)}</td>
-      <td class="num">${r.passed} / ${r.warned} / ${r.failed}</td></tr>`).join('') + '</tbody>';
-}
-
 /* ---------- what changed (selected run vs its previous run) ---------- */
 function renderChanges() {
   const s = S.data.summary, checks = S.data.checks, prevId = s.previous_run_id;
@@ -496,7 +484,7 @@ function drawChecks() {
 
 /* ---------- switching runs ---------- */
 function renderAll() {
-  renderHeader(); renderTiles(); renderTrend(); renderRunsTable(); renderChanges(); renderHeat();
+  renderHeader(); renderTiles(); renderTrend(); renderChanges(); renderHeat();
   refreshTableOptions(); drawChecks();
 }
 async function showRun(id, { push = true } = {}) {
@@ -537,7 +525,6 @@ function wire() {
   trend.addEventListener('click', pick);
   trend.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(e); } });
 
-  $('runs').addEventListener('click', e => { const tr = e.target.closest('[data-run]'); if (tr) showRun(+tr.dataset.run); });
 
   const heat = $('heat');
   heat.addEventListener('mousemove', e => { const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
