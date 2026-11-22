@@ -31,7 +31,7 @@ if ($ExportOnly) {
     $run = if ($ResumeRunId -gt 0) { $ResumeRunId } else { [int](Invoke-Scalar "SELECT max(run_id) FROM discovery.dq_run;") }
     "export only: run_id = $run"
 } else {
-Step 'setup, engine, rules' { Invoke-File 'D00_setup.sql'; Invoke-File 'D01_functions.sql'; Invoke-File 'D02_rules.sql' }
+Step 'setup, engine, rules' { Invoke-File 'D00_setup.sql'; Invoke-File 'D01_functions.sql'; Invoke-File 'D02_rules.sql'; Invoke-File 'D04_events.sql' }
 if ($ResumeRunId -gt 0) {
     $run = $ResumeRunId
     "resuming run_id = $run"
@@ -137,32 +137,52 @@ SELECT json_build_object('latest_run_id', (SELECT max(run_id) FROM discovery.dq_
    FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
 "@
 
-Export-Json 'catalog.json' @"
-SELECT json_agg(json_build_object('table', table_name, 'table_type', table_type, 'description', description, 'rows', row_count,
-       'size_bytes', size_bytes, 'columns', column_count, 'primary_key', pk_columns, 'foreign_keys', fk_count,
-       'date_column', date_column, 'min_date', min_date, 'max_date', max_date) ORDER BY row_count DESC)
-FROM discovery.dq_table_catalog WHERE run_id = $run;
+# ---------- Explorer data (dashboard v3 tabs): per run, so the Columns and Daily volume tabs follow the run picker ----------
+function Export-Explorer([int]$run, [string]$dir) {
+Export-Json 'profile.json' -dir $dir -sql @"
+SELECT json_build_object('tables', json_agg(t ORDER BY (t->>'rows')::bigint DESC)) FROM (
+  SELECT json_build_object('table', c.table_name, 'type', c.table_type, 'description', c.description, 'rows', c.row_count,
+    'columns', (SELECT json_agg(json_build_object('column', p.column_name, 'ordinal', p.ordinal, 'type', p.data_type, 'family', p.type_family,
+        'description', col_description(format('cc.%I', p.table_name)::regclass, p.ordinal),
+        'rows', p.row_count, 'nulls', p.null_count, 'null_pct', p.null_pct, 'distinct', p.distinct_count,
+        'min', p.min_value, 'max', p.max_value, 'p01', p.p01, 'p50', p.p50, 'p99', p.p99, 'mean', round(p.mean_value, 2), 'true_pct', p.true_pct,
+        'top', (SELECT json_agg(json_build_object('v', d.value, 'n', d.row_count, 'pct', d.pct) ORDER BY d.rank)
+                FROM discovery.dq_distribution d WHERE d.run_id = p.run_id AND d.table_name = p.table_name AND d.column_name = p.column_name))
+      ORDER BY p.ordinal)
+      FROM discovery.dq_column_profile p WHERE p.run_id = c.run_id AND p.table_name = c.table_name)) AS t
+  FROM discovery.dq_table_catalog c WHERE c.run_id = $run) x;
+"@
+Export-Json 'volume.json' -dir $dir -sql @"
+SELECT json_build_object(
+  'days', (SELECT json_agg(day ORDER BY day) FROM discovery.dq_daily_volume WHERE run_id = $run AND table_name = 'contact'),
+  'tables', (SELECT json_object_agg(table_name, json_build_object('rows', r, 'base', b, 'out', o, 'closed', cl)) FROM (
+     SELECT table_name, json_agg(row_count ORDER BY day) AS r, json_agg(round(baseline) ORDER BY day) AS b,
+            json_agg(is_outlier::int ORDER BY day) AS o, json_agg(is_center_closed::int ORDER BY day) AS cl
+     FROM discovery.dq_daily_volume WHERE run_id = $run GROUP BY table_name) x));
+"@
+}
+Export-Explorer -run $run -dir (Join-Path $out "runs\$run")
+if ($AllRuns) {
+    $ids = & $psql @conn -At -c "SELECT DISTINCT run_id FROM discovery.dq_scorecard WHERE run_id < $run ORDER BY 1;"
+    foreach ($id in $ids) { Export-Explorer -run ([int]$id) -dir (Join-Path $out "runs\$id") }
+}
+
+# ---------- Rule catalogue: every rule with its result in every run ----------
+Export-Json 'rules.json' -sql @"
+SELECT json_agg(json_build_object('rule_id', r.rule_id, 'table', r.table_name, 'column', r.column_name, 'dimension', r.dimension,
+       'rule', r.rule_name, 'description', r.description, 'problem', r.problem_plain, 'severity', r.severity, 'unit', r.unit,
+       'warn_above', r.warn_above, 'fail_above', r.fail_above, 'expected_note', r.expected_note, 'sql', btrim(r.check_sql),
+       'history', (SELECT json_agg(json_build_object('run', c.run_id, 'status', c.status, 'value', c.measured_value, 'rule', c.rule_name) ORDER BY c.run_id)
+                   FROM discovery.dq_check_result c WHERE c.rule_id = r.rule_id))
+       ORDER BY r.rule_id)
+FROM discovery.dq_rule r WHERE r.is_active;
 "@
 
-Export-Json 'column_profile.json' @"
-SELECT json_agg(json_build_object('table', table_name, 'column', column_name, 'ordinal', ordinal, 'type', data_type, 'family', type_family,
-       'rows', row_count, 'nulls', null_count, 'null_pct', null_pct, 'distinct', distinct_count, 'distinct_pct', distinct_pct,
-       'min', min_value, 'max', max_value, 'mean', mean_value, 'stddev', stddev_value,
-       'p01', p01, 'p25', p25, 'p50', p50, 'p75', p75, 'p99', p99,
-       'zeros', zero_count, 'negatives', negative_count, 'empty_strings', empty_string_count, 'true_pct', true_pct)
-       ORDER BY table_name, ordinal)
-FROM discovery.dq_column_profile WHERE run_id = $run;
-"@
-
-Export-Json 'distribution.json' @"
-SELECT json_agg(json_build_object('table', table_name, 'column', column_name, 'rank', rank, 'value', value, 'rows', row_count, 'pct', pct)
-       ORDER BY table_name, column_name, rank)
-FROM discovery.dq_distribution WHERE run_id = $run;
-"@
-
-Export-Json 'daily_volume.json' @"
-SELECT json_agg(json_build_object('table', table_name, 'day', day, 'rows', row_count, 'baseline', round(baseline), 'ratio', round(ratio, 3),
-       'outlier', is_outlier, 'closed', is_center_closed) ORDER BY table_name, day)
-FROM discovery.dq_daily_volume WHERE run_id = $run;
+# ---------- Events that annotate the daily volume timeline ----------
+Export-Json 'events.json' -sql @"
+SELECT json_build_object(
+  'events', (SELECT json_agg(json_build_object('start', start_date, 'end', end_date, 'kind', kind, 'title', title, 'description', description) ORDER BY start_date) FROM discovery.dq_event),
+  'launches', (SELECT json_agg(json_build_object('date', launch_date, 'title', launch_name, 'type', launch_type, 'description', description) ORDER BY launch_date) FROM cc.product_launch),
+  'holidays', (SELECT json_agg(json_build_object('date', full_date, 'title', holiday_name, 'closed', is_center_closed) ORDER BY full_date) FROM cc.dim_date WHERE is_holiday));
 "@
 "done: run $run"
