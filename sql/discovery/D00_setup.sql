@@ -119,6 +119,16 @@ CREATE TABLE IF NOT EXISTS discovery.dq_daily_volume (
   PRIMARY KEY (run_id, table_name, day)
 );
 
+-- Context for business users (added for dashboard v2.4):
+--   dq_rule.problem_plain   what the problem is, in plain words ("a data field that was never filled in")
+--   dq_rule.evidence_sql    optional SELECT returning a JSON list of the specific items behind a result
+--   dq_check_result.evidence  that list, captured at check time
+--   dq_run.summary          what changed in the run, in plain words
+ALTER TABLE discovery.dq_rule         ADD COLUMN IF NOT EXISTS problem_plain text;
+ALTER TABLE discovery.dq_rule         ADD COLUMN IF NOT EXISTS evidence_sql text;
+ALTER TABLE discovery.dq_check_result ADD COLUMN IF NOT EXISTS evidence jsonb;
+ALTER TABLE discovery.dq_run          ADD COLUMN IF NOT EXISTS summary text;
+
 -- Health score per table x dimension
 CREATE TABLE IF NOT EXISTS discovery.dq_scorecard (
   run_id      int NOT NULL REFERENCES discovery.dq_run,

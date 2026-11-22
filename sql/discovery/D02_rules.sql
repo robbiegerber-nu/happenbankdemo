@@ -329,4 +329,80 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  'Customers whose relationship starts after the end of the period.',
  $$SELECT count(*) FROM cc.customer WHERE customer_since > date '2026-10-31'$$,'rows',0,0,'Medium',NULL);
 
+-- ======================= Business-user context =======================
+-- problem_plain: the problem in plain words, used in "What changed" headlines ("Fixed: <problem>")
+UPDATE discovery.dq_rule r SET problem_plain = v.p FROM (VALUES
+ ('CMP-005', 'phone and chat contacts where the customer was not identified'),
+ ('CMP-007', 'customers with no income band recorded'),
+ ('CMP-008', 'customers with no gender recorded'),
+ ('CMP-012', 'open days with no contacts recorded'),
+ ('CMP-018', 'a data field that was never filled in'),
+ ('UNQ-012', 'the same contact recorded twice'),
+ ('VAL-005', 'contacts recorded while the phones were closed'),
+ ('VAL-007', 'very long phone and chat waits'),
+ ('VAL-023', 'calls answered long after closing time'),
+ ('VAL-024', 'a data field that never changed'),
+ ('VAL-025', 'new product openings bunched on a few days'),
+ ('VOL-011', 'days with unusual contact volume'),
+ ('VOL-012', 'days with unusual phone menu (IVR) volume'),
+ ('VOL-013', 'days with an unusual number of agents logged in'),
+ ('VOL-014', 'days with unusual complaint volume')
+) v(id, p) WHERE r.rule_id = v.id;
+
+-- evidence_sql: returns a JSON list of {item, detail, records} (or {t, c, detail, records} for a data field)
+UPDATE discovery.dq_rule SET evidence_sql = $$
+  SELECT jsonb_agg(jsonb_build_object('t', table_name, 'c', column_name, 'records', row_count,
+           'detail', 'empty on all ' || to_char(row_count, 'FM999,999,999') || ' records') ORDER BY row_count DESC)
+  FROM discovery.dq_column_profile WHERE run_id = {run_id} AND row_count > 0 AND null_pct = 100$$
+WHERE rule_id = 'CMP-018';
+
+UPDATE discovery.dq_rule SET evidence_sql = $$
+  SELECT jsonb_agg(jsonb_build_object('t', table_name, 'c', column_name, 'records', row_count,
+           'detail', 'every one of ' || to_char(row_count, 'FM999,999,999') || ' records is "' || coalesce(min_value, 'true/false') || '"') ORDER BY row_count DESC)
+  FROM discovery.dq_column_profile WHERE run_id = {run_id} AND row_count > 1 AND distinct_count = 1
+    AND (table_name, column_name) NOT IN (('dim_site', 'timezone'))$$
+WHERE rule_id = 'VAL-024';
+
+UPDATE discovery.dq_rule SET evidence_sql = $$
+  SELECT jsonb_agg(jsonb_build_object('item', x.product_name, 'records', x.holders,
+           'detail', 'opened on only ' || x.days || ' different days (' || to_char(x.holders, 'FM999,999') || ' accounts)') ORDER BY x.days)
+  FROM (SELECT p.product_name, count(DISTINCT cp.open_date) AS days, count(*) AS holders, min(p.introduced_date) AS intro
+        FROM cc.customer_product cp JOIN cc.dim_product p USING (product_id) WHERE p.is_new_in_period GROUP BY 1) x
+  WHERE x.days < 0.5 * least(100, date '2026-10-31' - x.intro)$$
+WHERE rule_id = 'VAL-025';
+
+UPDATE discovery.dq_rule SET evidence_sql = $$
+  SELECT jsonb_agg(jsonb_build_object('item', x.bucket, 'records', x.n,
+           'detail', to_char(x.n, 'FM999,999') || ' contacts, ' || to_char(x.first_t, 'HH24:MI') || '–' || to_char(x.last_t, 'HH24:MI')) ORDER BY x.n DESC)
+  FROM (SELECT CASE WHEN d.is_center_closed THEN 'On a day the center was closed'
+                    WHEN c.offered_ts::time < CASE WHEN d.day_of_week = 6 THEN time '08:00' ELSE time '07:00' END THEN 'Before opening time'
+                    ELSE 'After closing time' END AS bucket,
+               count(*) AS n, min(c.offered_ts::time) AS first_t, max(c.offered_ts::time) AS last_t
+        FROM cc.contact c JOIN cc.dim_date d ON d.full_date = c.offered_ts::date
+        WHERE c.channel_id IN (1, 2) AND (d.is_center_closed
+          OR (d.day_of_week = 6 AND NOT c.offered_ts::time BETWEEN '08:00' AND '17:00')
+          OR (d.day_of_week < 6 AND NOT c.offered_ts::time BETWEEN '07:00' AND '21:00'))
+        GROUP BY 1) x$$
+WHERE rule_id = 'VAL-005';
+
+UPDATE discovery.dq_rule SET evidence_sql = $$
+  SELECT jsonb_agg(jsonb_build_object('item', 'Customer contacts on ' || to_char(x.ts, 'Mon DD, YYYY HH24:MI:SS'), 'records', x.n,
+           'detail', x.n || ' records with the same customer, channel and second'))
+  FROM (SELECT date_trunc('second', offered_ts) AS ts, count(*) AS n FROM cc.contact WHERE customer_id IS NOT NULL
+        GROUP BY customer_id, channel_id, date_trunc('second', offered_ts) HAVING count(*) > 1) x$$
+WHERE rule_id = 'UNQ-012';
+
+-- Volume rules: list the flagged days with how far they were from normal
+UPDATE discovery.dq_rule r SET evidence_sql = replace(replace($$
+  SELECT jsonb_agg(jsonb_build_object('item', to_char(day, 'Dy Mon DD, YYYY'), 'records', row_count,
+           'detail', CASE WHEN ratio >= 1 THEN round((ratio - 1) * 100) || '% above normal'
+                          ELSE round((1 - ratio) * 100) || '% below normal' END
+                     || ' (' || to_char(row_count, 'FM999,999') || ' ##WHAT## vs about ' || to_char(round(baseline), 'FM999,999') || ')')
+         ORDER BY abs(ratio - 1) DESC)
+  FROM discovery.dq_daily_volume WHERE run_id = {run_id} AND table_name = '##TBL##' AND is_outlier$$,
+  '##TBL##', v.tbl), '##WHAT##', v.what)
+FROM (VALUES ('VOL-011', 'contact', 'contacts'), ('VOL-012', 'ivr_session', 'calls'),
+             ('VOL-013', 'agents_logged_in', 'agents'), ('VOL-014', 'complaint', 'complaints')) v(id, tbl, what)
+WHERE r.rule_id = v.id;
+
 SELECT dimension, count(*) AS rules FROM discovery.dq_rule GROUP BY 1 ORDER BY 1;

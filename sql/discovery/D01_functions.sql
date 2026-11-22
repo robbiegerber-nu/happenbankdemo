@@ -126,20 +126,28 @@ END $$;
 
 -- ---------- 4. Run every active rule ----------
 CREATE OR REPLACE FUNCTION discovery.run_checks(p_run int) RETURNS void LANGUAGE plpgsql AS $$
-DECLARE r record; val numeric; st text; err text; t0 timestamptz;
+DECLARE r record; val numeric; st text; err text; t0 timestamptz; ev jsonb;
 BEGIN
   FOR r IN SELECT * FROM discovery.dq_rule WHERE is_active ORDER BY rule_id LOOP
-    t0 := clock_timestamp(); err := NULL;
+    t0 := clock_timestamp(); err := NULL; ev := NULL;
     BEGIN
       EXECUTE replace(r.check_sql, '{run_id}', p_run::text) INTO val;
       st := CASE WHEN val IS NULL THEN 'Error' WHEN val > r.fail_above THEN 'Fail' WHEN val > r.warn_above THEN 'Warn' ELSE 'Pass' END;
     EXCEPTION WHEN OTHERS THEN
       val := NULL; st := 'Error'; err := SQLERRM;
     END;
-    INSERT INTO discovery.dq_check_result
+    -- evidence: the specific items behind a non-zero result (which fields, which days, which products...)
+    IF r.evidence_sql IS NOT NULL AND coalesce(val, 0) > 0 THEN
+      BEGIN
+        EXECUTE replace(r.evidence_sql, '{run_id}', p_run::text) INTO ev;
+      EXCEPTION WHEN OTHERS THEN ev := jsonb_build_array(jsonb_build_object('item', 'Evidence could not be collected', 'detail', SQLERRM));
+      END;
+    END IF;
+    INSERT INTO discovery.dq_check_result (run_id, rule_id, table_name, column_name, dimension, rule_name, severity, measured_value, unit,
+            warn_above, fail_above, status, description, expected_note, error_message, duration_ms, checked_at, evidence)
     VALUES (p_run, r.rule_id, r.table_name, r.column_name, r.dimension, r.rule_name, r.severity, round(val, 4), r.unit,
             r.warn_above, r.fail_above, st, r.description, r.expected_note, err,
-            (extract(epoch FROM clock_timestamp() - t0) * 1000)::int, clock_timestamp());
+            (extract(epoch FROM clock_timestamp() - t0) * 1000)::int, clock_timestamp(), ev);
   END LOOP;
 END $$;
 

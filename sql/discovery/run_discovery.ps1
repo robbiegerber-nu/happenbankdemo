@@ -3,7 +3,8 @@
 #   -ResumeRunId N   finish an interrupted run from the rule-check step (keeps its catalog, profiles and volume)
 #   -ExportOnly      skip all checks; re-export JSON for the latest run (or -ResumeRunId N)
 #   -AllRuns         also re-export every earlier run's folder (docs/data/runs/<run_id>/)
-param([string]$Notes = 'Scheduled discovery run', [int]$ResumeRunId = 0, [switch]$ExportOnly, [switch]$AllRuns)
+#   -Summary "..."   what changed in this run, in plain words for business users (shown on the dashboard)
+param([string]$Notes = 'Scheduled discovery run', [string]$Summary = '', [int]$ResumeRunId = 0, [switch]$ExportOnly, [switch]$AllRuns)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -36,8 +37,8 @@ if ($ResumeRunId -gt 0) {
     "resuming run_id = $run"
     Invoke-Scalar "DELETE FROM discovery.dq_check_result WHERE run_id = $run; DELETE FROM discovery.dq_scorecard WHERE run_id = $run;" | Out-Null
 } else {
-    $notesSql = $Notes.Replace("'", "''")
-    $run = [int](Invoke-Scalar "INSERT INTO discovery.dq_run (notes) VALUES ('$notesSql') RETURNING run_id;")
+    $notesSql = $Notes.Replace("'", "''"); $summarySql = if ($Summary) { "'" + $Summary.Replace("'", "''") + "'" } else { 'NULL' }
+    $run = [int](Invoke-Scalar "INSERT INTO discovery.dq_run (notes, summary) VALUES ('$notesSql', $summarySql) RETURNING run_id;")
     "run_id = $run"
     Step 'table catalog'  { Invoke-Scalar "SELECT discovery.build_catalog($run);" | Out-Null }
     Step 'column profiles' {
@@ -66,7 +67,7 @@ function Export-Json([string]$name, [string]$sql, [string]$dir = $out) {
 function Export-RunFiles([int]$run, [string]$dir) {
 Export-Json 'summary.json' -dir $dir -sql @"
 SELECT json_build_object(
-  'run', (SELECT json_build_object('run_id', run_id, 'started_at', started_at, 'finished_at', finished_at, 'notes', notes) FROM discovery.dq_run WHERE run_id = $run),
+  'run', (SELECT json_build_object('run_id', run_id, 'started_at', started_at, 'finished_at', finished_at, 'notes', notes, 'summary', summary) FROM discovery.dq_run WHERE run_id = $run),
   'overall', (SELECT json_build_object('score', score, 'status', status, 'checks', checks, 'passed', passed, 'warned', warned, 'failed', failed)
               FROM discovery.dq_scorecard WHERE run_id = $run AND table_name = '(all tables)' AND dimension = '(all dimensions)'),
   'tables_monitored', (SELECT count(*) FROM discovery.dq_table_catalog WHERE run_id = $run),
@@ -92,9 +93,19 @@ Export-Json 'checks.json' -dir $dir -sql @"
 SELECT json_agg(json_build_object('rule_id', c.rule_id, 'table', c.table_name, 'column', c.column_name, 'dimension', c.dimension, 'rule', c.rule_name,
        'severity', c.severity, 'value', c.measured_value, 'unit', c.unit, 'warn_above', c.warn_above, 'fail_above', c.fail_above, 'status', c.status,
        'description', c.description, 'expected_note', c.expected_note, 'error', c.error_message, 'duration_ms', c.duration_ms,
-       'prev_status', p.status, 'prev_value', p.measured_value, 'prev_rule', p.rule_name)
+       'prev_status', p.status, 'prev_value', p.measured_value, 'prev_rule', p.rule_name,
+       'problem', q.problem_plain, 'evidence', c.evidence, 'prev_evidence', p.evidence,
+       -- for data fields flagged last run: how they look in this run (filled count, distinct values, top values)
+       'followup', (SELECT json_agg(json_build_object('t', e->>'t', 'c', e->>'c', 'rows', cp.row_count, 'filled', cp.row_count - cp.null_count,
+                           'distinct', cp.distinct_count,
+                           'top', (SELECT json_agg(json_build_object('v', d.value, 'n', d.row_count) ORDER BY d.rank)
+                                   FROM discovery.dq_distribution d WHERE d.run_id = $run AND d.table_name = e->>'t' AND d.column_name = e->>'c' AND d.rank <= 4)))
+                    FROM jsonb_array_elements(p.evidence) e
+                    JOIN discovery.dq_column_profile cp ON cp.run_id = $run AND cp.table_name = e->>'t' AND cp.column_name = e->>'c'
+                    WHERE e ? 'c'))
        ORDER BY CASE c.status WHEN 'Fail' THEN 0 WHEN 'Error' THEN 0 WHEN 'Warn' THEN 1 ELSE 2 END, c.rule_id)
 FROM discovery.dq_check_result c
+LEFT JOIN discovery.dq_rule q ON q.rule_id = c.rule_id
 LEFT JOIN discovery.dq_check_result p ON p.rule_id = c.rule_id
       AND p.run_id = (SELECT max(run_id) FROM discovery.dq_check_result WHERE run_id < $run)
 WHERE c.run_id = $run;
@@ -121,7 +132,7 @@ if ($AllRuns) {
 # Index of all runs for the dashboard's run picker and trend chart
 Export-Json 'index.json' -dir (Join-Path $out 'runs') -sql @"
 SELECT json_build_object('latest_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard), 'runs',
-  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'score', s.score, 'status', s.status,
+  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'summary', r.summary, 'score', s.score, 'status', s.status,
           'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
    FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
 "@

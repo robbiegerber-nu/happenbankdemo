@@ -132,13 +132,25 @@
 
   /* ---- Changes ---- */
   .changes { padding: 4px 0; }
-  .change { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--grid); }
+  .change { padding: 14px 16px; border-bottom: 1px solid var(--grid); }
   .change:last-child { border-bottom: none; }
-  .change .what { font-size: 0.88rem; }
-  .change .what .desc { color: var(--text-secondary); font-size: 0.8rem; }
-  .change .vals { font-size: 0.82rem; color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .arrow { color: var(--text-muted); margin: 0 2px; }
   .change .flow { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .ch-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+  .ch-title { font-size: 0.95rem; }
+  .ch-kind { font-weight: 700; }
+  .ch-kind.better { color: var(--good-ink); } .ch-kind.worse { color: var(--critical-ink); } .ch-kind.neutral { color: var(--text-primary); }
+  .ch-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 10px; }
+  @media (max-width: 700px) { .ch-grid { grid-template-columns: minmax(0, 1fr); } }
+  .ch-col { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 0.86rem; }
+  .ch-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+  .ch-what { font-weight: 600; margin-top: 2px; }
+  .ch-col ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-secondary); }
+  .ch-col li { margin: 3px 0; }
+  .ch-col li b { color: var(--text-primary); font-weight: 600; }
+  .ch-why { margin-top: 10px; font-size: 0.86rem; color: var(--text-secondary); }
+  .ch-why b { color: var(--text-primary); }
+  .ch-meta { margin-top: 6px; font-size: 0.75rem; color: var(--text-muted); }
 
   /* ---- Heatmap ---- */
   .scroll { overflow-x: auto; position: relative; }
@@ -288,7 +300,7 @@
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
   </section>
 
-  <footer>Data Quality Dashboard · v2.3 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <footer>Data Quality Dashboard · v2.4 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -592,17 +604,64 @@ function renderChanges() {
   const rank = { Pass: 0, Warn: 1, Fail: 2, Error: 2 };
   const changed = checks.filter(c => !c.prev_status || c.prev_status !== c.status || (c.prev_rule && c.prev_rule !== c.rule))
     .sort((a, b) => (rank[b.status] - rank[a.status]) || a.rule_id.localeCompare(b.rule_id));
-  $('changes-sub').textContent = `${changed.length} rule${changed.length === 1 ? '' : 's'} changed status or definition; ${checks.length - changed.length} unchanged.`;
-  $('changes').innerHTML = changed.length ? changed.map(c => {
-    const kind = !c.prev_status ? 'New rule' : c.prev_status !== c.status
-      ? (rank[c.status] < rank[c.prev_status] ? 'Improved' : 'Worse') : 'Rule redefined';
+  const kindOf = c => {
+    if (!c.prev_status) return { label: 'New check', cls: 'neutral' };
+    if (c.prev_status === c.status) return { label: 'Check refined', cls: 'neutral' };
+    if (rank[c.status] < rank[c.prev_status]) return c.status === 'Pass' ? { label: 'Fixed', cls: 'better' } : { label: 'Improved', cls: 'better' };
+    return c.prev_status === 'Pass' ? { label: c.status === 'Warn' ? 'New warning' : 'New problem', cls: 'worse' } : { label: 'Got worse', cls: 'worse' };
+  };
+  const kinds = changed.map(kindOf);
+  const tally = {}; kinds.forEach(k => tally[k.label] = (tally[k.label] || 0) + 1);
+  $('changes-sub').textContent = changed.length
+    ? `${changed.length} check${changed.length === 1 ? '' : 's'} changed: ${Object.entries(tally).map(([k, n]) => {
+        const plural = { 'New check': 'new checks', 'Check refined': 'checks refined', 'New warning': 'new warnings', 'New problem': 'new problems' };
+        return `${n} ${n > 1 && plural[k] ? plural[k] : k.toLowerCase()}`; }).join(', ')}. ${checks.length - changed.length} unchanged.`
+    : `Nothing changed: all ${checks.length} checks have the same result as run #${prevId}.`;
+  const why = s.run.summary || s.run.notes || '';
+  const whyHtml = why ? `<div class="change ch-why" style="margin-top:0"><b>What happened in run #${s.run.run_id}:</b> ${esc(why)}</div>` : '';
+  $('changes').innerHTML = whyHtml + (changed.length ? changed.map((c, i) => {
+    const k = kinds[i];
     const flow = !c.prev_status ? `${badge('New', 'New')} <span class="arrow">→</span> ${badge(c.status)}`
                                 : `${badge(c.prev_status)} <span class="arrow" aria-label="to">→</span> ${badge(c.status)}`;
-    return `<div class="change"><span class="flow">${flow}</span>
-      <div class="what"><strong>${esc(kind)}:</strong> <code>${esc(c.rule_id)}</code> ${esc(c.rule)}
-        <div class="desc">${esc(c.table)}${c.column ? '.' + esc(c.column) : ''} · ${esc(c.dimension)}</div></div>
-      <div class="vals">${c.prev_status ? `${fmtNum(c.prev_value, c.unit)} <span class="arrow">→</span> ` : ''}${fmtNum(c.value, c.unit)}</div></div>`;
-  }).join('') : `<div class="empty">No rule changed status since run #${prevId}.</div>`;
+    return `<div class="change">
+      <div class="ch-head"><span class="flow">${flow}</span>
+        <span class="ch-title"><span class="ch-kind ${k.cls}">${esc(k.label)}:</span> ${esc(problemOf(c))}</span></div>
+      <div class="ch-grid">
+        <div class="ch-col"><div class="ch-label">Before · run #${prevId}</div>${beforeHtml(c)}</div>
+        <div class="ch-col"><div class="ch-label">Now · run #${s.run.run_id}</div>${nowHtml(c)}</div>
+      </div>
+      <div class="ch-meta">Check ${esc(c.rule_id)} · ${esc(AREA[c.table] || c.table)} · ${esc(c.dimension)}</div>
+    </div>`;
+  }).join('') : `<div class="empty">Every check has the same result as run #${prevId}.</div>`);
+}
+
+/* ---------- change-card helpers: plain-language before / now ---------- */
+const humanize = s => String(s || '').replace(/_/g, ' ');
+// what the problem is, in plain words (stored with the rule; falls back to the rule name)
+const problemOf = c => c.problem || findingTitle(c.rule).replace(/ found$/, '').replace(/^./, m => m.toLowerCase());
+const evItem = e => e.item ? esc(e.item) : `${esc(AREA[e.t] || e.t)} › ${esc(humanize(e.c))}`;
+function evList(list, max = 4) {
+  if (!list || !list.length) return '';
+  const shown = list.slice(0, max).map(e => `<li><b>${evItem(e)}</b>${e.detail ? ': ' + esc(e.detail) : ''}</li>`).join('');
+  return `<ul>${shown}${list.length > max ? `<li>and ${list.length - max} more</li>` : ''}</ul>`;
+}
+function beforeHtml(c) {
+  if (!c.prev_status) return `<div class="ch-what">This check didn't exist yet</div>`;
+  const refined = c.prev_rule && c.prev_rule !== c.rule;
+  const what = Number(c.prev_value) > 0 ? plainFound(c.prev_value, c.unit) : 'Nothing flagged';
+  return `<div class="ch-what">${esc(what)}${refined ? ' <span style="font-weight:400;color:var(--text-muted)">(measured the old way)</span>' : ''}</div>${evList(c.prev_evidence)}`;
+}
+function nowHtml(c) {
+  if (Number(c.value) > 0) return `<div class="ch-what">${esc(plainFound(c.value, c.unit))}</div>${evList(c.evidence)}`;
+  // nothing flagged now: show how the data fields that were flagged last time look in this run
+  const fu = (c.followup || []).map(f => {
+    const name = `${esc(AREA[f.t] || f.t)} › ${esc(humanize(f.c))}`;
+    const prev = (c.prev_evidence || []).find(e => e.t === f.t && e.c === f.c);
+    if (prev && /^empty/.test(prev.detail || '')) return `<li><b>${name}</b>: now filled in on ${fmtInt(f.filled)} of ${fmtInt(f.rows)} records</li>`;
+    if (f.distinct > 1 && f.top) return `<li><b>${name}</b>: now has ${fmtInt(f.distinct)} different values: ${f.top.map(t => `${esc(t.v)} ${fmtInt(t.n)}`).join(' · ')}</li>`;
+    return `<li><b>${name}</b>: ${fmtInt(f.distinct)} different values across ${fmtInt(f.rows)} records</li>`;
+  }).join('');
+  return `<div class="ch-what">None found</div>${fu ? `<ul>${fu}</ul>` : ''}`;
 }
 
 /* ---------- scorecard ---------- */
