@@ -28,7 +28,8 @@ CREATE TEMP TABLE sched_iv AS
 SELECT gen.dk(it) AS date_key, gen.iv(it) AS interval_id, r.primary_channel_id AS grp,
        sum(extract(epoch FROM least(s.scheduled_end_ts, it + interval '15 min') - greatest(s.scheduled_start_ts, it))) / 900.0 AS fte
 FROM cc.agent_schedule s JOIN cc.dim_agent r USING (agent_id)
-CROSS JOIN LATERAL generate_series(s.scheduled_start_ts, s.scheduled_end_ts - interval '1 ms', interval '15 min') it
+-- cut at the quarter hour, not from the shift's own start (remediation R02)
+CROSS JOIN LATERAL generate_series(date_bin('15 min', s.scheduled_start_ts, timestamptz '2024-01-01 00:00'), s.scheduled_end_ts - interval '1 ms', interval '15 min') it
 WHERE s.activity = 'Open Shift'
 GROUP BY 1, 2, 3;
 
