@@ -1,7 +1,7 @@
 # Exports the JSON files the operational dashboards read (docs/data/dashboards/).
-#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers]
+#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers|service]
 # Env overrides (same as the discovery toolkit): HAPPEN_DB = database, HAPPEN_EXPORT = output folder.
-param([ValidateSet('all', 'executive', 'stability', 'drivers')][string]$Only = 'all')
+param([ValidateSet('all', 'executive', 'stability', 'drivers', 'service')][string]$Only = 'all')
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -60,4 +60,11 @@ if ($Only -in 'all', 'drivers') {
         Export-Gzip "drivers/agents/$m.json.gz" 'E07_driver_month.sql' @("m=$m", 't=driver_agent')
     }
     "{0,-36} {1,10:N0} bytes {2,4:N0}s" -f "drivers: $($months.Count) months", (Get-ChildItem (Join-Path $out 'drivers') -Recurse -File | Measure-Object Length -Sum).Sum, ((Get-Date) - $t).TotalSeconds
+}
+if ($Only -in 'all', 'service') {
+    Export-Json 'service/index.json' 'E08_service_index.sql'
+    $t = Get-Date
+    $months = (Get-Content (Join-Path $out 'service\index.json') -Raw -Encoding UTF8 | ConvertFrom-Json).months
+    foreach ($m in $months) { Export-Gzip "service/$m.json.gz" 'E09_service_month.sql' @("m=$m") }
+    "{0,-36} {1,10:N0} bytes {2,4:N0}s" -f "service: $($months.Count) months", (Get-ChildItem (Join-Path $out 'service') -File | Measure-Object Length -Sum).Sum, ((Get-Date) - $t).TotalSeconds
 }

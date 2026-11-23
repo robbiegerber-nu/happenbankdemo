@@ -10,7 +10,7 @@
   const NAV = [
     { group: 'Overview', items: [{ name: 'Executive scorecard', href: 'executive.html', id: 'executive' }] },
     { group: 'Operations', items: [
-      { name: 'Service & access', href: null }, { name: 'Workforce management', href: null }, { name: 'Agent & team coaching', href: null }] },
+      { name: 'Service & access', href: 'service.html', id: 'service' }, { name: 'Workforce management', href: null }, { name: 'Agent & team coaching', href: null }] },
     { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
       { name: 'Customer experience', href: null }, { name: 'Customer & persona insights', href: null },

@@ -66,6 +66,7 @@ main:focus { outline: none; }
 body {
   margin: 0; background: var(--page); color: var(--text-secondary);
   font-family: var(--font); font-size: 15px; line-height: 1.5;
+  font-variant-ligatures: none;   /* the font turns "(1)" into a circled digit */
 }
 a { color: var(--brand-blue); }
 a:hover { color: var(--brand-blue-hover); }
