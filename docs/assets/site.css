@@ -21,6 +21,7 @@
   --watch-wash: #F2A900; --watch-ink: #7A5200;
   --off-wash: #FD4621;   --off-ink: #B8260B;
   --wash-op: 0.12;
+  --on-ink: #FFFFFF;   /* icon color on a filled ink shape */
   --event: #636363;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
   --font: 'Rethink Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -36,7 +37,7 @@
     --good-wash: #2FD39A; --good-ink: #2FD39A;
     --watch-wash: #F2B92E; --watch-ink: #F2B92E;
     --off-wash: #FF6E4F; --off-ink: #FF6E4F;
-    --wash-op: 0.11; --event: #9E9A97;
+    --wash-op: 0.12; --on-ink: #141313; --event: #9E9A97;
     --shadow: none;
     color-scheme: dark;
   }
@@ -50,12 +51,13 @@
   --good-wash: #2FD39A; --good-ink: #2FD39A;
   --watch-wash: #F2B92E; --watch-ink: #F2B92E;
   --off-wash: #FF6E4F; --off-ink: #FF6E4F;
-  --wash-op: 0.11; --event: #9E9A97;
+  --wash-op: 0.12; --on-ink: #141313; --event: #9E9A97;
   --shadow: none;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--page); color: var(--text-secondary);
@@ -217,5 +219,5 @@ button { font: inherit; color: inherit; }
   .filter { flex: 1 1 140px; }
   .filter select { width: 100%; }
   .filter-bar .spacer { display: none; }
-  .filter-bar .btn, .filter-bar .link-btn { font-size: 13px; min-height: 36px; }
+  .filter-bar .btn, .filter-bar .link-btn, .filter-bar select { min-height: 44px; }
 }

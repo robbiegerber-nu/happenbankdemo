@@ -3,85 +3,59 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Quality Dashboard</title>
+<title>Data Quality Dashboard · Happen Bank Contact Center (demo)</title>
 <meta name="description" content="Data quality health of the synthetic Happen Bank contact center demo dataset: completeness, uniqueness, validity, consistency, volume and timeliness checks, tracked run over run.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.1">
+<script src="assets/site.js?v=1.1"></script>
 <style>
+  /* Colors, type, header and buttons come from assets/site.css. These aliases map this page's names onto the shared tokens. */
   :root {
-    color-scheme: light;
-    --page: #f9f9f7;
-    --surface: #fcfcfb;
-    --surface-2: #f3f3f0;
-    --text-primary: #0b0b0b;
-    --text-secondary: #52514e;
-    --text-muted: #6f6d68;
-    --grid: #e1e0d9;
-    --axis: #c3c2b7;
-    --border: rgba(11,11,11,0.10);
-    --accent: #2a78d6;
-    --series-1: #2a78d6;
-    --good: #0ca30c;     --good-ink: #006300;   --good-wash: #e6f4e6;
-    --warning: #fab219;  --warning-ink: #7a5200; --warning-wash: #fdf3dc;
-    --critical: #d03b3b; --critical-ink: #a32424; --critical-wash: #fbe6e6;
-    --none-wash: #f0efec;
-    --focus: #2a78d6;
+    --surface-2: var(--surface-warm); --axis: color-mix(in srgb, var(--text-muted) 45%, transparent);
+    --accent: var(--brand-blue); --series-1: var(--brand-blue); --focus: var(--brand-blue);
+    /* marks and text use the ink shades; fills are light washes */
+    --good: var(--good-ink); --warning: var(--watch-ink); --warning-ink: var(--watch-ink);
+    --critical: var(--off-ink); --critical-ink: var(--off-ink);
+    --pass-fill: color-mix(in srgb, var(--good-wash) calc(var(--wash-op) * 100%), var(--surface));
+    --warn-fill: color-mix(in srgb, var(--watch-wash) calc(var(--wash-op) * 100%), var(--surface));
+    --fail-fill: color-mix(in srgb, var(--off-wash) calc(var(--wash-op) * 100%), var(--surface));
+    --none-wash: var(--surface-warm); --band-op: 0.13;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:where(:not([data-theme="light"])) {
-      color-scheme: dark;
-      --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
-      --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
-      --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --accent: #3987e5; --series-1: #3987e5;
-      --good-ink: #3fc23f; --good-wash: #15301a;
-      --warning-ink: #fab219; --warning-wash: #3a2f12;
-      --critical-ink: #ef7070; --critical-wash: #3a1a1a;
-      --none-wash: #232321; --focus: #3987e5;
-    }
-  }
-  :root[data-theme="dark"] {
-    color-scheme: dark;
-    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
-    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #9a988f;
-    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --accent: #3987e5; --series-1: #3987e5;
-    --good-ink: #3fc23f; --good-wash: #15301a;
-    --warning-ink: #fab219; --warning-wash: #3a2f12;
-    --critical-ink: #ef7070; --critical-wash: #3a1a1a;
-    --none-wash: #232321; --focus: #3987e5;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--page); color: var(--text-primary);
-         font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.5; }
-  a { color: var(--accent); }
-  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
-  header { padding: 28px 0 8px; }
-  h1 { margin: 0; font-size: 1.6rem; letter-spacing: -0.01em; }
+  main.wrap { padding-top: 28px; color: var(--text-primary); }
   .sub { margin: 4px 0 0; color: var(--text-secondary); }
   .meta { margin: 10px 0 0; color: var(--text-muted); font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  .notice { margin: 16px 0 0; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border);
-            border-left: 3px solid var(--accent); border-radius: 8px; font-size: 0.85rem; color: var(--text-secondary); }
+  .notice { margin: 8px 0 0; font-size: 0.85rem; color: var(--text-secondary); }
+  h2, .inc { scroll-margin-top: 84px; }
+  .card-tools { display: flex; justify-content: flex-end; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; }
+  .chart-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; }
+  .chart-head .card-tools { margin: 0; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; min-height: 40px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
   section { margin: 28px 0; }
-  h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  section > h2 { margin-bottom: 4px; }
   .section-sub { margin: 0 0 12px; color: var(--text-secondary); font-size: 0.9rem; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
-  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); }
 
   /* ---- Stat tiles ---- */
   .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  .tile { padding: 16px 18px; }
+  .tile { padding: 16px 18px; min-width: 0; }
   .tile .label { color: var(--text-secondary); font-size: 0.82rem; }
-  .tile .value { font-size: 1.9rem; font-weight: 650; line-height: 1.15; margin-top: 4px; }
+  .tile .value { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; margin-top: 4px; }
   .tile .note { color: var(--text-muted); font-size: 0.8rem; margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
   .tile.hero .value { font-size: 2.6rem; }
   .delta { font-size: 0.82rem; font-weight: 600; }
   .delta.up { color: var(--good-ink); } .delta.down { color: var(--critical-ink); } .delta.flat { color: var(--text-muted); }
-  .counts { display: grid; grid-template-columns: repeat(3, auto); justify-content: start; gap: 4px 14px; margin-top: 8px; font-size: 0.9rem; }
+  .counts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 0.9rem; }
   .counts > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
   /* ---- Status badges (icon + label, never colour alone) ---- */
   .badge { display: inline-flex; align-items: center; gap: 5px; font-weight: 600; font-size: 0.82rem; white-space: nowrap; }
   .badge .dot { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center;
-                font-size: 11px; font-weight: 800; color: #fff; flex: none; }
+                font-size: 11px; font-weight: 800; color: var(--on-ink); flex: none; }
   .badge.Pass .dot { background: var(--good); }
-  .badge.Warn .dot { background: var(--warning); color: #0b0b0b; }
+  .badge.Warn .dot { background: var(--warning); color: var(--on-ink); }
   .badge.Fail .dot, .badge.Error .dot { background: var(--critical); }
   .badge.Pass { color: var(--good-ink); } .badge.Warn { color: var(--warning-ink); }
   .badge.Fail, .badge.Error { color: var(--critical-ink); }
@@ -104,6 +78,7 @@
   svg.trend .pt-label { fill: var(--text-primary); font-size: 12px; font-weight: 650; }
   svg.trend .hit { fill: transparent; cursor: default; }
   svg.trend .hit:focus { outline: none; }
+  svg.trend .hit:focus-visible { stroke: var(--focus); stroke-width: 2; }
   svg.trend .hit:focus + .pt, svg.trend .hover .pt { r: 7; }
   .runs { font-size: 0.85rem; min-width: 460px; }
   .runs th { text-align: left; font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px; border-bottom: 1px solid var(--grid); }
@@ -124,13 +99,7 @@
   svg.trend .phase-rule { stroke: var(--axis); stroke-width: 1; }
   svg.trend .phase-cap { fill: var(--text-secondary); font-size: 11px; font-weight: 600; }
 
-  /* ---- Run picker ---- */
-  .runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
-  .runbar label { font-size: 0.85rem; font-weight: 600; }
-  .runbar select { font: inherit; font-size: 0.9rem; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--border);
-                   background: var(--surface); color: var(--text-primary); max-width: 100%; }
-  .runbar select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
-  .older { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: var(--warning-wash); border: 1px solid var(--border);
+  .older { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: var(--warn-fill); border: 1px solid var(--border);
            border-left: 3px solid var(--warning); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 0.88rem; }
   .older[hidden] { display: none; }
   .loading { opacity: 0.55; transition: opacity 0.1s; }
@@ -148,7 +117,7 @@
   .ch-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 10px; }
   @media (max-width: 700px) { .ch-grid { grid-template-columns: minmax(0, 1fr); } }
   .ch-col { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 0.86rem; }
-  .ch-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+  .ch-label { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); }
   .ch-what { font-weight: 600; margin-top: 2px; }
   .ch-col ul { margin: 6px 0 0; padding-left: 18px; color: var(--text-secondary); }
   .ch-col li { margin: 3px 0; }
@@ -173,8 +142,8 @@
   button.cell:hover { border-color: var(--axis); }
   button.cell:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   button.cell.selected { border-color: var(--text-primary); }
-  .cell.Pass { background: var(--good-wash); } .cell.Warn { background: var(--warning-wash); }
-  .cell.Fail, .cell.Error { background: var(--critical-wash); } .cell.None { background: var(--none-wash); color: var(--text-muted); font-size: 0.8rem; }
+  .cell.Pass { background: var(--pass-fill); } .cell.Warn { background: var(--warn-fill); }
+  .cell.Fail, .cell.Error { background: var(--fail-fill); } .cell.None { background: var(--none-wash); color: var(--text-muted); font-size: 0.8rem; }
   .cell .score { font-size: 0.75rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .heat td.total { border-left: 2px solid var(--grid); }
   .heat tr:last-child th, .heat tr:last-child td { border-bottom: none; }
@@ -208,12 +177,8 @@
   /* ---- Filters + checks table ---- */
   .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
   .filters label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--text-secondary); gap: 3px; }
-  .filters select, .filters input { font: inherit; font-size: 0.88rem; padding: 6px 8px; border-radius: 6px;
+  .filters select, .filters input { font: inherit; font-size: 0.88rem; padding: 6px 10px; border-radius: 8px; min-height: 40px; max-width: 100%;
             border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); min-width: 150px; }
-  .btn { font: inherit; font-size: 0.85rem; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border);
-         background: var(--surface); color: var(--text-primary); cursor: pointer; }
-  .btn:hover { background: var(--surface-2); }
-  .btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
   .filters .count { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
   .checks { min-width: 860px; font-size: 0.86rem; }
   .checks th { text-align: left; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px;
@@ -227,18 +192,17 @@
   .checks code { font-size: 0.8rem; white-space: nowrap; }
   .table-wrap { max-height: 640px; overflow: auto; }
   .empty { padding: 24px; text-align: center; color: var(--text-muted); }
-  footer { padding: 24px 0 40px; color: var(--text-muted); font-size: 0.8rem; }
 
   /* ---- Tabs ---- */
   .tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--grid); overflow-x: auto; scrollbar-width: none; }
-  .tabs button { font: inherit; font-size: 0.92rem; font-weight: 600; color: var(--text-secondary); background: none; border: 0;
+  .tabs button { min-height: 44px; font: inherit; font-size: 0.92rem; font-weight: 600; color: var(--text-secondary); background: none; border: 0;
                  border-bottom: 2px solid transparent; padding: 10px 14px 9px; cursor: pointer; white-space: nowrap; margin-bottom: -1px; }
   .tabs button:hover { color: var(--text-primary); }
   .tabs button[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--accent); }
   .tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 6px 6px 0 0; }
   [role="tabpanel"][hidden] { display: none; }
   .sub-h { font-size: 0.95rem; margin: 22px 0 8px; }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; align-self: end; }
+  .seg { min-height: 40px; display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; align-self: end; }
   .seg button { font: inherit; font-size: 0.85rem; padding: 6px 11px; border: 0; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text-primary); font-weight: 650; }
@@ -255,7 +219,7 @@
   .fill .bar span { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
   .typ { color: var(--text-secondary); font-size: 0.82rem; max-width: 300px; }
   .typ .v { color: var(--text-primary); }
-  .cols tr.flagged td { background: var(--warning-wash); }
+  .cols tr.flagged td { background: var(--warn-fill); }
 
   /* ---- Daily volume tab ---- */
   #v-days { min-width: 620px; }
@@ -265,13 +229,11 @@
   svg.vol .grid line { stroke: var(--grid); stroke-width: 1; }
   svg.vol .axis-label { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
   svg.vol .band { fill: var(--series-1); opacity: var(--band-op, 0.13); }
-  @media (prefers-color-scheme: dark) { :root:where(:not([data-theme="light"])) { --band-op: 0.26; } }
-  :root[data-theme="dark"] { --band-op: 0.26; }
   svg.vol .line { fill: none; stroke: var(--series-1); stroke-width: 1.5; stroke-linejoin: round; }
   svg.vol .out { fill: var(--warning); stroke: var(--surface); stroke-width: 2; }
-  svg.vol .ev { fill: var(--text-primary); opacity: 0.07; }
+  svg.vol .ev { fill: var(--event); opacity: 0.12; }
   svg.vol .ev-label { fill: var(--text-secondary); font-size: 11px; font-weight: 600; }
-  svg.vol .launch { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  svg.vol .launch { stroke: var(--event); stroke-opacity: 0.6; stroke-width: 1; }
   svg.vol .launch-mk { fill: var(--text-secondary); }
   svg.vol .hol { fill: var(--text-muted); }
   svg.vol .cross { stroke: var(--text-primary); stroke-width: 1; opacity: 0.5; }
@@ -281,7 +243,7 @@
 
   /* ---- Daily load card + incidents (v3.1) ---- */
   .tab-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px;
-               background: var(--critical); color: #fff; font-size: 0.7rem; font-weight: 700; vertical-align: 1px; }
+               background: var(--critical); color: var(--on-ink); font-size: 0.7rem; font-weight: 700; vertical-align: 1px; }
   .loads { min-width: 640px; font-size: 0.85rem; }
   .loads th { text-align: left; font-size: 0.74rem; color: var(--text-secondary); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--grid); background: var(--surface-2); }
   .loads td { padding: 8px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
@@ -325,8 +287,8 @@
   .tag { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--surface-2);
          border: 1px solid var(--border); color: var(--text-secondary); margin-left: 6px; vertical-align: 1px; }
   .strip { display: flex; gap: 3px; align-items: center; }
-  .strip .s { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; }
-  .strip .s.Pass { background: var(--good); } .strip .s.Warn { background: var(--warning); color: #0b0b0b; }
+  .strip .s { width: 18px; height: 18px; border-radius: 50%; display: inline-grid; place-items: center; font-size: 10px; font-weight: 800; color: var(--on-ink); }
+  .strip .s.Pass { background: var(--good); } .strip .s.Warn { background: var(--warning); color: var(--on-ink); }
   .strip .s.Fail, .strip .s.Error { background: var(--critical); }
   .strip .s.none { background: none; border: 1px dashed var(--axis); color: var(--text-muted); }
   .strip .s.cur { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text-primary); }
@@ -346,6 +308,14 @@
     .r-body { padding-left: 16px; }
     .strip-label { text-align: left; }
   }
+  @media (max-width: 767px) {
+    main button:not(.run-btn), main select, main input[type="search"], .tabs button, .toggle { min-height: 44px; }
+    .runs .run-btn { min-height: 44px; min-width: 44px; text-align: left; }
+    .filters label { flex: 1 1 150px; } main .filters select, main .filters input { width: 100%; min-height: 44px; }
+    .seg { flex-wrap: wrap; }
+    .rule > summary, details.sql > summary { min-height: 44px; }
+    .filter-bar .filter { flex: 1 1 100%; }
+  }
   @media (max-width: 600px) {
     .tile.hero .value { font-size: 2.2rem; }
     .filters .count { margin-left: 0; width: 100%; }
@@ -355,24 +325,26 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Data Quality Dashboard</h1>
-    <p class="sub">Can we trust the Happen Bank contact center demo dataset? Automated checks across six data quality dimensions, tracked run over run.</p>
-    <div class="runbar" id="runbar" hidden>
-      <label for="run-select">Viewing</label>
-      <select id="run-select"></select>
-    </div>
-    <div class="meta" id="meta">Loading…</div>
-    <div class="older" id="older" hidden role="status">
-      <span id="older-text"></span>
-      <button type="button" class="btn" id="to-latest"></button>
-    </div>
-    <div class="notice">All data is <strong>synthetic</strong>, generated for demonstration. It is not real Happen Bank data.
-      Definitions: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary">Data Dictionary</a> ·
-      How this was built: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery">Data Discovery</a> ·
-      <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/3b-Iteration-Log">Iteration Log</a></div>
-  </header>
+<div class="filter-bar" role="region" aria-label="Filters">
+  <div class="wrap">
+    <label class="filter" id="runbar" hidden><span class="flabel">Run</span>
+      <select id="run-select" aria-label="Run"></select></label>
+    <button class="link-btn" id="reset" type="button">Reset to default</button>
+    <span class="spacer"></span>
+    <button class="btn" id="copy-link" type="button">Copy link</button>
+  </div>
+</div>
+<main class="wrap" id="main">
+  <h1>Data quality dashboard</h1>
+  <p class="sub">Can we trust the contact center demo dataset? Automated checks across six data quality dimensions, tracked run over run.</p>
+  <div class="meta" id="meta">Loading…</div>
+  <div class="older" id="older" hidden role="status">
+    <span id="older-text"></span>
+    <button type="button" class="btn" id="to-latest"></button>
+  </div>
+  <p class="notice">Definitions: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary">Data dictionary</a> ·
+    How this was built: <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery">Data discovery</a> ·
+    <a href="https://github.com/robbiegerber-nu/happenbankdemo/wiki/3b-Iteration-Log">Iteration log</a></p>
 
   <nav class="tabs" role="tablist" aria-label="Dashboard views">
     <button type="button" role="tab" id="t-overview" data-tab="overview" aria-controls="tab-overview" aria-selected="true">Overview</button>
@@ -390,6 +362,7 @@
   <section aria-labelledby="h-load" id="load-section" hidden>
     <h2 id="h-load">Daily load</h2>
     <p class="section-sub" id="load-sub"></p>
+    <div class="card-tools"><button class="btn" type="button" id="load-csv">Download CSV</button></div>
     <div class="card" id="load-card"></div>
   </section>
 
@@ -398,8 +371,10 @@
     <p class="section-sub">Every discovery run is kept, so you can see whether fixes actually improved the data. Click a point to view that run.</p>
     <div class="trend-grid">
       <figure class="card chart-card" style="margin:0">
-        <figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
+        <div class="chart-head"><figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
+          <div class="card-tools"><button class="btn" type="button" id="trend-csv" hidden>Download CSV</button><button class="btn" type="button" id="trend-table" aria-pressed="false">View as table</button></div></div>
         <div id="trend"></div>
+        <div id="trend-tbl" class="scroll" hidden></div>
       </figure>
     </div>
   </section>
@@ -413,6 +388,7 @@
   <section aria-labelledby="h-score">
     <h2 id="h-score">Health scorecard</h2>
     <p class="section-sub">Each cell scores one table on one data quality dimension. Hover for details; click a cell to see its checks below.</p>
+    <div class="card-tools"><button class="btn" type="button" id="heat-csv">Download CSV</button></div>
     <div class="card">
       <div class="scroll"><table class="heat" id="heat"></table></div>
       <div class="legend">
@@ -434,6 +410,7 @@
       <label>Search <input id="f-text" type="search" placeholder="Rule, column, description"></label>
       <button class="btn" id="f-clear" type="button">Clear filters</button>
       <span class="count" id="f-count" aria-live="polite"></span>
+      <button class="btn" type="button" id="checks-csv">Download CSV</button>
     </div>
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="checks"></table></div></div>
   </section>
@@ -449,6 +426,7 @@
       <label>Show <select id="c-show"><option value="">All fields</option><option value="flag">Only flagged fields</option><option value="blank">Fields with blanks</option></select></label>
       <label>Search <input id="c-text" type="search" placeholder="Field name or description"></label>
       <span class="count" id="c-count" aria-live="polite"></span>
+      <button class="btn" type="button" id="cols-csv">Download CSV</button>
     </div>
     <div class="card col-summary" id="c-summary"></div>
     <div class="card"><div class="table-wrap scroll"><table class="checks cols" id="c-table-view"></table></div></div>
@@ -471,11 +449,14 @@
       </span>
     </div>
     <figure class="card chart-card" style="margin:0">
-      <figcaption class="chart-title" id="v-title"></figcaption>
+      <div class="chart-head"><figcaption class="chart-title" id="v-title"></figcaption>
+        <div class="card-tools"><label class="toggle"><input type="checkbox" id="v-events" checked> Show events</label><button class="btn" type="button" id="vol-csv" hidden>Download CSV</button><button class="btn" type="button" id="v-astable" aria-pressed="false">View as table</button></div></div>
       <div id="v-chart"></div>
       <div class="legend" id="v-legend"></div>
+      <div id="v-tbl" class="table-wrap scroll" hidden></div>
     </figure>
     <h3 class="sub-h">Unusual days in this range</h3>
+    <div class="card-tools"><button class="btn" type="button" id="days-csv">Download CSV</button></div>
     <div class="card"><div class="table-wrap scroll"><table class="checks" id="v-days"></table></div></div>
   </section>
   </div>
@@ -492,6 +473,7 @@
       <label>History <select id="r-hist"><option value="">All</option><option value="changed">Result changed over time</option><option value="new">Added or refined later</option></select></label>
       <label>Search <input id="r-text" type="search" placeholder="Check name, area or description"></label>
       <span class="count" id="r-count" aria-live="polite"></span>
+      <button class="btn" type="button" id="rules-csv">Download CSV</button>
     </div>
     <div class="card" id="r-list"></div>
   </section>
@@ -510,12 +492,12 @@
   </section>
   </div>
 
-  <footer>Data Quality Dashboard · v3.2 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
-    <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
-</div>
+</main>
 <div class="tip" id="tip" role="tooltip"></div>
 
 <script>
+Site.renderChrome('quality');
+const signed = (n, d = 1) => { const r = Number(n.toFixed(d)); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toFixed(d); };
 const DIMS = ['Completeness', 'Uniqueness', 'Validity', 'Consistency', 'Volume', 'Timeliness'];
 const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕', New: '+', Info: 'i' };
 const UNIT_SINGULAR = { rows: 'row', days: 'day', columns: 'column', products: 'product' };
@@ -524,13 +506,16 @@ const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
 const fmtNum = (v, unit) => {
   if (v == null) return '—';
   const n = Number(v);
-  if (unit === '%') return n.toFixed(n < 1 && n !== 0 ? 3 : 2) + '%';
+  // one decimal; more only where it would hide the value (tiny failure rates and their limits)
+  if (unit === '%') return n.toFixed(n !== 0 && n < 1 ? 3 : 1) + '%';
   const s = Number.isInteger(n) ? fmtInt(n) : n.toLocaleString('en-US', { maximumFractionDigits: 2 });
   return `${s} ${n === 1 && UNIT_SINGULAR[unit] ? UNIT_SINGULAR[unit] : unit}`;
 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const badge = (st, label = st) => `<span class="badge ${st}"><span class="dot" aria-hidden="true">${ICON[st]}</span>${label}</span>`;
-const fmtDate = d => new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+const fmtDate = d => { const t = new Date(d), tz = 'America/Chicago';
+  return t.toLocaleDateString('en-US', { timeZone: tz, month: 'short', day: 'numeric', year: 'numeric' }) + ', ' +
+    t.toLocaleTimeString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' }).replace(/\s?([AP])M/, (_, x) => ' ' + x.toLowerCase() + 'm') + ' CT'; };
 const shortDate = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const shortNote = n => (n || '').replace(/^Run \d+:\s*/, '');
 // business days are plain dates: format them without a time-zone shift
@@ -569,14 +554,15 @@ function renderHeader() {
   $('run-select').value = String(S.selected);
   $('meta').innerHTML =
     `<span>Run #${s.run.run_id} · ${fmtDate(s.run.finished_at || s.run.started_at)}</span>` +
-    `<span>Data period ${s.period.start} → ${s.period.end}</span><span>${esc(s.run.notes || '')}</span>`;
+    `<span>Data period ${Site.fmt.date(s.period.start)} – ${Site.fmt.date(s.period.end)}</span><span>${esc(s.run.notes || '')}</span>`;
   const older = S.selected !== S.latest;
   $('older').hidden = !older;
   if (older) {
     $('older-text').innerHTML = `<strong>You're viewing an earlier run (#${S.selected}).</strong> The latest is run #${S.latest}.`;
     $('to-latest').textContent = `Back to latest (run #${S.latest})`;
   }
-  document.title = older ? `Data Quality Dashboard · Run #${S.selected}` : 'Data Quality Dashboard';
+  document.title = older ? `Data Quality Dashboard · Run #${S.selected} · Happen Bank Contact Center (demo)` : 'Data Quality Dashboard · Happen Bank Contact Center (demo)';
+  $('footer-generated').textContent = `Data Quality Dashboard v3.3 · run #${s.run.run_id}, ${fmtDate(s.run.finished_at || s.run.started_at)} · source: discovery schema in PostgreSQL, exported by sql/discovery/run_discovery.ps1`;
 }
 
 function renderTiles() {
@@ -585,8 +571,8 @@ function renderTiles() {
   if (prev) {
     const d = Number(o.score) - Number(prev.score);
     const cls = d > 0.05 ? 'up' : d < -0.05 ? 'down' : 'flat';
-    const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '■';
-    delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${d >= 0 ? '+' : ''}${d.toFixed(1)} vs run #${prev.run_id}</span>`;
+    const arrow = cls === 'up' ? '▲' : cls === 'down' ? '▼' : '–';
+    delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${cls === 'flat' ? 'No change' : signed(d)} vs run #${prev.run_id}</span>`;
   }
   $('tiles').innerHTML = `
     <div class="card tile hero"><div class="label has-tip" data-ktip="score">Overall health score<i class="info" aria-hidden="true">i</i></div>
@@ -784,7 +770,7 @@ function renderTrend() {
   const phases = [];
   h.forEach((r, i) => { const p = phaseOf(r); if (!phases.length || phases[phases.length - 1].p !== p) phases.push({ p, a: i, b: i }); else phases[phases.length - 1].b = i; });
   const twoPhases = phases.length > 1;
-  const W = Math.max(280, Math.round($('trend').clientWidth || 560)), H = twoPhases ? 256 : 230, m = { t: 22, r: 28, b: twoPhases ? 70 : 44, l: 40 };
+  const W = Math.max(280, Math.round($('trend').clientWidth || $('trend').closest('figure').clientWidth - 32 || 560)), H = twoPhases ? 256 : 230, m = { t: 22, r: 28, b: twoPhases ? 70 : 44, l: 40 };
   const lo = Math.max(0, Math.floor((Math.min(...h.map(r => +r.score)) - 2) / 2) * 2), hi = 100;
   const x = i => h.length === 1 ? (m.l + W - m.r) / 2 : m.l + i * (W - m.l - m.r) / (h.length - 1);
   const y = v => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
@@ -828,6 +814,10 @@ function renderTrend() {
         </g>`).join('')}
       ${si >= 0 ? `<text class="pt-label" x="${x(si)}" y="${y(+h[si].score) - 15}" text-anchor="middle">${Number(h[si].score).toFixed(1)}</text>` : ''}
     </svg>`;
+}
+function renderTrendTable() {
+  $('trend-tbl').innerHTML = `<table class="runs"><thead><tr><th>Run</th><th>Data through</th><th class="num">Score</th><th>Status</th><th class="num">Pass</th><th class="num">Warn</th><th class="num">Fail</th></tr></thead><tbody>` +
+    S.runs.slice().reverse().map(r => `<tr class="${r.run_id === S.selected ? 'current' : ''}" data-run="${r.run_id}"><td><button type="button" class="run-btn">#${r.run_id}</button></td><td>${r.data_to ? Site.fmt.date(r.data_to) : '—'}</td><td class="num">${Number(r.score).toFixed(1)}</td><td>${badge(r.status)}</td><td class="num">${r.passed}</td><td class="num">${r.warned}</td><td class="num">${r.failed}</td></tr>`).join('') + '</tbody></table>';
 }
 const trendTip = i => { const r = S.runs[i];
   return `<div class="t-title">Run #${r.run_id} · ${r.business_date ? 'data for ' + dayShort(r.business_date) : r.data_to ? 'data to ' + dayShort(r.data_to) : fmtDate(r.started_at)}</div>
@@ -953,17 +943,47 @@ const heatTip = d => {
 };
 
 /* ---------- checks table ---------- */
+/* filters live in the address, so a copied link opens the same view */
+const FILTERS = ['f-status', 'f-dim', 'f-table', 'f-text', 'c-table', 'c-show', 'c-text', 'v-table', 'r-status', 'r-dim', 'r-sev', 'r-hist', 'r-text', 'i-status'];
+const LATE = ['f-table', 'c-table', 'v-table'];         // lists filled once their data loads
+const dfltOf = id => id === 'c-table' || id === 'v-table' ? 'contact' : '';
+const asked = new URL(location.href).searchParams;      // late lists read their starting value from here, once
+const takeAsked = id => { const v = asked.get(id); asked.delete(id); return v; };
+function saveFilters() {
+  const url = new URL(location.href), p = url.searchParams;
+  FILTERS.forEach(id => { if (asked.has(id)) return;    // not applied yet: keep what the link asked for
+    const v = $(id).value; if (v && v !== dfltOf(id)) p.set(id, v); else p.delete(id); });
+  if (V.range !== V_DEFAULT) p.set('range', V.range); else p.delete('range');
+  if (url.href !== location.href) history.replaceState(history.state, '', url);
+}
+function setRange(r) { V.range = r; $('v-range').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === r)); }
+const validRange = r => [...$('v-range').querySelectorAll('button')].some(b => b.dataset.range === r);
+function applyFilters() {                               // on load
+  FILTERS.filter(id => !LATE.includes(id)).forEach(id => { const v = takeAsked(id), el = $(id);
+    if (v != null && (!el.options || [...el.options].some(o => o.value === v))) el.value = v; });
+  const r = takeAsked('range'); if (validRange(r)) setRange(r);
+}
+function restoreFilters() {                             // back and forward
+  const p = new URL(location.href).searchParams;
+  FILTERS.forEach(id => { $(id).value = p.get(id) || dfltOf(id); });
+  setRange(validRange(p.get('range')) ? p.get('range') : V_DEFAULT);
+  if (S.data) { drawChecks(); renderActiveTab(); }
+}
+
 const F = { s: $('f-status'), d: $('f-dim'), t: $('f-table'), x: $('f-text') };
 function refreshTableOptions() {
-  const keep = F.t.value, tables = [...new Set(S.data.checks.map(c => c.table))].sort();
+  const keep = takeAsked('f-table') || F.t.value, tables = [...new Set(S.data.checks.map(c => c.table))].sort();
   F.t.innerHTML = '<option value="">All</option>' + tables.map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
   F.t.value = tables.includes(keep) ? keep : '';
 }
-function drawChecks() {
+function filteredChecks() {
   const checks = S.data.checks, q = F.x.value.trim().toLowerCase();
-  const rows = checks.filter(c => (!F.s.value || c.status === F.s.value) && (!F.d.value || c.dimension === F.d.value) &&
+  return checks.filter(c => (!F.s.value || c.status === F.s.value) && (!F.d.value || c.dimension === F.d.value) &&
     (!F.t.value || c.table === F.t.value) &&
     (!q || [c.rule_id, c.rule, c.column, c.description, c.table].join(' ').toLowerCase().includes(q)));
+}
+function drawChecks() {
+  const checks = S.data.checks, rows = filteredChecks();
   $('f-count').textContent = `${rows.length} of ${checks.length} checks`;
   const hd = (label, cls = '') => `<th${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-chtip="${label}" tabindex="0"
       aria-label="${label}: what is in this column?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
@@ -1075,7 +1095,7 @@ function drawIncidents() {
   const list = S.incidents || [], f = $('i-status').value;
   const shown = list.filter(i => !f || i.status === f);
   $('i-count').textContent = `${shown.length} of ${list.length} incidents`;
-  if (!list.length) { $('i-list').innerHTML = `<div class="card empty">No incidents yet. Incidents start with the daily loads from 1 Nov 2026 (run #6 onward).</div>`; return; }
+  if (!list.length) { $('i-list').innerHTML = `<div class="card empty">No incidents yet. Incidents start with the daily loads from Nov 1, 2026 (run #6 onward).</div>`; return; }
   $('i-list').innerHTML = shown.map(i => {
     const last = (i.updates || [])[i.updates.length - 1] || {};
     const now = (last.checks || []).filter(c => +c.records > 0);
@@ -1101,8 +1121,10 @@ function drawIncidents() {
 }
 
 /* ---------- Columns: profile explorer ---------- */
-const trimTs = v => { const s = String(v ?? ''); return /^\d{4}-\d\d-\d\d[ T]\d\d:\d\d/.test(s) ? s.slice(0, 16).replace('T', ' ') : s; };
-const pct = n => n == null ? '—' : (n > 0 && n < 0.1 ? '<0.1' : n > 99.9 && n < 100 ? '>99.9' : Number(n).toFixed(1).replace(/\.0$/, '')) + '%';
+const trimTs = v => { const s = String(v ?? ''), m = /^\d{4}-\d\d-\d\d(?:[ T](\d\d):(\d\d))?/.exec(s);
+  if (!m || (!m[1] && s.length > 10)) return s;
+  return Site.fmt.date(s) + (m[1] ? `, ${(+m[1] % 12) || 12}:${m[2]} ${+m[1] < 12 ? 'am' : 'pm'}` : ''); };
+const pct = n => n == null ? '—' : (n > 0 && n < 0.1 ? '<0.1' : n > 99.9 && n < 100 ? '>99.9' : Number(n).toFixed(1)) + '%';
 function colFlag(c) {
   if (c.rows > 0 && Number(c.null_pct) >= 100) return 'Always empty';
   if (c.rows > 1 && c.distinct === 1) return 'Same value on every record';
@@ -1133,22 +1155,26 @@ function colTip(c) {
   return h;
 }
 function renderColumns(p) {
-  const sel = $('c-table'), keep = sel.value || 'contact';
+  const sel = $('c-table'), keep = takeAsked('c-table') || sel.value || 'contact';
   const tables = p.tables.filter(t => t.columns && t.columns.length);
   sel.innerHTML = tables.map(t => `<option value="${esc(t.table)}">${esc(t.table)}${AREA[t.table] ? ' · ' + esc(AREA[t.table]) : ''}</option>`).join('');
   sel.value = tables.some(t => t.table === keep) ? keep : tables[0].table;
   S.profile = p; drawColumns();
 }
-function drawColumns() {
-  const t = S.profile.tables.find(x => x.table === $('c-table').value); if (!t) return;
+const profileTable = () => S.profile && S.profile.tables.find(x => x.table === $('c-table').value);
+function filteredCols(t) {
   const show = $('c-show').value, q = $('c-text').value.trim().toLowerCase();
+  return t.columns.filter(c => (!show || (show === 'flag' ? colFlag(c) : c.nulls > 0)) &&
+    (!q || [c.column, c.description].join(' ').toLowerCase().includes(q)));
+}
+function drawColumns() {
+  const t = profileTable(); if (!t) return;
   const flaggedAll = t.columns.filter(colFlag);
   $('c-summary').innerHTML = `<b>${esc(t.table)}</b>${AREA[t.table] ? ` (${esc(AREA[t.table])})` : ''} · ${esc(t.type || '')} table ·
     <b>${fmtInt(t.rows)}</b> records · <b>${t.columns.length}</b> fields profiled in run #${S.selected} ·
     ${flaggedAll.length ? `${badge('Warn', `${flaggedAll.length} field${flaggedAll.length === 1 ? '' : 's'} flagged`)}` : badge('Pass', 'No fields flagged')}
     ${t.description ? `<div style="margin-top:4px">${esc(t.description)}</div>` : ''}`;
-  const cols = t.columns.filter(c => (!show || (show === 'flag' ? colFlag(c) : c.nulls > 0)) &&
-    (!q || [c.column, c.description].join(' ').toLowerCase().includes(q)));
+  const cols = filteredCols(t);
   $('c-count').textContent = `${cols.length} of ${t.columns.length} fields`;
   $('c-table-view').innerHTML = `<thead><tr><th>Field</th><th>Filled in</th><th class="num">Different values</th>
     <th>Typical values</th><th>What it means</th></tr></thead><tbody>` +
@@ -1167,7 +1193,8 @@ function drawColumns() {
 
 /* ---------- Daily volume: timeline with events ---------- */
 // a phone can't show 1,000+ daily points legibly, so phones open on the last 90 days
-const V = { range: innerWidth < 600 ? '90' : 'all', idx: null };
+const V_DEFAULT = innerWidth < 600 ? '90' : 'all';
+const V = { range: V_DEFAULT, idx: null, events: true, table: false };
 document.querySelectorAll('#v-range button').forEach(b => b.setAttribute('aria-pressed', b.dataset.range === V.range));
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const dayDate = s => new Date(s + 'T00:00:00');
@@ -1177,7 +1204,7 @@ function niceStep(max, n = 5) {
   const raw = max / n, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
   return [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= raw) || mag * 10;
 }
-const shortNum = n => n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'K' : String(n);
+const shortNum = Site.fmt.shortNum;
 function explain(day, ev) {
   const out = [];
   ev.events.forEach(e => { if (day >= e.start && day <= e.end) out.push(e.title); });
@@ -1190,7 +1217,7 @@ function explain(day, ev) {
   return out;
 }
 function renderVolume(v, ev) {
-  const sel = $('v-table'), keep = sel.value || 'contact';
+  const sel = $('v-table'), keep = takeAsked('v-table') || sel.value || 'contact';
   const names = Object.keys(v.tables).sort((a, b) => (a === 'contact' ? -1 : b === 'contact' ? 1 : (SERIES_NAME[a] || a).localeCompare(SERIES_NAME[b] || b)));
   sel.innerHTML = names.map(n => `<option value="${esc(n)}">${esc(SERIES_NAME[n] || n)} (${esc(n)})</option>`).join('');
   sel.value = names.includes(keep) ? keep : names[0];
@@ -1207,7 +1234,7 @@ function drawVolume() {
   if (!s) return;
   const [i0, i1] = volRange();
   const open = []; for (let i = i0; i <= i1; i++) if (!s.closed[i] && s.rows[i] != null) open.push(i);
-  const W = Math.max(300, Math.round($('v-chart').clientWidth || 800)), H = W < 520 ? 260 : 320;
+  const W = Math.max(300, Math.round($('v-chart').clientWidth || $('v-title').closest('figure').clientWidth - 32 || 800)), H = W < 520 ? 260 : 320;
   const m = { t: 26, r: 14, b: 40, l: W < 520 ? 40 : 52 };
   const maxV = Math.max(1, ...open.map(i => Math.max(s.rows[i], (s.base[i] || 0) * 1.35)));
   const step = niceStep(maxV), top = Math.ceil(maxV / step) * step;
@@ -1244,15 +1271,15 @@ function drawVolume() {
   const label = SERIES_NAME[name] || name;
   $('v-title').textContent = `${label}: records per day${V.range === 'all' ? '' : V.range === '90' ? ', last 90 days' : ', ' + V.range}`;
   $('v-chart').innerHTML = `
-    <svg class="vol" viewBox="0 0 ${W} ${H}" tabindex="0" role="img" aria-label="${esc(label)} records per day from ${days[i0]} to ${days[i1]}, ${outs.length} unusual days. Use left and right arrow keys to move between days; the unusual days are listed in the table below.">
+    <svg class="vol" viewBox="0 0 ${W} ${H}" tabindex="0" role="img" aria-label="${esc(label)} records per day from ${Site.fmt.date(days[i0])} to ${Site.fmt.date(days[i1])}, ${outs.length} unusual days. Use left and right arrow keys to move between days; the unusual days are listed in the table below.">
       <g class="grid">${ticks.map(t => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"></line>
         <text class="axis-label" x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${shortNum(t)}</text>`).join('')}</g>
-      ${evs}
+      ${V.events ? evs : ''}
       <path class="band" d="${band}"></path>
-      ${launches}
+      ${V.events ? launches : ''}
       <path class="line" d="${line}"></path>
       ${outs.map(i => `<circle class="out" cx="${x(i)}" cy="${y(s.rows[i])}" r="4"></circle>`).join('')}
-      ${hols}
+      ${V.events ? hols : ''}
       ${xtShown.map(i => `<text class="axis-label" x="${x(i)}" y="${H - m.b + 24}" text-anchor="middle">${lab(i)}</text>`).join('')}
       <g id="v-cross" style="display:none"><line class="cross" y1="${m.t}" y2="${H - m.b}"></line><circle class="cross-pt" r="4.5"></circle></g>
     </svg>`;
@@ -1269,10 +1296,15 @@ function drawVolume() {
   $('v-days').innerHTML = `<thead><tr><th>Day</th><th class="num">Records</th><th class="num">Normal for that weekday</th><th class="num">Difference</th><th>Likely explanation</th></tr></thead><tbody>` +
     (rows.length ? rows.map(i => { const b = s.base[i], d = b ? s.rows[i] / b - 1 : null, why = explain(days[i], ev);
       return `<tr><td style="white-space:nowrap">${longDay(days[i])}</td><td class="num">${fmtInt(s.rows[i])}</td><td class="num">${b ? fmtInt(Math.round(b)) : '—'}</td>
-        <td class="num"><span class="delta ${d > 0 ? 'up' : 'down'}" style="color:var(--text-primary)"><span aria-hidden="true">${d > 0 ? '▲' : '▼'}</span> ${d == null ? '—' : (d > 0 ? '+' : '') + Math.round(d * 100) + '%'}</span></td>
+        <td class="num"><span class="delta ${d > 0 ? 'up' : 'down'}" style="color:var(--text-primary)"><span aria-hidden="true">${d > 0 ? '▲' : '▼'}</span> ${d == null ? '—' : signed(d * 100) + '%'}</span></td>
         <td>${why.length ? esc(why.join(' · ')) : '<span style="color:var(--text-muted)">No known event: worth a look</span>'}</td></tr>`; }).join('')
      : `<tr><td colspan="5" class="empty">No unusual days in this range.</td></tr>`) + '</tbody>';
   if (V.idx != null && open.includes(V.idx)) volCross(V.idx); else V.idx = null;
+  // table view of the same days
+  $('v-chart').hidden = $('v-legend').hidden = V.table; $('v-tbl').hidden = $('vol-csv').hidden = !V.table;
+  $('v-astable').setAttribute('aria-pressed', V.table); $('v-astable').textContent = V.table ? 'View as chart' : 'View as table';
+  $('v-tbl').innerHTML = !V.table ? '' : `<table class="checks" style="min-width:0"><thead><tr><th>Day</th><th class="num">Records</th><th class="num">Normal for that weekday</th><th>Status</th></tr></thead><tbody>` +
+    open.slice().reverse().map(i => `<tr><td>${longDay(days[i])}</td><td class="num">${fmtInt(s.rows[i])}</td><td class="num">${s.base[i] ? fmtInt(Math.round(s.base[i])) : '—'}</td><td>${s.out[i] ? badge('Warn', 'Unusual') : 'Normal'}</td></tr>`).join('') + '</tbody></table>';
 }
 function volTip(i) {
   const s = S.vol.tables[S.volGeo.name], d = S.vol.days[i], b = s.base[i], why = explain(d, S.ev);
@@ -1280,7 +1312,7 @@ function volTip(i) {
   let h = `<div class="t-title">${longDay(d)}</div>
     <div class="t-row"><span>Records</span><span>${fmtInt(s.rows[i])}</span></div>`;
   if (b) h += `<div class="t-row"><span>Normal for a ${DOW[dayDate(d).getDay()]}</span><span>${fmtInt(Math.round(b))}</span></div>
-    <div class="t-row"><span>Compared with normal</span><span>${(s.rows[i] / b - 1 >= 0 ? '+' : '') + Math.round((s.rows[i] / b - 1) * 100)}%</span></div>`;
+    <div class="t-row"><span>Compared with normal</span><span>${signed((s.rows[i] / b - 1) * 100)}%</span></div>`;
   if (s.out[i]) h += `<p style="margin-top:6px">${badge('Warn', 'Unusual day')}</p>`;
   if (hol) h += `<p><span class="t-strong">Holiday:</span> ${esc(hol.title)}${hol.closed ? ' (closed)' : ''}</p>`;
   launchToday.forEach(l => { h += `<p><span class="t-strong">Launch:</span> ${esc(l.title)}. ${esc(l.description || '')}</p>`; });
@@ -1313,20 +1345,22 @@ function ruleFlags(r) {
   return { added: first && first > S.runs[0].run_id ? first : null, refined: refined ? refined.run : null, changed: statuses.size > 1 };
 }
 function renderRules(rules) {
-  const dimSel = $('r-dim');
-  if (dimSel.options.length === 1) DIMS.forEach(d => dimSel.add(new Option(d, d)));
   S.rules = rules; drawRules();
 }
-function drawRules() {
+function filteredRules() {
   const rules = S.rules, q = $('r-text').value.trim().toLowerCase();
   const st = $('r-status').value, dim = $('r-dim').value, sev = $('r-sev').value, hist = $('r-hist').value;
   const rank = { Fail: 0, Error: 0, Warn: 1, Pass: 2 };
-  const list = rules.filter(r => {
+  return rules.filter(r => {
     const now = ruleNow(r), f = ruleFlags(r);
     return (!st || (now && (st === 'Fail' ? ['Fail', 'Error'].includes(now.status) : now.status === st))) && (!dim || r.dimension === dim) &&
       (!sev || r.severity === sev) && (!hist || (hist === 'changed' ? f.changed : (f.added || f.refined))) &&
       (!q || [r.rule_id, r.rule, r.description, r.problem, r.table, AREA[r.table], r.column].join(' ').toLowerCase().includes(q));
   }).sort((a, b) => ((rank[(ruleNow(a) || {}).status] ?? 3) - (rank[(ruleNow(b) || {}).status] ?? 3)) || a.rule_id.localeCompare(b.rule_id));
+}
+function drawRules() {
+  if (!S.rules) return;
+  const rules = S.rules, list = filteredRules();
   $('r-count').textContent = `${list.length} of ${rules.length} checks`;
   const runIds = S.runs.map(r => r.run_id);
   $('r-list').innerHTML = list.length ? list.map(r => {
@@ -1359,13 +1393,13 @@ function drawRules() {
 
 /* ---------- switching runs ---------- */
 function renderAll() {
-  renderHeader(); renderTiles(); renderLoad(); renderTrend(); renderChanges(); renderHeat();
+  renderHeader(); renderTiles(); renderLoad(); renderTrend(); renderTrendTable(); renderChanges(); renderHeat();
   refreshTableOptions(); drawChecks(); renderActiveTab();
 }
 async function showRun(id, { push = true } = {}) {
   if (!runById(id)) id = S.latest;
   const req = ++S.reqId;
-  document.querySelector('.wrap').classList.add('loading');
+  $('main').classList.add('loading');
   try {
     const base = `runs/${id}/`;
     const [summary, score, checks, hist] = await Promise.all([
@@ -1379,7 +1413,7 @@ async function showRun(id, { push = true } = {}) {
   } catch (e) {
     $('meta').textContent = `Could not load run #${id}: ${e.message}`;
   } finally {
-    if (req === S.reqId) document.querySelector('.wrap').classList.remove('loading');
+    if (req === S.reqId) $('main').classList.remove('loading');
   }
 }
 
@@ -1388,6 +1422,7 @@ function wire() {
   $('run-select').addEventListener('change', e => showRun(+e.target.value));
   $('to-latest').addEventListener('click', () => showRun(S.latest));
   addEventListener('popstate', () => {
+    restoreFilters();
     const t = tabFromUrl(); if (t !== S.tab) setTab(t, { push: false });
     const r = +(new URL(location.href).searchParams.get('run')) || S.latest; if (r !== S.selected) showRun(r, { push: false });
   });
@@ -1415,8 +1450,7 @@ function wire() {
   /* daily volume */
   $('v-table').addEventListener('change', () => { V.idx = null; drawVolume(); });
   $('v-range').addEventListener('click', e => { const b = e.target.closest('[data-range]'); if (!b) return;
-    V.range = b.dataset.range; V.idx = null;
-    $('v-range').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b)); drawVolume(); });
+    setRange(b.dataset.range); V.idx = null; drawVolume(); saveFilters(); });
   const vc = $('v-chart');
   const vAt = (i, x, y) => { if (i == null) return; volCross(i); tip.classList.add('wide'); showTip(volTip(i), x, y); };
   vc.addEventListener('mousemove', e => { if (!S.volGeo) return; vAt(volNearest(e.clientX), e.clientX, e.clientY); });
@@ -1478,8 +1512,8 @@ function wire() {
   heat.addEventListener('click', e => {
     const c = e.target.closest('button.cell'); if (!c) return;
     heat.querySelectorAll('.selected').forEach(n => n.classList.remove('selected')); c.classList.add('selected');
-    hideTip(); F.s.value = ''; F.x.value = ''; F.t.value = c.dataset.table || ''; F.d.value = c.dataset.dim || ''; drawChecks();
-    $('h-checks').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    hideTip(); F.s.value = ''; F.x.value = ''; F.t.value = c.dataset.table || ''; F.d.value = c.dataset.dim || ''; drawChecks(); saveFilters();
+    $('h-checks').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   });
 
   ['Fail', 'Warn', 'Pass'].forEach(s => F.s.add(new Option(s, s)));
@@ -1496,8 +1530,46 @@ function wire() {
   checksTable.addEventListener('focusout', chHide);
   $('f-clear').addEventListener('click', () => {
     F.s.value = F.d.value = F.t.value = F.x.value = '';
-    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); drawChecks();
+    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected')); drawChecks(); saveFilters();
   });
+
+  /* filters in the address, reset, copy link, table views and CSV */
+  DIMS.forEach(d => $('r-dim').add(new Option(d, d)));
+  applyFilters();
+  FILTERS.forEach(id => $(id).addEventListener($(id).tagName === 'INPUT' ? 'input' : 'change', saveFilters));
+  $('copy-link').addEventListener('click', e => Site.copyLink(e.currentTarget));
+  $('reset').addEventListener('click', () => {
+    FILTERS.forEach(id => { asked.delete(id); $(id).value = dfltOf(id); });
+    document.querySelectorAll('#heat .selected').forEach(n => n.classList.remove('selected'));
+    setRange(V_DEFAULT); V.events = $('v-events').checked = true; V.idx = null; saveFilters();
+    if (S.selected !== S.latest) showRun(S.latest); else { drawChecks(); renderActiveTab(); }
+  });
+  $('v-events').addEventListener('change', e => { V.events = e.target.checked; drawVolume(); });
+  $('v-astable').addEventListener('click', () => { V.table = !V.table; drawVolume(); });
+  $('trend-table').addEventListener('click', e => {
+    const on = $('trend-tbl').hidden; $('trend-tbl').hidden = !on; $('trend').hidden = on; $('trend-csv').hidden = !on;
+    e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.textContent = on ? 'View as chart' : 'View as table'; if (!on) renderTrend();
+  });
+  $('trend-tbl').addEventListener('click', e => { const r = e.target.closest('[data-run]'); if (r) showRun(+r.dataset.run); });
+  // each CSV holds what its table shows, with full values
+  const through = () => S.data.summary.period.end;
+  const about = (what, ids) => `Data quality · ${what} · run #${S.selected} · data through ${through()} · filters: ` +
+    (ids.map(id => id === 'range' ? `range=${V.range}` : $(id).value && `${id.slice(2)}=${$(id).value}`).filter(Boolean).join('; ') || 'none');
+  const save = (id, name, what, ids, header, rows) => $(id).addEventListener('click', () => Site.downloadCsv('data-quality-' + name, through(), about(what, ids), header, rows()));
+  save('trend-csv', 'runs', 'health score by run', [], ['run', 'data_through', 'score', 'status', 'pass', 'warn', 'fail'], () => S.runs.slice().reverse().map(r => [r.run_id, r.data_to, r.score, r.status, r.passed, r.warned, r.failed]));
+  save('load-csv', 'loads', 'daily load', [], ['file', 'type', 'business_date', 'status', 'rows_received', 'sender_declared', 'added', 'replaced', 'removed', 'held', 'held_released', 'note'],
+    () => (S.data.summary.loads || []).map(l => [l.file, LOAD_KIND[l.kind], l.business_date, l.status, l.received, l.expected, l.inserted, l.replaced, l.deleted, l.held, l.released, l.fix || l.reason]));
+  save('heat-csv', 'scorecard', 'health scorecard', [], ['table', 'dimension', 'score', 'status', 'checks', 'passed', 'warned', 'failed'], () => S.data.score.map(r => [r.table, r.dimension, r.score, r.status, r.checks, r.passed, r.warned, r.failed]));
+  save('checks-csv', 'checks', 'check results', ['f-status', 'f-dim', 'f-table', 'f-text'], ['status', 'rule_id', 'check', 'description', 'table', 'column', 'dimension', 'severity', 'measured', 'unit', 'warn_above', 'fail_above'],
+    () => filteredChecks().map(c => [c.status, c.rule_id, c.rule, c.description, c.table, c.column, c.dimension, c.severity, c.value, c.unit, c.warn_above, c.fail_above]));
+  save('cols-csv', 'columns', 'column profiles', ['c-table', 'c-show', 'c-text'], ['table', 'field', 'type', 'records', 'blank', 'blank_pct', 'different_values', 'typical_values', 'description'],
+    () => { const t = profileTable(); return filteredCols(t).map(c => [t.table, c.column, c.type, c.rows, c.nulls, c.null_pct, c.distinct, (c.top || []).map(x => x.v).join(' | ') || (c.min != null ? `${c.min} to ${c.max}` : ''), c.description]); });
+  const volRows = only => { const v = S.vol.tables[S.volGeo.name]; return S.volGeo.open.filter(i => !only || v.out[i]).reverse().map(i => [S.vol.days[i], v.rows[i], v.base[i], v.out[i] ? 'Unusual' : 'Normal', explain(S.vol.days[i], S.ev).join(' | ')]); };
+  const volHead = ['day', 'records', 'normal_for_weekday', 'status', 'known_events'];
+  save('vol-csv', 'daily-volume', 'daily volume', ['v-table', 'range'], volHead, () => volRows(false));
+  save('days-csv', 'unusual-days', 'unusual days', ['v-table', 'range'], volHead, () => volRows(true));
+  save('rules-csv', 'rules', 'rule catalogue', ['r-status', 'r-dim', 'r-sev', 'r-hist', 'r-text'], ['rule_id', 'check', 'result', 'table', 'column', 'dimension', 'importance', 'warn_above', 'fail_above', 'unit', 'description'],
+    () => filteredRules().map(r => [r.rule_id, r.rule, (ruleNow(r) || {}).status, r.table, r.column, r.dimension, r.severity, r.warn_above, r.fail_above, r.unit, r.description]));
 
   let t; addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { renderTrend(); if (S.tab === 'volume' && S.vol) drawVolume(); }, 150); });
 }

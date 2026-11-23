@@ -250,5 +250,19 @@
   }
   function hideTip() { if (tip) tip.style.display = 'none'; }
 
-  window.Site = { renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  // ---------- CSV and links (Style Guide: Export and sharing) ----------
+  function downloadCsv(name, through, filters, header, rows) {
+    const q = (v) => { const s = v == null ? '' : String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const text = ['# ' + DISCLAIMER, '# ' + filters.replace(/[\r\n]+/g, ' '), header.map(q).join(','), ...rows.map((r) => r.map(q).join(','))].join('\r\n');
+    const a = el('a', { download: `happen-demo_${name}_${through}.csv`, href: URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' })) });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+  function copyLink(b) {
+    const done = (t) => { b.textContent = t; setTimeout(() => (b.textContent = 'Copy link'), 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(() => done('Link copied'), () => done('Copy failed'));
+    else done('Copy failed');
+  }
+
+  window.Site = { downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();
