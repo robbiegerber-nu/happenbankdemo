@@ -103,7 +103,11 @@
     { "id": "contact_rate", "name": "Contacts per 100 customers a month", "short": "Contact rate", "format": "rate", "better": "none", "target": null,
       "definition": "Contacts from identified customers for every 100 customers on the books, per month. No target; it shows who needs help most often.", "formula": "Contacts ÷ (customers × months) × 100", "exclusions": "Excludes contacts with no identified customer.", "minN": 50, "wiki": "service-and-access" },
     { "id": "reach", "name": "Customers who contacted", "short": "Reach", "format": "pct", "better": "none", "target": null,
-      "definition": "Share of customers who contacted at least once in the quarter. No target.", "formula": "Customers with one or more contacts ÷ customers on the books", "minN": 50, "wiki": "service-and-access" }
+      "definition": "Share of customers who contacted at least once in the quarter. No target.", "formula": "Customers with one or more contacts ÷ customers on the books", "minN": 50, "wiki": "service-and-access" },
+    { "id": "no_agent", "name": "Requests handled without an agent", "short": "No agent needed", "format": "pct", "better": "higher", "target": null,
+      "definition": "Share of all requests (phone menu sessions finished in the menu, plus every contact on any channel) that needed no agent. No target; goal: rising over time.", "formula": "Contained menu sessions ÷ (contained menu sessions + contacts)", "minN": 50, "wiki": "self-service" },
+    { "id": "stuck", "name": "Menu users who contacted within 7 days", "short": "Contact after menu", "format": "pct", "better": "lower", "target": null,
+      "definition": "Share of customers who finished a task in the phone menu and then contacted an agent on any channel within 7 days, for any reason. No target; read it beside the 7 days before.", "formula": "Contained sessions followed by a contact within 7 days ÷ contained sessions of identified customers", "exclusions": "Excludes sessions with no identified customer, and the last 7 days of data.", "minN": 50, "wiki": "self-service" }
   ],
   "sections": [
     { "id": "access", "name": "Service and access" },

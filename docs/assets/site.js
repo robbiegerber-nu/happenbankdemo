@@ -14,7 +14,7 @@
     { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
       { name: 'Customer experience', href: 'cx.html', id: 'cx' }, { name: 'Customer & persona insights', href: 'personas.html', id: 'personas' },
-      { name: 'Product launch impact', href: 'launch.html', id: 'launch' }, { name: 'Self-service & channel shift', href: null }] },
+      { name: 'Product launch impact', href: 'launch.html', id: 'launch' }, { name: 'Self-service & channel shift', href: 'selfservice.html', id: 'selfservice' }] },
     { group: 'Data', items: [{ name: 'Data quality', href: 'index.html', id: 'quality' }] }
   ];
 

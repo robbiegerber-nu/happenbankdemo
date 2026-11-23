@@ -17,6 +17,7 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 | [Customer experience](https://robbiegerber-nu.github.io/happenbankdemo/cx.html) | How do customers feel, and what drives it? |
 | [Product launch impact](https://robbiegerber-nu.github.io/happenbankdemo/launch.html) | What happens after a launch, and for how long? |
 | [Customer & persona insights](https://robbiegerber-nu.github.io/happenbankdemo/personas.html) | Who contacts us most, how, and who has the worst experience? |
+| [Self-service & channel shift](https://robbiegerber-nu.github.io/happenbankdemo/selfservice.html) | Are phone menus and digital channels absorbing demand? |
 | [Performance driver explorer](https://robbiegerber-nu.github.io/happenbankdemo/drivers.html) | What changed, and what drove it? |
 | [Process stability monitor](https://robbiegerber-nu.github.io/happenbankdemo/stability.html) | Is this a real change or normal variation? |
 | [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/) | Can we trust the data? |
