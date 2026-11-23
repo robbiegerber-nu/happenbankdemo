@@ -1,9 +1,9 @@
 # Exports the JSON files the operational dashboards read (docs/data/dashboards/).
-#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers|service]
+#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers|service|workforce]
 # Run after each daily load by sql\pipeline\load_day.ps1 (only when no check failed), or by hand at any time.
 # Everything is written to a temporary folder first and copied across only when every export has worked.
 # Env overrides (same as the discovery toolkit): HAPPEN_DB = database, HAPPEN_EXPORT = data folder (files go in its dashboards subfolder).
-param([ValidateSet('all', 'executive', 'stability', 'drivers', 'service')][string]$Only = 'all')
+param([ValidateSet('all', 'executive', 'stability', 'drivers', 'service', 'workforce')][string]$Only = 'all')
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -75,6 +75,16 @@ if ($Only -in 'all', 'service') {
     "{0,-36} {1,10:N0} bytes {2,4:N0}s" -f "service: $($months.Count) months", (Get-ChildItem (Join-Path $out 'service') -File | Measure-Object Length -Sum).Sum, ((Get-Date) - $t).TotalSeconds
 }
 
+if ($Only -in 'all', 'workforce') {
+    Invoke-SqlFile 'E10_workforce_cube.sql'
+    Export-Gzip 'workforce/index.json.gz' 'E11_workforce_index.sql' @()
+    $t = Get-Date
+    $months = & $psql @conn -At -v ON_ERROR_STOP=1 -c "SELECT DISTINCT to_char(d, 'YYYY-MM') FROM dash.wf_interval ORDER BY 1;"
+    if ($LASTEXITCODE -ne 0) { throw 'workforce months failed' }
+    foreach ($m in $months) { Export-Gzip "workforce/$m.json.gz" 'E12_workforce_month.sql' @("m=$m") }
+    "{0,-36} {1,10:N0} bytes {2,4:N0}s" -f "workforce: $($months.Count) months", (Get-ChildItem (Join-Path $out 'workforce') -File | Measure-Object Length -Sum).Sum, ((Get-Date) - $t).TotalSeconds
+}
+
 # ---------- Publish the finished set to the data folder ----------
 # kpis.json is written by hand and is never touched. Month files that no longer exist in the data (after a reset) are removed.
 $changed = 0; $removed = 0
@@ -85,7 +95,7 @@ foreach ($f in $new) {
     New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
     Copy-Item $f.FullName $dest -Force; $changed++
 }
-foreach ($sub in 'stability', 'drivers', 'service') {
+foreach ($sub in 'stability', 'drivers', 'service', 'workforce') {
     if (-not (Test-Path (Join-Path $out $sub)) -or -not (Test-Path (Join-Path $final $sub))) { continue }
     Get-ChildItem (Join-Path $final $sub) -Recurse -File | Where-Object { -not (Test-Path (Join-Path $out $_.FullName.Substring($final.Length + 1))) } |
         ForEach-Object { Remove-Item $_.FullName; $removed++ }

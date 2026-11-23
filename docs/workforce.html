@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workforce Management · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated adherence, shrinkage, occupancy and staffing, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=1.8"></script>
+<script src="assets/workforce.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .ctls { display: contents; }
+  @media (min-width: 768px) { .filter-bar .wrap { gap: 7px; } .ctls .filter { gap: 4px; } .ctls select { padding-left: 8px; padding-right: 20px; } #f-days { width: 104px; } #f-end { width: 196px; } #f-ch { width: 98px; } #f-site { width: 120px; } #f-team { width: 150px; } #f-dow { width: 116px; } }
+  .phone-f { display: none; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile-top { display: flex; justify-content: space-between; gap: 6px; }
+  .tile-top button.t { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); min-height: 24px; }
+  .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
+  .chart { margin-top: 10px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .x { overflow-x: auto; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }
+  .name { border: 0; background: none; padding: 4px 0; min-height: 28px; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  h3 { margin-top: 20px; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .l1 { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; } .l2 { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1.5; } .pt.low { fill: var(--surface); stroke: var(--text-muted); } .pt.day { stroke: var(--text-primary); stroke-width: 2; }
+  .tg { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; } .wb { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .evb { fill: var(--event); fill-opacity: .12; } .evl { stroke: var(--event); stroke-opacity: .6; }
+  .ev circle { fill: var(--surface); stroke: var(--event); } .ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
+  .lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus-visible, .hm:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  .cell { fill: var(--brand-blue); } .cell0 { fill: var(--surface-warm); } .cell-low { fill: none; stroke: var(--grid); }
+  .cell-sel { fill: none; stroke: var(--text-primary); stroke-width: 2.5; } .cell-cur { fill: none; stroke: var(--off-ink); stroke-width: 2; }
+  .dow { fill: var(--text-secondary); font-size: 12.5px; font-family: var(--font); cursor: pointer; } .dow.sel { font-weight: 700; fill: var(--brand-blue); }
+  .l3 { fill: none; stroke: var(--text-muted); stroke-width: 1.5; } .bar { fill: var(--brand-blue); } .bar.low { fill: var(--text-muted); fill-opacity: .35; } .tick0 { stroke: var(--text-primary); stroke-width: 2; }
+  .sm-h { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 10px; }
+  .gap { fill: var(--off-wash); fill-opacity: .18; }
+  @media (max-width: 767px) {
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .card { padding: 14px; }
+    .tile .v { font-size: 22px; }
+    .name, .chip { min-height: 44px; }
+  }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+  <div class="ctls" id="ctls">
+    <label class="filter"><span class="flabel">Period</span><select id="f-days"><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option></select></label>
+    <label class="filter"><span class="flabel">Ending</span><select id="f-end"></select></label>
+    <label class="filter"><span class="flabel">Group</span><select id="f-ch"></select></label>
+    <label class="filter"><span class="flabel">Site</span><select id="f-site"></select></label>
+    <label class="filter"><span class="flabel">Team</span><select id="f-team"></select></label>
+    <label class="filter"><span class="flabel">Day</span><select id="f-dow"></select></label>
+    <button class="link-btn" id="f-reset" type="button">Reset</button>
+  </div>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<main class="wrap" id="main">
+  <h1>Workforce management</h1>
+  <p class="sub" id="s-page"></p>
+  <div class="chips" id="chips"></div>
+  <p class="note" id="loading">Loading workforce data…</p>
+  <div id="content" hidden>
+    <div class="tiles" id="tiles"></div>
+    <p class="note" id="n-tiles"></p>
+    <section class="card" aria-labelledby="t-day">
+      <div class="head"><div><h2 id="t-day"></h2><div class="sub" id="s-day"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-day" type="button" hidden>Download CSV</button><button class="btn" id="tb-day" type="button">View as table</button></div></div>
+      <div class="chart" id="c-day"></div><div class="legend" id="lg-day"></div><div class="tbl" id="tbl-day" tabindex="0" role="region" aria-label="Values by day" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="t-prof">
+      <div class="head"><div><h2 id="t-prof"></h2><div class="sub" id="s-prof"></div></div><div class="tools"><button class="btn" id="csv-prof" type="button" hidden>Download CSV</button><button class="btn" id="tb-prof" type="button">View as table</button></div></div>
+      <div id="prof-box"><div class="chart" id="c-prof"></div><div class="legend" id="lg-prof"></div><h3>Staff not available, by reason</h3><p class="note">Same time axis and the same vertical scale for every reason. Scheduled breaks and lunches are outlined; filled is what happened.</p><div id="c-off"></div></div>
+      <div class="tbl" id="tbl-prof" tabindex="0" role="region" aria-label="Values by time of day" hidden></div>
+    </section>
+    <section class="card" id="sec-slots" aria-labelledby="t-slots">
+      <div class="head"><div><h2 id="t-slots"></h2><div class="sub" id="s-slots"></div></div><div class="tools"><button class="btn" id="csv-slots" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-slots"></div><p class="note" id="n-slots"></p>
+    </section>
+    <section class="card" aria-labelledby="t-shr">
+      <div class="head"><div><h2 id="t-shr"></h2><div class="sub" id="s-shr"></div></div><div class="tools"><button class="btn" id="csv-shr" type="button">Download CSV</button></div></div>
+      <div class="chart" id="c-shr"></div><p class="note" id="n-shr"></p>
+    </section>
+    <section class="card" aria-labelledby="t-team">
+      <div class="head"><div><h2 id="t-team"></h2><div class="sub">Click a name to filter; Ctrl + click adds. Minutes are per agent-day worked.</div></div><div class="tools"><button class="btn" id="csv-team" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-team"></div>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), WF = Workforce;
+  Site.renderChrome('workforce');
+  const DAY = 864e5, iso = (t) => new Date(t).toISOString().slice(0, 10), ts = (s) => Date.parse(s + 'T00:00:00Z'), dowOf = (d) => new Date(ts(d)).getUTCDay();
+  const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  // agent groups, and the channels their requirement covers (phone agents also make callbacks)
+  const GROUPS = { 1: { name: 'Phone', serves: 'phone and callback', ch: [1, 4] }, 2: { name: 'Chat', serves: 'chat', ch: [2] }, 3: { name: 'Email', serves: 'email and secure message', ch: null } };
+  const DEF = { days: '30', end: 'latest', ch: '1', site: '', metric: 'adherence', team: [], dow: [], iv: null, day: null }, S = { ...DEF, team: [], dow: [] };
+  const files = {}; let IDX, SVC, KPI, EV, ROWS, W, req = 0, events = true, tblDay = false, tblProf = false, A, B0, cur = {};
+  const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
+  const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
+  const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; }));
+  const time = (i) => { const m = i * 15, h = Math.floor(m / 60); return `${h % 12 || 12}:${String(m % 60).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`; }, slot = (i) => `${time(i)} – ${time((i + 1) % 96)}`;
+  const G = () => GROUPS[S.ch], teams = () => IDX.teams.filter((t) => String(t.ch) === S.ch), tName = (id) => IDX.teams.find((t) => t.id === id).name;
+  const whole = () => !S.site && !S.team.length;                    // the requirement exists only for a whole group
+  const canReq = () => !!G().ch && whole();
+  const METRICS = () => ['adherence', 'conformance', 'shrinkage', 'occupancy', ...(canReq() ? ['staffing', 'forecast'] : [])];
+
+  Promise.all([file('data/dashboards/kpis.json'), file('data/dashboards/workforce/index.json.gz'), file('data/dashboards/service/index.json'), file('data/dashboards/events.json')]).then(([k, i, s, e]) => {
+    KPI = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); IDX = i; SVC = s; EV = e.events;
+    ROWS = i.days.map((r) => Object.fromEntries(i.keys.map((c, j) => [c, r[j]])));
+    $('f-end').innerHTML = `<option value="latest">${fmt.date(i.data_through)} (latest)</option>` + i.months.slice(0, -1).reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    $('f-ch').innerHTML = Object.entries(GROUPS).map(([id, g]) => `<option value="${id}">${g.name}</option>`).join('');
+    const p = new URLSearchParams(location.search), one = (id, v) => [...$(id).options].some((o) => o.value === v);
+    if (one('f-days', p.get('days'))) S.days = p.get('days');
+    if (one('f-end', p.get('end'))) S.end = p.get('end'); else if (one('f-end', carried())) S.end = carried();
+    if (one('f-ch', p.get('ch'))) S.ch = p.get('ch');
+    if (teams().some((t) => t.site === p.get('site'))) S.site = p.get('site');
+    if (['adherence', 'conformance', 'shrinkage', 'occupancy', 'staffing', 'forecast'].includes(p.get('metric'))) S.metric = p.get('metric');
+    S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x)); S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
+    if (p.get('iv') != null && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
+    if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day');
+    Site.setDataThrough(i.data_through);
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Workforce management v1.0`;
+    return update();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The workforce data could not be loaded. ' + e.message; }
+  function windowOf() {
+    let e = ts(IDX.data_through); if (S.end !== 'latest') { const [y, m] = S.end.split('-').map(Number); e = Date.UTC(y, m, 0); }
+    const s = e - (+S.days - 1) * DAY, first = ts(IDX.months[0] + '-01'), s0 = s - +S.days * DAY;
+    return { s: Math.max(s, first), e, s0, e0: s - DAY, cmp: s0 >= first };
+  }
+  // ---------- Data: every filter except the ones a chart ignores ----------
+  function okTeam(id, skip) { const t = IDX.teams.find((x) => x.id === id); return t && String(t.ch) === S.ch && (!S.site || t.site === S.site) && (skip || !S.team.length || S.team.includes(id)); }
+  function okDay(d, skip = []) { return (skip.includes('dow') || !S.dow.length || S.dow.includes(dowOf(d))) && (skip.includes('day') || !S.day || S.day === d); }
+  function daily(a, b, key, skip = []) {
+    const out = new Map();
+    for (const r of ROWS) { const t = ts(r.d); if (t < a || t > b || !okTeam(r.t, skip.includes('team')) || !okDay(r.d, skip)) continue; const k = key(r); WF.add(out.get(k) || (out.set(k, {}), out.get(k)), r, WF.DAY); }
+    return out;
+  }
+  // interval rows of a window: [{ d, i, t, ...minutes }] as blocks of columns, plus the requirement and forecast
+  async function load(a, b) {
+    const ms = IDX.months.filter((m) => m >= iso(a).slice(0, 7) && m <= iso(b).slice(0, 7)), f = G().ch;
+    const [w, s] = await Promise.all([Promise.all(ms.map((m) => file(`data/dashboards/workforce/${m}.json.gz`))), f ? Promise.all(ms.map((m) => file(`data/dashboards/service/${m}.json.gz`))) : []]);
+    const inWin = (m, d) => { const t = ts(`${m}-${String(d).padStart(2, '0')}`); return t >= a && t <= b; }, iv = [], rq = [], qs = f ? new Set(SVC.queues.filter((q) => f.includes(q.channel)).map((q) => q.id)) : null;
+    w.forEach((x) => { const c = x.cols; for (let j = 0; j < c.d.length; j++) if (inWin(x.m, c.d[j]) && okTeam(c.t[j])) iv.push({ d: `${x.m}-${String(c.d[j]).padStart(2, '0')}`, i: c.i[j], c, j }); });
+    s.forEach((x) => { const c = x.cols; for (let j = 0; j < c.d.length; j++) if (qs.has(c.q[j]) && inWin(x.m, c.d[j])) rq.push({ d: `${x.m}-${String(c.d[j]).padStart(2, '0')}`, i: c.i[j], r: c.r[j] * 15, o: c.o[j], f: c.f[j], own: c.q[j] }); });
+    // callbacks can be requested on a closed day, when no one is scheduled: that is not a staffing shortfall
+    const open = new Set(); for (const x of iv) if (x.c.open[x.j] > 0) open.add(x.d);
+    for (const x of rq) if (!open.has(x.d)) x.r = 0;
+    return { iv, rq };
+  }
+  function intervals(data, key, skip = []) {   // agent minutes by key, with req/o/f joined
+    const out = new Map(), at = (k) => out.get(k) || (out.set(k, {}), out.get(k)), okI = (x) => skip.includes('iv') || S.iv == null || S.iv === x.i;
+    for (const x of data.iv) { if (!okDay(x.d, skip) || !okI(x)) continue; const p = at(key(x)); for (const k of WF.IV) p[k] = (p[k] || 0) + x.c[k][x.j]; }
+    if (canReq()) for (const x of data.rq) { if (!okDay(x.d, skip) || !okI(x)) continue; const p = at(key(x)); p.req = (p.req || 0) + x.r; p.o = (p.o || 0) + x.o; p.f = (p.f || 0) + x.f; }
+    return out;
+  }
+  const sum = (map, keys) => { const t = {}; for (const p of map.values()) WF.add(t, p, keys); return t; };
+  const ALLIV = [...WF.IV, 'req', 'o', 'f'];
+  function total(a, b, data, skip) { const t = sum(daily(a, b, () => 1, skip), WF.DAY); return Object.assign(t, sum(intervals(data, () => 1, skip), ALLIV), { aux: t.aux }); }
+
+  async function update() {
+    const r = ++req;
+    S.team = S.team.filter((x) => okTeam(x, true));
+    if (!METRICS().includes(S.metric)) S.metric = 'adherence';
+    W = windowOf(); if (S.day && (ts(S.day) < W.s || ts(S.day) > W.e)) S.day = null;
+    const [a, b] = await Promise.all([load(W.s, W.e), W.cmp ? load(W.s0, W.e0) : { iv: [], rq: [] }]);
+    if (r !== req) return; A = a; B0 = b;
+    $('loading').hidden = true; $('content').hidden = false;
+    controls(); writeUrl(); renderTiles(); renderDay(); renderProfile(); renderSlots(); renderShrink(); renderTeams();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); };
+  function controls() {
+    $('f-days').value = S.days; $('f-end').value = S.end; $('f-ch').value = S.ch;
+    const many = (a) => (a.length > 1 ? `<option value="*" selected>${a.length} selected</option>` : '');
+    $('f-site').innerHTML = `<option value="">All</option>` + [...new Set(teams().map((t) => t.site))].sort().map((s) => `<option${S.site === s ? ' selected' : ''}>${esc(s)}</option>`).join('');
+    $('f-team').innerHTML = `<option value="">All</option>` + many(S.team) + teams().filter((t) => !S.site || t.site === S.site).map((t) => `<option value="${t.id}"${S.team.length === 1 && S.team[0] === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+    $('f-dow').innerHTML = `<option value="">All</option>` + many(S.dow) + DOW.map((d, i) => `<option value="${i}"${S.dow.length === 1 && S.dow[0] === i ? ' selected' : ''}>${d}</option>`).join('');
+    const c = [...(S.site ? [['site', S.site, 'Site: ' + S.site]] : []), ...S.team.map((x) => ['team', x, 'Team: ' + tName(x)]), ...S.dow.map((x) => ['dow', x, 'Day: ' + DOW[x]]), ...(S.iv != null ? [['iv', S.iv, 'Time: ' + slot(S.iv)]] : []), ...(S.day ? [['day', S.day, 'Date: ' + fmt.date(S.day)]] : [])];
+    $('chips').innerHTML = c.map(([k, v, t]) => `<button type="button" class="chip" data-q="${k}" data-v="${esc(v)}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join('');
+    const n = c.length + ['days', 'end', 'ch'].filter((x) => S[x] !== DEF[x]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
+    $('s-page').textContent = `${G().name} agents (${G().serves}) · ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))} · ${W.cmp ? `compared with the ${S.days} days before` : 'no full earlier period to compare'}`;
+  }
+  function writeUrl() {
+    const p = new URLSearchParams(); for (const k of ['days', 'end', 'ch', 'site', 'metric']) if (S[k] !== DEF[k]) p.set(k, S[k]);
+    if (S.end === 'latest' && carried()) p.set('end', 'latest');
+    S.team.forEach((x) => p.append('team', x)); S.dow.forEach((x) => p.append('dow', x)); if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day);
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+  function toggle(k, v, add) { const a = S[k]; S[k] = a.includes(v) ? (add ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : add ? [...a, v] : [v]; go(); }
+  const kpi = (m) => (m === 'staffing' ? { ...KPI.staffing, definition: `How far scheduled ${G().name.toLowerCase()} agents were above (+) or below (−) the staff needed for ${G().serves} contacts. Uses scheduled open-shift minutes.` } : KPI[m]);
+  const V = (m, v, full) => fmt.value(v, kpi(m).format, full), low = (m, p) => WF.n(m, p) < kpi(m).minN, val = (m, p) => WF.value(m, p), stat = (m, p) => (low(m, p) ? 'none' : statusOf(kpi(m), val(m, p)));
+  const badge = (m, p) => (kpi(m).target == null ? '' : `<span class="status ${stat(m, p)}">${low(m, p) ? 'Too few' : STATUS_WORD[stat(m, p)]}</span>`);
+
+  // ---------- Tiles ----------
+  function renderTiles() {
+    // time-of-day filters apply to staffing only: adherence, shrinkage and occupancy are recorded per day
+    const now = total(W.s, W.e, A), was = W.cmp && !S.day ? total(W.s0, W.e0, B0) : null, host = $('tiles'); host.innerHTML = '';
+    for (const m of METRICS()) {
+      const k = kpi(m), v = val(m, now), lo = low(m, now), ch = was ? fmt.change(v, val(m, was), k.format) : null, q = ch ? changeQuality(k, v, val(m, was), ch) : 'neutral';
+      let meta = k.target == null ? 'No target' : 'Target ' + k.targetLabel, st = badge(m, now);
+      if (m === 'forecast') { const d = [...intervals(A, (x) => x.d, ['iv']).values()].filter((p) => p.f > 0), ok = d.filter((p) => Math.abs(fmt.displayed(val('forecast', p), 'signedpct')) <= 10); meta = `${ok.length} of ${d.length} days within ±10%`; st = ''; }
+      const t = document.createElement('div'); t.className = 'tile' + (S.metric === m ? ' sel' : '');
+      t.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${V(m, v)}</div>${st}<div class="m">${esc(meta)}${lo ? ` · n = ${fmt.count(WF.n(m, now))}, below ${k.minN}` : ''}</div>${ch ? `<span class="chg ${lo ? 'neutral' : q}">${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} vs prior ${S.days} days${!lo && Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span>` : ''}`;
+      t.querySelector('.tile-top').append(Site.infoButton(k)); t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(t);
+    }
+    $('n-tiles').textContent = [S.iv != null ? `The time filter applies to staffing and forecast. Adherence, conformance, shrinkage and occupancy are recorded per day.` : '', !canReq() ? (G().ch ? 'Staffing and forecast are set for the whole group, so they are hidden while a site or team is selected.' : 'Email staffing is not compared with a requirement, because those contacts can wait up to 24 hours.') : ''].filter(Boolean).join(' ');
+  }
+  // ---------- Chart helpers ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  const tick = (m, v) => (kpi(m).format === 'signedpct' ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + '%' : +v.toFixed(1) + '%');
+  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  function tip(node, html, click) {
+    const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); };
+    node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
+    if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
+  }
+  function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
+  const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${p ? ic(p) : ''}${esc(t)}</span>`).join('');
+
+  // ---------- By day ----------
+  function renderDay() {
+    const m = S.metric, k = kpi(m), host = $('c-day'), iv = m === 'staffing' || m === 'forecast', map = iv ? intervals(A, (x) => x.d, ['day']) : daily(W.s, W.e, (r) => r.d, ['day']);
+    const pts = [...map].map(([d, p]) => ({ d, t: ts(d), p, v: val(m, p), low: low(m, p) })).filter((x) => x.v != null).sort((a, b) => a.t - b.t); cur.day = pts;
+    $('t-day').textContent = `${k.name} by day, ${G().name.toLowerCase()} agents`; $('s-day').textContent = `${k.short}, daily, ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · days with no one scheduled are skipped`;
+    host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
+    const nm = (x) => `${DOW[dowOf(x.d)]}, ${fmt.date(x.d)}`;
+    if (tblDay) { $('tbl-day').innerHTML = `<table><thead><tr><th scope="col">Day</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}</tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${nm(x)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v, true)}</td>${k.target == null ? '' : `<td>${badge(m, x.p)}</td>`}</tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; $('lg-day').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
+    const w = host.clientWidth || 800, narrow = w < 560, H = 270, M = { t: 44, r: narrow ? 10 : 92, b: 28, l: 56 }, iw = w - M.l - M.r, ih = H - M.t - M.b, tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch), src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, vs = [...src.map((x) => x.v), ...tg, ...wb];
+    let a = Math.min(...vs), b = Math.max(...vs); const pad = (b - a || 1) * .1; a -= pad; b += pad;
+    const x = (t) => M.l + (t - W.s + DAY / 2) / (W.e - W.s + DAY) * iw, y = (v) => M.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih, step = iw / ((W.e - W.s) / DAY + 1);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(a, b, 5)) { el('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g); text(ax, M.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    let lx = -99; for (let t = W.s; t <= W.e; t += DAY) { const d = new Date(t); if (+S.days > 7 && d.getUTCDay() !== 0) continue; if (x(t) - lx < 50) continue; text(ax, x(t), H - 8, +S.days > 7 ? fmt.dateShort(iso(t)) : DOW[d.getUTCDay()].slice(0, 3) + ' ' + d.getUTCDate(), '', 'middle'); lx = x(t); }
+    const marks = []; if (events) { let n = 0; for (const e of EV) { const p = ts(e.start), q = ts(e.end); if (q < W.s || p > W.e) continue; n++; const ea = Math.max(M.l, x(p) - step / 2), eb = Math.min(M.l + iw, x(q) + step / 2); if (e.span === 'Period') el('rect', { class: 'evb', x: ea, y: M.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: x(p), x2: x(p), y1: M.t, y2: M.t + ih }, s); marks.push([e, n, e.span === 'Period' ? ea : x(p)]); } }
+    if (tg.length) (k.better === 'range' ? [[k.watch[0], k.target[0]], [k.target[1], k.watch[1]]] : [[k.watch, k.target]]).forEach(([p, q]) => el('rect', { class: 'wb', x: M.l, width: iw, y: y(Math.max(p, q)), height: Math.abs(y(p) - y(q)) }, s));
+    for (const t of tg) { el('line', { class: 'tg', x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, s); if (!narrow) text(s, M.l + iw + 8, y(t) + 4, 'Target ' + tick(m, t), 'lab'); }
+    el('path', { class: 'l1', d: src.map((q, i) => `${i ? 'L' : 'M'}${x(q.t).toFixed(1)},${y(q.v).toFixed(1)}`).join('') }, s);
+    pts.forEach((q) => { el('circle', { class: 'pt' + (q.low ? ' low' : '') + (S.day === q.d ? ' day' : ''), cx: x(q.t), cy: y(q.v), r: S.day === q.d ? 6 : step > 14 ? 4 : 2.5 }, s);
+      const h = el('rect', { class: 'hit', x: x(q.t) - step / 2, y: M.t, width: Math.max(step, 4), height: ih, tabindex: q === pts[pts.length - 1] ? 0 : -1, 'data-k': 'day|' + q.d, role: 'button', 'aria-pressed': S.day === q.d, 'aria-label': `${nm(q)}: ${V(m, q.v, true)}${k.target == null || q.low ? '' : ', ' + STATUS_WORD[stat(m, q.p)]}. Filter to this day` }, s);
+      tip(h, () => `<b>${nm(q)}</b><br>${esc(k.name)}: <b>${V(m, q.v, true)}</b> ${badge(m, q.p)}${iv ? '' : `<br>${fmt.count(WF.n(m, q.p))} agent-days`}${q.low ? `, below ${k.minN}` : ''}${EV.filter((e) => e.start <= q.d && e.end >= q.d).map((e) => `<br><span class="muted">Event: ${esc(e.name)}</span>`).join('')}<br><span class="muted">Click to filter to this day</span>`, () => { S.day = S.day === q.d ? null : q.d; go(); }); });
+    arrows(s);
+    for (const [e, n, ex] of marks) { const q = el('g', { class: 'ev', transform: `translate(${ex},${M.t - 14})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, n); tip(q, () => `<b>${n}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
+    $('lg-day').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : [])]);
+  }
+
+  // ---------- Average day ----------
+  const OFF = [['Lunch', (p) => p.alun, (p) => p.slun], ['Breaks', (p) => p.abrk, (p) => p.sbrk], ['Coaching, meetings and training', (p) => p.amtg, (p) => p.smtg], ['Unplanned unavailable', (p) => p.aux, null], ['Absent', (p) => p.absent, null]];
+  function openDays(skip = []) { const s = new Set(); for (const x of A.iv) if (okDay(x.d, skip)) s.add(x.d); return s.size || 1; }
+  function renderProfile() {
+    const nd = openDays(), fte = (v) => (v || 0) / 15 / nd, pts = [...intervals(A, (x) => x.i, ['iv'])].map(([i, p]) => ({ i, p })).filter((x) => x.p.open > 0 || x.p.avail > 0).sort((a, b) => a.i - b.i), R = canReq(); cur.prof = pts; cur.nd = nd;
+    $('t-prof').textContent = `Average day: ${R ? 'required, scheduled and available staff' : 'scheduled and available staff'}, ${G().name.toLowerCase()} agents`;
+    $('s-prof').textContent = `Staff (FTE) per 15 minutes, averaged over ${nd} ${nd === 1 ? 'day' : 'days'}${!S.dow.length && !S.day && S.ch !== '3' ? '. Saturdays have shorter hours; pick a day to separate them' : ''}`;
+    $('prof-box').hidden = tblProf; $('tbl-prof').hidden = $('csv-prof').hidden = !tblProf; $('tb-prof').textContent = tblProf ? 'View as chart' : 'View as table'; $('tb-prof').setAttribute('aria-pressed', tblProf);
+    if (tblProf) { $('tbl-prof').innerHTML = `<table><thead><tr><th scope="col">Time</th>${R ? '<th scope="col">Required</th>' : ''}<th scope="col">Scheduled</th><th scope="col">Available</th>${OFF.map((o) => `<th scope="col">${o[0]}</th>`).join('')}</tr></thead><tbody>${pts.map((x) => `<tr><td>${slot(x.i)}</td>${R ? `<td>${fte(x.p.req).toFixed(1)}</td>` : ''}<td>${fte(x.p.open).toFixed(1)}</td><td>${fte(x.p.avail).toFixed(1)}</td>${OFF.map((o) => `<td>${fte(o[1](x.p)).toFixed(1)}</td>`).join('')}</tr>`).join('')}</tbody></table>`; return; }
+    const host = $('c-prof'), off = $('c-off'); host.innerHTML = ''; off.innerHTML = ''; $('lg-prof').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
+    const w = host.clientWidth || 800, M = { l: 56, r: 12 }, iw = w - M.l - M.r, i0 = pts[0].i, n = pts[pts.length - 1].i - i0 + 1, x = (i) => M.l + (i - i0 + .5) / n * iw, bw = iw / n;
+    const base = (box, H, top, b, label, role) => { const t = 8, ih = H - t - 24, y = (v) => t + (b - v) / b * ih, s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role, 'aria-label': label }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const q of ticks(0, b, top)) { el('line', { x1: M.l, x2: M.l + iw, y1: y(q), y2: y(q) }, g); text(ax, M.l - 8, y(q) + 4, String(q), '', 'end'); } let lx = -99; for (let i = Math.ceil(i0 / 4) * 4; i < i0 + n; i += 4) { if (x(i) - lx < 46) continue; text(ax, x(i), H - 6, `${Math.floor(i / 4) % 12 || 12} ${i < 48 ? 'am' : 'pm'}`, '', 'middle'); lx = x(i); } return { s, y, t, ih }; };
+    const b = Math.max(...pts.flatMap((q) => [fte(q.p.req), fte(q.p.open), fte(q.p.avail)])) * 1.06 || 1, { s, y, t, ih } = base(host, 250, 5, b, 'Staff by time of day. Use View as table for values.', 'group');
+    if (R) for (const q of pts) if (fte(q.p.avail) < fte(q.p.req)) el('rect', { class: 'gap', x: x(q.i) - bw / 2, y: t, width: bw, height: ih }, s);
+    const path = (f) => pts.map((q, i) => `${i ? 'L' : 'M'}${x(q.i).toFixed(1)},${y(f(q)).toFixed(1)}`).join('');
+    if (R) el('path', { class: 'l2', d: path((q) => fte(q.p.req)) }, s); el('path', { class: 'l3', d: path((q) => fte(q.p.open)) }, s); el('path', { class: 'l1', d: path((q) => fte(q.p.avail)) }, s);
+    pts.forEach((q, j) => { const p = q.p, gap = fte(p.avail) - fte(p.req), h = el('rect', { class: 'hit', x: x(q.i) - bw / 2, y: t, width: bw, height: ih, tabindex: j ? -1 : 0, 'data-k': 'prof|' + q.i, role: 'button', 'aria-pressed': S.iv === q.i, 'aria-label': `${slot(q.i)}: ${R ? `required ${fte(p.req).toFixed(1)}, ` : ''}scheduled ${fte(p.open).toFixed(1)}, available ${fte(p.avail).toFixed(1)}${R && gap < 0 ? ', short' : ''}. Filter to this time` }, s);
+      tip(h, () => `<b>${slot(q.i)}</b>${R ? `<br>Required: ${fte(p.req).toFixed(1)}` : ''}<br>Scheduled: ${fte(p.open).toFixed(1)}<br>Available: <b>${fte(p.avail).toFixed(1)}</b>${R ? `<br>${gap < 0 ? 'Short' : 'Over'} by ${Math.abs(gap).toFixed(1)}` : ''}<br>${OFF.map((o) => `${o[0]}: ${fte(o[1](p)).toFixed(1)}`).join('<br>')}`, () => { S.iv = S.iv === q.i ? null : q.i; go(); }); });
+    arrows(s); if (S.iv != null) el('rect', { class: 'cell-sel', x: x(S.iv) - bw / 2, y: t, width: bw, height: ih }, s);
+    $('lg-prof').innerHTML = leg([...(R ? [['<line class="l2" x2="20" y1="7" y2="7"/>', 'Required']] : []), ['<line class="l3" x2="20" y1="7" y2="7"/>', 'Scheduled (open shift)'], ['<line class="l1" x2="20" y1="7" y2="7"/>', 'Available'], ...(R ? [['<rect class="gap" style="fill-opacity:.4" width="20" height="14"/>', 'Fewer available than required']] : [])]);
+    const ob = Math.max(...pts.flatMap((q) => OFF.flatMap((o) => [fte(o[1](q.p)), o[2] ? fte(o[2](q.p)) : 0]))) * 1.08 || 1;
+    OFF.forEach((o) => { const d = document.createElement('div'); d.className = 'sm-h'; d.textContent = o[0]; off.append(d); const box = document.createElement('div'); box.className = 'chart'; box.style.marginTop = '0'; off.append(box);
+      const c = base(box, 92, 2, ob, `${o[0]} by time of day`, 'img'); pts.forEach((q) => { const v = fte(o[1](q.p)); el('rect', { class: 'bar', x: x(q.i) - bw * .4, y: c.y(v), width: bw * .8, height: Math.max(0, c.y(0) - c.y(v)) }, c.s); if (o[2]) { const z = fte(o[2](q.p)); if (z > 0) el('rect', { fill: 'none', style: 'stroke:var(--text-primary);stroke-width:1', x: x(q.i) - bw * .4, y: c.y(z), width: bw * .8, height: Math.max(0, c.y(0) - c.y(z)) }, c.s); } }); });
+  }
+
+  // ---------- Weekly time slots that run short ----------
+  function renderSlots() {
+    const R = canReq(); $('sec-slots').hidden = !R; if (!R) return;
+    const nd = {}; new Set(A.iv.filter((x) => okDay(x.d, ['dow'])).map((x) => x.d)).forEach((d) => { nd[dowOf(d)] = (nd[dowOf(d)] || 0) + 1; });
+    const rows = [...intervals(A, (x) => dowOf(x.d) * 100 + x.i, ['dow', 'iv'])].map(([k, p]) => { const dow = Math.floor(k / 100), q = 15 * (nd[dow] || 1); return { dow, i: k % 100, req: (p.req || 0) / q, open: (p.open || 0) / q, av: (p.avail || 0) / q, off: ((p.sbrk || 0) + (p.slun || 0) + (p.smtg || 0)) / q, aux: (p.aux || 0) / q, abs: (p.absent || 0) / q }; }).filter((r) => r.open > 0 && r.req > 0).map((r) => ({ ...r, gap: r.av - r.req })).filter((r) => r.gap < 0).sort((a, b) => a.gap - b.gap); cur.slots = rows;
+    // where the shortfall comes from: already short on the schedule, or lost on the day
+    const planned = rows.reduce((s, r) => s + Math.min(-r.gap, Math.max(0, r.req - r.open)), 0), all = rows.reduce((s, r) => s - r.gap, 0);
+    $('t-slots').textContent = 'Time slots that run shortest of staff'; $('s-slots').textContent = `Average FTE per week slot, shortest first · available minus required`;
+    const f = (v) => v.toFixed(1), sg = (v) => (v < 0 ? '−' : v > 0 ? '+' : '') + Math.abs(v).toFixed(1);
+    $('tbl-slots').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Day and time</th><th scope="col">Required</th><th scope="col">Scheduled</th><th scope="col">Available</th><th scope="col">Gap</th><th scope="col">Short on schedule</th><th scope="col">Lost on the day</th><th scope="col">Off queue by schedule</th><th scope="col">Unplanned</th><th scope="col">Absent</th></tr></thead><tbody>${rows.slice(0, 10).map((r, i) => { const sh = Math.min(-r.gap, Math.max(0, r.req - r.open)); return `<tr><td><button type="button" class="name" data-k="slot|${r.dow}|${r.i}" data-i="${i}">${DOW[r.dow]}, ${slot(r.i)}</button></td><td>${f(r.req)}</td><td>${f(r.open)}</td><td>${f(r.av)}</td><td><b>${sg(r.gap)}</b></td><td>${f(sh)}</td><td>${f(-r.gap - sh)}</td><td>${f(r.off)}</td><td>${f(r.aux)}</td><td>${f(r.abs)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No slot averages fewer available staff than required.</p>';
+    $('n-slots').textContent = rows.length ? `Off queue by schedule is breaks, lunches, coaching, meetings and training planned for that slot. ${rows.length} weekly slots average fewer available staff than required. Across them, ${(planned / all * 100).toFixed(1)}% of the shortfall was already there on the schedule; the rest was lost on the day to absence, unplanned time, or late starts and breaks.` : '';
+  }
+
+  // ---------- Shrinkage ----------
+  function renderShrink() {
+    const now = sum(daily(W.s, W.e, () => 1), WF.DAY), was = W.cmp && !S.day ? sum(daily(W.s0, W.e0, () => 1), WF.DAY) : null, host = $('c-shr'); host.innerHTML = '';
+    const rows = WF.REASONS.map(([k, n, planned]) => ({ k, n, planned, m: now[k] || 0, v: now.sched > 0 ? (now[k] || 0) / now.sched * 100 : 0, w: was && was.sched > 0 ? (was[k] || 0) / was.sched * 100 : null })).sort((a, b) => b.v - a.v); cur.shr = rows;
+    $('t-shr').textContent = `Shrinkage by reason, ${G().name.toLowerCase()} agents`; $('s-shr').textContent = `Share of scheduled minutes${was ? `; the tick marks the ${S.days} days before` : ''}`;
+    if (!(now.sched > 0)) { host.textContent = 'No data for these filters.'; $('n-shr').textContent = ''; return; }
+    const w = host.clientWidth || 800, narrow = w < 560, lw = narrow ? 130 : 230, vw = narrow ? 64 : 150, rh = 30, H = rows.length * rh + 4, max = Math.max(...rows.flatMap((r) => [r.v, r.w || 0])) * 1.04 || 1, x = (v) => lw + v / max * (w - lw - vw);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'img', 'aria-label': 'Shrinkage by reason: ' + rows.map((r) => `${r.n} ${r.v.toFixed(1)}%`).join(', ') }, host);
+    rows.forEach((r, i) => { const y = 2 + i * rh; text(s, lw - 10, y + 19, r.n, 'lab', 'end'); el('rect', { class: 'bar', x: lw, y: y + 7, width: Math.max(1, x(r.v) - lw), height: rh - 14, rx: 2 }, s); if (r.w != null) el('line', { class: 'tick0', x1: x(r.w), x2: x(r.w), y1: y + 4, y2: y + rh - 4 }, s); text(s, w - vw + 8, y + 19, `${r.v.toFixed(1)}%${narrow ? '' : r.planned ? ' · planned' : ' · unplanned'}`, 'lab'); });
+    const pl = rows.filter((r) => r.planned).reduce((a, r) => a + r.v, 0), un = rows.filter((r) => !r.planned).reduce((a, r) => a + r.v, 0);
+    $('n-shr').textContent = `Planned ${pl.toFixed(1)}% · unplanned ${un.toFixed(1)}% · total ${(pl + un).toFixed(1)}%. PTO is not in scheduled minutes: ${fmt.count(now.npto || 0)} agent-days of PTO, beside ${fmt.count((now.n || 0) + (now.nabs || 0))} scheduled.`;
+  }
+
+  // ---------- Teams ----------
+  function renderTeams() {
+    const map = daily(W.s, W.e, (r) => r.t, ['team']), rows = teams().filter((t) => !S.site || t.site === S.site).map((t) => ({ t, p: map.get(t.id) || {} })).filter((r) => (r.p.n || 0) + (r.p.nabs || 0) > 0).sort((a, b) => (val('adherence', a.p) ?? 999) - (val('adherence', b.p) ?? 999)); cur.team = rows;
+    $('t-team').textContent = `Teams, ${G().name.toLowerCase()} agents`;
+    const c = (m, p) => `<td class="${low(m, p) ? 'low' : ''}">${V(m, val(m, p), true)}${low(m, p) ? ' (too few)' : ''}</td>`, per = (v, p) => (p.n > 0 ? (v / p.n).toFixed(1) + ' min' : '–');
+    $('tbl-team').innerHTML = `<table><thead><tr><th scope="col">Team</th><th scope="col">Site</th><th scope="col">Adherence</th><th scope="col">Status</th><th scope="col">Conformance</th><th scope="col">Shrinkage</th><th scope="col">Occupancy</th><th scope="col">Absence</th><th scope="col">Unplanned</th><th scope="col">Long breaks</th><th scope="col">Late start</th><th scope="col">Early finish</th><th scope="col">Agent-days</th></tr></thead><tbody>${rows.map(({ t, p }) => { const on = S.team.includes(t.id); return `<tr class="${S.team.length ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="team|${t.id}" data-id="${t.id}" aria-pressed="${on}">${esc(t.name)}</button>${t.sup ? `<div class="muted">Supervisor: ${esc(t.sup)}</div>` : ''}</td><td>${esc(t.site)}</td>${c('adherence', p)}<td>${badge('adherence', p)}</td>${c('conformance', p)}${c('shrinkage', p)}${c('occupancy', p)}<td>${p.sched > 0 ? (p.abs / p.sched * 100).toFixed(1) + '%' : '–'}</td><td>${per(p.aux, p)}</td><td>${per(p.ext, p)}</td><td>${per(p.late, p)}</td><td>${per(p.early, p)}</td><td>${fmt.count(p.n || 0)}</td></tr>`; }).join('')}</tbody></table>`;
+  }
+
+  // ---------- Events ----------
+  for (const [id, key] of [['f-days', 'days'], ['f-end', 'end'], ['f-ch', 'ch'], ['f-site', 'site']]) $(id).addEventListener('change', (e) => { S[key] = e.target.value; if (key === 'end') carried(S.end === 'latest' ? null : S.end); if (key === 'ch') { S.site = ''; S.team = []; S.iv = null; } if (key === 'site') S.team = []; go(); });
+  for (const [id, key] of [['f-team', 'team'], ['f-dow', 'dow']]) $(id).addEventListener('change', (e) => { if (e.target.value !== '*') { S[key] = e.target.value ? [+e.target.value] : []; go(); } });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; if (k === 'team' || k === 'dow') S[k] = S[k].filter((x) => x !== +b.dataset.v); else S[k] = k === 'site' ? '' : null; go(); });
+  $('tbl-team').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) toggle('team', +b.dataset.id, e.ctrlKey || e.metaKey); });
+  $('tbl-slots').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const r = cur.slots[+b.dataset.i]; S.dow = [r.dow]; S.iv = r.i; go(); } });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF, { team: [], dow: [] }); carried(null); events = $('t-events').checked = true; go(); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
+  $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderDay(); });
+  $('tb-day').addEventListener('click', () => { tblDay = !tblDay; renderDay(); }); $('tb-prof').addEventListener('click', () => { tblProf = !tblProf; renderProfile(); });
+  const about = (w) => `Workforce management · ${G().name} agents · ${w} · ${iso(W.s)} to ${iso(W.e)} · filters: ${[...(S.site ? ['site=' + S.site] : []), ...S.team.map((x) => 'team=' + tName(x)), ...S.dow.map((x) => 'day=' + DOW[x]), ...(S.iv != null ? ['time=' + slot(S.iv)] : []), ...(S.day ? ['date=' + S.day] : [])].join('; ') || 'none'} · data through ${IDX.data_through}`;
+  const csv = (n, w, h, r) => Site.downloadCsv(`workforce_${n}_${G().name.toLowerCase()}`, IDX.data_through, about(w), h, r);
+  $('csv-day').addEventListener('click', () => csv('by-day', kpi(S.metric).name + ' by day', ['date', S.metric, 'n'], cur.day.slice().reverse().map((x) => [x.d, x.v, WF.n(S.metric, x.p)])));
+  $('csv-prof').addEventListener('click', () => csv('average-day', 'average day, FTE', ['time', 'required', 'scheduled', 'available', ...OFF.map((o) => o[0])], cur.prof.map((x) => [slot(x.i), ...[x.p.req, x.p.open, x.p.avail, ...OFF.map((o) => o[1](x.p))].map((v) => (v || 0) / 15 / cur.nd)])));
+  $('csv-slots').addEventListener('click', () => csv('short-slots', 'slots short of staff, FTE', ['day_of_week', 'time', 'required', 'scheduled', 'available', 'gap', 'on_scheduled_break_lunch_meeting', 'unplanned', 'absent'], cur.slots.map((r) => [DOW[r.dow], slot(r.i), r.req, r.open, r.av, r.gap, r.off, r.aux, r.abs])));
+  $('csv-shr').addEventListener('click', () => csv('shrinkage', 'shrinkage by reason', ['reason', 'planned', 'minutes', 'share_of_scheduled_pct', 'prior_pct'], cur.shr.map((r) => [r.n, r.planned ? 'planned' : 'unplanned', r.m, r.v, r.w])));
+  $('csv-team').addEventListener('click', () => csv('teams', 'teams', ['team', 'site', 'supervisor', 'adherence', 'conformance', 'shrinkage', 'occupancy', ...WF.DAY], cur.team.map(({ t, p }) => [t.name, t.site, t.sup, val('adherence', p), val('conformance', p), val('shrinkage', p), val('occupancy', p), ...WF.DAY.map((k) => p[k])])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (A) { renderDay(); renderProfile(); renderShrink(); } }, 150); });
+})();
+</script>
+</body>
+</html>

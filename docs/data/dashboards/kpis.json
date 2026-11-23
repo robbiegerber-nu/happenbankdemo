@@ -78,6 +78,17 @@
       "definition": "Share of contacts that came through chat, email or secure message rather than phone or callback.",
       "formula": "Chat + email + secure message contacts ÷ all contacts offered", "minN": 50, "wiki": "self-service" }
   ],
+  "extra": [
+    { "id": "conformance", "name": "Conformance", "short": "Conformance", "format": "pct", "better": "none", "target": null,
+      "definition": "Time agents were logged in as a share of the time they were scheduled. It can exceed 100%. No target; about 100% is expected.",
+      "formula": "Logged-in minutes ÷ scheduled minutes", "exclusions": "Excludes PTO and absence days.", "minN": 5, "wiki": "workforce" },
+    { "id": "shrinkage", "name": "Shrinkage", "short": "Shrinkage", "format": "pct", "better": "none", "target": null,
+      "definition": "Share of scheduled time agents were not available for contacts. No target is set on this dashboard; read the trend.",
+      "formula": "(Breaks + lunch + training + coaching + meetings + unplanned unavailable + absence) ÷ scheduled minutes",
+      "exclusions": "Excludes PTO, which is not in scheduled minutes.", "minN": 5, "wiki": "workforce" },
+    { "id": "forecast", "name": "Forecast error", "short": "Forecast error", "format": "signedpct", "better": "range", "target": [-10, 10], "watch": [-15, 15], "targetLabel": "within ±10% a day",
+      "definition": "How far contacts offered were above (+) or below (−) the forecast.", "formula": "(Offered − forecast) ÷ forecast", "minN": 0, "wiki": "workforce" }
+  ],
   "sections": [
     { "id": "access", "name": "Service and access" },
     { "id": "experience", "name": "Resolution and experience" },
