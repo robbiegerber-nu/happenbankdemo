@@ -1,0 +1,14 @@
+{
+    "kind":  "Late",
+    "arrived_on":  "2026-11-05",
+    "business_date":  "2026-11-04",
+    "reason":  "The agent activity extract for 4 Nov failed. A re-run has delivered the morning so far; the afternoon will follow.",
+    "files":  [
+                  {
+                      "feed":  "agent_activity",
+                      "file":  "agent_activity_morning.csv",
+                      "action":  "insert",
+                      "rows":  719
+                  }
+              ]
+}

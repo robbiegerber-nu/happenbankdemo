@@ -4,7 +4,10 @@
 #   -ExportOnly      skip all checks; re-export JSON for the latest run (or -ResumeRunId N)
 #   -AllRuns         also re-export every earlier run's folder (docs/data/runs/<run_id>/)
 #   -Summary "..."   what changed in this run, in plain words for business users (shown on the dashboard)
-param([string]$Notes = 'Scheduled discovery run', [string]$Summary = '', [int]$ResumeRunId = 0, [switch]$ExportOnly, [switch]$AllRuns)
+#   -BusinessDate d  (v3.1, set by load_day.ps1) the business day this run checks; links the day's loads to the run
+#   -SkipExport      run the checks only (load_day.ps1 exports after tracking incidents)
+param([string]$Notes = 'Scheduled discovery run', [string]$Summary = '', [int]$ResumeRunId = 0, [switch]$ExportOnly, [switch]$AllRuns,
+      [string]$BusinessDate = '', [switch]$SkipExport)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -19,7 +22,8 @@ function Invoke-File([string]$f) {
     if ($LASTEXITCODE -ne 0) { throw "$f failed" }
 }
 function Invoke-Scalar([string]$sql) {
-    $r = & $psql @conn -q -At -v ON_ERROR_STOP=1 -c $sql
+    # more sort memory for this session only: profiling counts distinct values over millions of rows
+    $r = & $psql @conn -q -At -v ON_ERROR_STOP=1 -c "SET work_mem = '256MB'; $sql"
     if ($LASTEXITCODE -ne 0) { throw "SQL failed: $sql" }
     return ($r | Select-Object -Last 1)
 }
@@ -31,14 +35,16 @@ if ($ExportOnly) {
     $run = if ($ResumeRunId -gt 0) { $ResumeRunId } else { [int](Invoke-Scalar "SELECT max(run_id) FROM discovery.dq_run;") }
     "export only: run_id = $run"
 } else {
-Step 'setup, engine, rules' { Invoke-File 'D00_setup.sql'; Invoke-File 'D01_functions.sql'; Invoke-File 'D02_rules.sql'; Invoke-File 'D04_events.sql' }
+Step 'setup, engine, rules' { foreach ($f in 'D00_setup.sql', 'D01_functions.sql', 'D02_rules.sql', 'D04_events.sql', 'D05_evidence.sql', 'D06_incidents.sql') { Invoke-File $f } }
 if ($ResumeRunId -gt 0) {
     $run = $ResumeRunId
     "resuming run_id = $run"
     Invoke-Scalar "DELETE FROM discovery.dq_check_result WHERE run_id = $run; DELETE FROM discovery.dq_scorecard WHERE run_id = $run;" | Out-Null
 } else {
     $notesSql = $Notes.Replace("'", "''"); $summarySql = if ($Summary) { "'" + $Summary.Replace("'", "''") + "'" } else { 'NULL' }
-    $run = [int](Invoke-Scalar "INSERT INTO discovery.dq_run (notes, summary) VALUES ('$notesSql', $summarySql) RETURNING run_id;")
+    $bdSql = if ($BusinessDate) { "'$BusinessDate'" } else { 'NULL' }
+    $run = [int](Invoke-Scalar "INSERT INTO discovery.dq_run (notes, summary, business_date, period_end) VALUES ('$notesSql', $summarySql, $bdSql, discovery.period_end()) RETURNING run_id;")
+    if ($BusinessDate) { Invoke-Scalar "UPDATE discovery.dq_load SET run_id = $run WHERE run_id IS NULL;" | Out-Null }
     "run_id = $run"
     Step 'table catalog'  { Invoke-Scalar "SELECT discovery.build_catalog($run);" | Out-Null }
     Step 'column profiles' {
@@ -50,6 +56,7 @@ if ($ResumeRunId -gt 0) {
 Step 'rule checks'    { Invoke-Scalar "SELECT discovery.run_checks($run);" | Out-Null }
 Step 'scorecard'      { Invoke-Scalar "SELECT discovery.build_scorecard($run);" | Out-Null }
 Invoke-Scalar "UPDATE discovery.dq_run SET finished_at = now() WHERE run_id = $run;" | Out-Null
+if ($SkipExport) { "checked: run $run"; return }
 }
 
 # ---------------- JSON export for the dashboard ----------------
@@ -67,13 +74,20 @@ function Export-Json([string]$name, [string]$sql, [string]$dir = $out) {
 function Export-RunFiles([int]$run, [string]$dir) {
 Export-Json 'summary.json' -dir $dir -sql @"
 SELECT json_build_object(
-  'run', (SELECT json_build_object('run_id', run_id, 'started_at', started_at, 'finished_at', finished_at, 'notes', notes, 'summary', summary) FROM discovery.dq_run WHERE run_id = $run),
+  'run', (SELECT json_build_object('run_id', run_id, 'started_at', started_at, 'finished_at', finished_at, 'notes', notes, 'summary', summary,
+                                   'business_date', business_date) FROM discovery.dq_run WHERE run_id = $run),
+  -- v3.1: the files this run checked
+  'loads', (SELECT json_agg(json_build_object('load_id', load_id, 'arrived_on', arrived_on, 'business_date', business_date, 'feed', feed,
+                  'file', file_name, 'kind', load_kind, 'action', action, 'status', status, 'expected', expected_rows, 'received', rows_received,
+                  'inserted', rows_inserted, 'replaced', rows_replaced, 'deleted', rows_deleted, 'held', rows_held, 'released', rows_released,
+                  'reason', reason, 'fix', fix) ORDER BY CASE load_kind WHEN 'Daily' THEN 1 ELSE 0 END, load_id)
+            FROM discovery.dq_load WHERE run_id = $run),
   'overall', (SELECT json_build_object('score', score, 'status', status, 'checks', checks, 'passed', passed, 'warned', warned, 'failed', failed)
               FROM discovery.dq_scorecard WHERE run_id = $run AND table_name = '(all tables)' AND dimension = '(all dimensions)'),
   'tables_monitored', (SELECT count(*) FROM discovery.dq_table_catalog WHERE run_id = $run),
   'rows_monitored', (SELECT sum(row_count) FROM discovery.dq_table_catalog WHERE run_id = $run),
   'columns_profiled', (SELECT count(*) FROM discovery.dq_column_profile WHERE run_id = $run),
-  'period', json_build_object('start', '2024-01-01', 'end', '2026-10-31'),
+  'period', json_build_object('start', '2024-01-01', 'end', (SELECT coalesce(period_end, date '2026-10-31') FROM discovery.dq_run WHERE run_id = $run)),
   'previous_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard WHERE run_id < $run),
   'history', (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'score', s.score, 'status', s.status,
                      'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
@@ -132,7 +146,7 @@ if ($AllRuns) {
 # Index of all runs for the dashboard's run picker and trend chart
 Export-Json 'index.json' -dir (Join-Path $out 'runs') -sql @"
 SELECT json_build_object('latest_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard), 'runs',
-  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'notes', r.notes, 'summary', r.summary, 'score', s.score, 'status', s.status,
+  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'business_date', r.business_date, 'notes', r.notes, 'summary', r.summary, 'score', s.score, 'status', s.status,
           'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
    FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
 "@
@@ -165,6 +179,33 @@ Export-Explorer -run $run -dir (Join-Path $out "runs\$run")
 if ($AllRuns) {
     $ids = & $psql @conn -At -c "SELECT DISTINCT run_id FROM discovery.dq_scorecard WHERE run_id < $run ORDER BY 1;"
     foreach ($id in $ids) { Export-Explorer -run ([int]$id) -dir (Join-Path $out "runs\$id") }
+}
+
+# ---------- v3.1: data incidents as they stood at each run (status, daily updates, cause, fix, fixing file, alert) ----------
+function Export-Incidents([int]$run, [string]$dir) {
+Export-Json 'incidents.json' -dir $dir -sql @"
+SELECT coalesce(json_agg(json_build_object(
+    'id', i.incident_id, 'title', i.title, 'business_date', i.business_date, 'rule_id', i.rule_id, 'impact', i.impact,
+    'status', (SELECT u.status FROM discovery.dq_incident_update u WHERE u.incident_id = i.incident_id AND u.run_id <= $run ORDER BY u.run_id DESC LIMIT 1),
+    'opened_run', i.opened_run_id,
+    'resolved_run', CASE WHEN i.resolved_run_id <= $run THEN i.resolved_run_id END,
+    'cause', CASE WHEN i.resolved_run_id <= $run THEN i.cause END,
+    'fix', CASE WHEN i.resolved_run_id <= $run THEN i.fix END,
+    'fix_file', CASE WHEN i.resolved_run_id <= $run THEN (SELECT json_build_object('file', l.file_name, 'kind', l.load_kind, 'arrived_on', l.arrived_on,
+                      'replaced', l.rows_replaced, 'deleted', l.rows_deleted, 'inserted', l.rows_inserted, 'released', l.rows_released)
+                      FROM discovery.dq_load l WHERE l.load_id = i.fix_load_id) END,
+    'github_issue', i.github_issue,
+    'checks', (SELECT json_agg(json_build_object('rule_id', k, 'problem', discovery.problem_of(k), 'unit', i.checks->k->>'unit')) FROM jsonb_object_keys(i.checks) k),
+    'updates', (SELECT json_agg(json_build_object('run', u.run_id, 'business_date', r.business_date, 'status', u.status, 'note', u.note, 'checks', u.checks) ORDER BY u.run_id)
+                FROM discovery.dq_incident_update u JOIN discovery.dq_run r USING (run_id) WHERE u.incident_id = i.incident_id AND u.run_id <= $run))
+  ORDER BY i.incident_id DESC), '[]')
+FROM discovery.dq_incident i WHERE i.opened_run_id <= $run;
+"@
+}
+Export-Incidents -run $run -dir (Join-Path $out "runs\$run")
+if ($AllRuns) {
+    $ids = & $psql @conn -At -c "SELECT DISTINCT run_id FROM discovery.dq_scorecard WHERE run_id < $run ORDER BY 1;"
+    foreach ($id in $ids) { Export-Incidents -run ([int]$id) -dir (Join-Path $out "runs\$id") }
 }
 
 # ---------- Rule catalogue: every rule with its result in every run ----------

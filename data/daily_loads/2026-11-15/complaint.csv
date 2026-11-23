@@ -1,0 +1,30 @@
+complaint_id,customer_id,contact_id,opened_ts,closed_ts,date_key,days_to_close,channel_received,category,severity,regulatory_flag,root_cause,launch_id,status
+10267270,124426,,2026-11-15 01:28:43.47554-06,2026-11-15 16:25:05.429999-06,20261115,0.6,Branch,Digital Banking,Low,f,App / online defect,,Closed
+10267271,326984,,2026-11-15 01:42:56.452536-06,2026-11-17 02:14:36.941702-06,20261115,2.0,Branch,Lending,Low,f,Process error,,Closed
+10267272,241235,,2026-11-15 04:08:59.881348-06,2026-11-20 03:33:25.01886-06,20261115,5.0,Social Media,Service Quality,Medium,f,Agent knowledge,,Closed
+10267273,216335,,2026-11-15 04:24:12.468652-06,2026-11-19 00:13:01.58988-06,20261115,3.8,Branch,Fees & Charges,Low,t,Fee policy,,Closed
+10267274,8058,,2026-11-15 04:36:40.191768-06,2026-11-21 08:34:23.742678-06,20261115,6.2,Web Form,Lending,High,f,Policy limitation,,Closed
+10267275,398733,,2026-11-15 04:40:41.151273-06,2026-11-18 10:47:44.85232-06,20261115,3.3,Branch,Lending,Low,f,Policy limitation,,Closed
+10267276,98875,,2026-11-15 04:41:35.28675-06,2026-11-22 08:17:05.089899-06,20261115,7.1,Branch,Fees & Charges,Medium,f,Communication unclear,,Closed
+10267277,20793,,2026-11-15 05:10:03.25987-06,2026-11-24 14:07:51.234614-06,20261115,9.4,Branch,Digital Banking,Medium,f,Communication unclear,,Closed
+10267278,92662,,2026-11-15 06:43:12.729784-06,2026-11-21 05:22:27.526198-06,20261115,5.9,Web Form,Lending,Low,f,Policy limitation,,Closed
+10267279,212429,,2026-11-15 06:48:30.524403-06,,20261115,,Branch,Fees & Charges,Medium,f,Fee policy,,Open
+10267280,170023,,2026-11-15 07:07:21.810779-06,2026-11-27 02:56:33.435097-06,20261115,11.8,Web Form,Digital Banking,Medium,f,App / online defect,,Closed
+10267281,326405,,2026-11-15 09:11:53.101136-06,2026-11-18 21:55:02.340417-06,20261115,3.5,Branch,Fraud & Disputes,Low,f,Fraud handling,,Closed
+10267282,38569,,2026-11-15 09:52:37.493365-06,2026-11-18 02:04:05.233954-06,20261115,2.7,Web Form,Fees & Charges,Low,t,Fee policy,,Closed
+10267283,298438,,2026-11-15 09:57:05.325049-06,2026-11-17 15:00:52.78901-06,20261115,2.2,Web Form,Fees & Charges,Medium,f,Fee policy,,Closed
+10267284,209459,,2026-11-15 10:14:56.809632-06,2026-11-19 20:33:30.681026-06,20261115,4.4,Web Form,Fees & Charges,Low,t,Fee policy,,Closed
+10267285,115247,,2026-11-15 10:28:15.940226-06,2026-11-18 16:53:46.278392-06,20261115,3.3,Branch,Digital Banking,Low,f,Communication unclear,,Closed
+10267286,117807,,2026-11-15 10:47:39.00107-06,2026-11-16 15:06:49.191523-06,20261115,1.2,Branch,Fraud & Disputes,Low,f,Fraud handling,,Closed
+10267287,350672,,2026-11-15 12:07:50.159858-06,2026-11-25 15:43:20.266427-06,20261115,10.1,Web Form,Service Quality,High,f,Process error,,Closed
+10267288,96196,,2026-11-15 12:34:58.965667-06,2026-11-22 06:11:08.493571-06,20261115,6.7,Web Form,Fees & Charges,High,f,Fee policy,,Closed
+10267289,255373,,2026-11-15 13:50:55.714912-06,2026-11-21 22:40:45.49567-06,20261115,6.4,Web Form,Fees & Charges,Medium,f,Communication unclear,,Closed
+10267290,386710,,2026-11-15 14:01:10.788757-06,2026-11-20 06:32:31.847399-06,20261115,4.7,Branch,Fraud & Disputes,Low,f,Fraud handling,,Closed
+10267291,71482,,2026-11-15 14:45:49.991367-06,2026-11-25 08:43:25.725869-06,20261115,9.7,Branch,Fraud & Disputes,Medium,f,Fraud handling,,Closed
+10267292,295598,,2026-11-15 16:23:48.943518-06,2026-11-27 20:19:12.255731-06,20261115,12.2,Branch,Digital Banking,High,f,Communication unclear,,Closed
+10267293,170802,,2026-11-15 17:09:16.841317-06,2026-11-17 16:15:04.581823-06,20261115,2.0,Branch,Fraud & Disputes,Low,t,Fraud handling,,Closed
+10267294,361747,,2026-11-15 17:37:20.299407-06,2026-11-28 13:33:02.938138-06,20261115,12.8,Social Media,Fraud & Disputes,High,f,Fraud handling,,Closed
+10267295,367720,,2026-11-15 20:46:27.428456-06,,20261115,,Web Form,Fraud & Disputes,High,f,Fraud handling,,Open
+10267296,254606,,2026-11-15 21:18:29.509171-06,2026-11-26 07:08:01.294507-06,20261115,10.4,Web Form,Digital Banking,Medium,t,Communication unclear,,Closed
+10267297,87425,,2026-11-15 23:01:10.313794-06,2026-11-21 13:36:06.510191-06,20261115,5.6,Branch,Service Quality,Medium,f,Agent knowledge,,Closed
+10267298,349118,,2026-11-15 23:59:09.036703-06,2026-11-18 18:35:11.58144-06,20261115,2.8,Branch,Fraud & Disputes,Medium,f,Process error,,Closed

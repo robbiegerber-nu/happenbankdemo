@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-08",
+    "business_date":  "2026-11-07",
+    "cause":  "Complaint close dates on 7 Nov were read as day/month instead of month/day, so 11/09 became 11 September.",
+    "fix":  "Replacement file re-sends the affected complaints with the correct close dates.",
+    "files":  [
+                  {
+                      "feed":  "complaint",
+                      "file":  "complaint_replace.csv",
+                      "action":  "upsert",
+                      "rows":  86
+                  }
+              ]
+}

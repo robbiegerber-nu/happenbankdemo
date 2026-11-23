@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-06",
+    "business_date":  "2026-11-05",
+    "cause":  "A release of the contact export on 5 Nov wrote the offered time in UTC while the other times stayed in local time, which also made wait times negative.",
+    "fix":  "Replacement file re-sends every 5 Nov contact with the local offered time and the correct wait time.",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact_replace.csv",
+                      "action":  "upsert",
+                      "rows":  7520
+                  }
+              ]
+}

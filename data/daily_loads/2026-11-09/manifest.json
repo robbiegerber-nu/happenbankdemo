@@ -1,0 +1,55 @@
+{
+    "kind":  "Daily",
+    "arrived_on":  "2026-11-09",
+    "business_date":  "2026-11-09",
+    "files":  [
+                  {
+                      "feed":  "agent_activity",
+                      "file":  "agent_activity.csv",
+                      "action":  "insert",
+                      "rows":  2081
+                  },
+                  {
+                      "feed":  "agent_daily",
+                      "file":  "agent_daily.csv",
+                      "action":  "insert",
+                      "rows":  165
+                  },
+                  {
+                      "feed":  "agent_schedule",
+                      "file":  "agent_schedule.csv",
+                      "action":  "insert",
+                      "rows":  1107
+                  },
+                  {
+                      "feed":  "complaint",
+                      "file":  "complaint.csv",
+                      "action":  "insert",
+                      "rows":  337
+                  },
+                  {
+                      "feed":  "contact",
+                      "file":  "contact.csv",
+                      "action":  "insert",
+                      "rows":  7098
+                  },
+                  {
+                      "feed":  "interval_volume",
+                      "file":  "interval_volume.csv",
+                      "action":  "insert",
+                      "rows":  923
+                  },
+                  {
+                      "feed":  "ivr_session",
+                      "file":  "ivr_session.csv",
+                      "action":  "insert",
+                      "rows":  5406
+                  },
+                  {
+                      "feed":  "survey_response",
+                      "file":  "survey_response.csv",
+                      "action":  "insert",
+                      "rows":  580
+                  }
+              ]
+}

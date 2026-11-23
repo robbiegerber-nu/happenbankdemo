@@ -87,6 +87,8 @@
   .badge.Fail, .badge.Error { color: var(--critical-ink); }
   .badge.New .dot { background: var(--accent); }
   .badge.New { color: var(--accent); }
+  .badge.Info .dot { background: var(--accent); }
+  .badge.Info { color: var(--accent); }
 
   /* ---- Trend + runs ---- */
   .trend-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
@@ -274,6 +276,36 @@
   .lg { display: inline-flex; align-items: center; gap: 6px; }
   .lg svg { flex: none; }
 
+  /* ---- Daily load card + incidents (v3.1) ---- */
+  .tab-count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 9px;
+               background: var(--critical); color: #fff; font-size: 0.7rem; font-weight: 700; vertical-align: 1px; }
+  .loads { min-width: 640px; font-size: 0.85rem; }
+  .loads th { text-align: left; font-size: 0.74rem; color: var(--text-secondary); font-weight: 600; padding: 9px 12px; border-bottom: 1px solid var(--grid); background: var(--surface-2); }
+  .loads td { padding: 8px 12px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+  .loads tr:last-child td { border-bottom: none; }
+  .loads .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .loads .why { color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px; }
+  .load-inc { padding: 10px 14px; border-top: 1px solid var(--grid); font-size: 0.86rem; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .load-inc a { font-weight: 600; }
+  .inc { margin-bottom: 12px; }
+  .inc-head { padding: 14px 16px 10px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+  .inc-title { font-weight: 650; font-size: 0.98rem; }
+  .inc-meta { color: var(--text-muted); font-size: 0.78rem; padding: 0 16px; }
+  .inc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; padding: 10px 16px 14px; }
+  @media (max-width: 700px) { .inc-grid { grid-template-columns: minmax(0, 1fr); } }
+  .inc-box { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; color: var(--text-secondary); }
+  .inc-box b { color: var(--text-primary); }
+  .inc-box p { margin: 4px 0; }
+  .inc-box ul { margin: 4px 0 0; padding-left: 18px; }
+  .timeline { list-style: none; margin: 4px 0 0; padding: 0; }
+  .timeline li { position: relative; padding: 0 0 10px 18px; }
+  .timeline li::before { content: ''; position: absolute; left: 4px; top: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--axis); }
+  .timeline li::after { content: ''; position: absolute; left: 7px; top: 15px; bottom: 0; width: 1px; background: var(--grid); }
+  .timeline li:last-child::after { display: none; }
+  .timeline li.Resolved::before { background: var(--good); } .timeline li.Open::before { background: var(--critical); }
+  .timeline li.Accepted::before { background: var(--accent); }
+  .timeline .when { font-weight: 600; color: var(--text-primary); }
+
   /* ---- Rules tab ---- */
   .rule { border-bottom: 1px solid var(--grid); }
   .rule:last-child { border-bottom: none; }
@@ -344,11 +376,18 @@
     <button type="button" role="tab" id="t-columns" data-tab="columns" aria-controls="tab-columns" aria-selected="false" tabindex="-1">Columns</button>
     <button type="button" role="tab" id="t-volume" data-tab="volume" aria-controls="tab-volume" aria-selected="false" tabindex="-1">Daily volume</button>
     <button type="button" role="tab" id="t-rules" data-tab="rules" aria-controls="tab-rules" aria-selected="false" tabindex="-1">Rules</button>
+    <button type="button" role="tab" id="t-incidents" data-tab="incidents" aria-controls="tab-incidents" aria-selected="false" tabindex="-1">Incidents<span class="tab-count" id="inc-count" hidden></span></button>
   </nav>
 
   <div id="tab-overview" role="tabpanel" aria-labelledby="t-overview">
   <section aria-label="Summary">
     <div class="tiles" id="tiles"></div>
+  </section>
+
+  <section aria-labelledby="h-load" id="load-section" hidden>
+    <h2 id="h-load">Daily load</h2>
+    <p class="section-sub" id="load-sub"></p>
+    <div class="card" id="load-card"></div>
   </section>
 
   <section aria-labelledby="h-trend">
@@ -455,14 +494,27 @@
   </section>
   </div>
 
-  <footer>Data Quality Dashboard · v3 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <!-- ===== Incidents: data problems from daily loads, from alert to fix ===== -->
+  <div id="tab-incidents" role="tabpanel" aria-labelledby="t-incidents" hidden>
+  <section aria-labelledby="h-incidents">
+    <h2 id="h-incidents">Data incidents</h2>
+    <p class="section-sub">Problems found in the daily data feeds: what went wrong, which records, what caused it and how it was fixed. Each one raised a GitHub alert that closed when a run confirmed the fix.</p>
+    <div class="filters">
+      <label>Status <select id="i-status"><option value="">All</option><option>Open</option><option>Resolved</option><option value="Accepted">Explained</option></select></label>
+      <span class="count" id="i-count" aria-live="polite"></span>
+    </div>
+    <div id="i-list"></div>
+  </section>
+  </div>
+
+  <footer>Data Quality Dashboard · v3.1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
 
 <script>
 const DIMS = ['Completeness', 'Uniqueness', 'Validity', 'Consistency', 'Volume', 'Timeliness'];
-const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕', New: '+' };
+const ICON = { Pass: '✓', Warn: '!', Fail: '✕', Error: '✕', New: '+', Info: 'i' };
 const UNIT_SINGULAR = { rows: 'row', days: 'day', columns: 'column', products: 'product' };
 const $ = id => document.getElementById(id);
 const fmtInt = n => n == null ? '—' : Number(n).toLocaleString('en-US');
@@ -478,6 +530,8 @@ const badge = (st, label = st) => `<span class="badge ${st}"><span class="dot" a
 const fmtDate = d => new Date(d).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
 const shortDate = d => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const shortNote = n => (n || '').replace(/^Run \d+:\s*/, '');
+// business days are plain dates: format them without a time-zone shift
+const dayShort = s => new Date(s + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 async function load(path) {
   const r = await fetch(`data/${path}`, { cache: 'no-cache' });
@@ -503,7 +557,8 @@ const hideTip = () => tip.classList.remove('show');
 function renderPicker() {
   const sel = $('run-select');
   sel.innerHTML = S.runs.slice().reverse().map(r =>
-    `<option value="${r.run_id}">Run #${r.run_id}${r.run_id === S.latest ? ' (latest)' : ''} · ${Number(r.score).toFixed(1)} · ${r.status} · ${shortDate(r.started_at)}</option>`).join('');
+    `<option value="${r.run_id}">Run #${r.run_id}${r.run_id === S.latest ? ' (latest)' : ''} · ${Number(r.score).toFixed(1)} · ${r.status} · ${
+      r.business_date ? 'data for ' + dayShort(r.business_date) : shortDate(r.started_at)}</option>`).join('');
   $('runbar').hidden = S.runs.length < 2;
 }
 function renderHeader() {
@@ -727,6 +782,13 @@ function renderTrend() {
   const ticks = []; for (let v = lo; v <= hi; v += (hi - lo) > 10 ? 5 : 2) ticks.push(v);
   const path = h.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(+r.score).toFixed(1)}`).join('');
   const si = h.findIndex(r => r.run_id === S.selected);
+  // labels: keep the selected, last and first runs, then add others only where they don't collide (20+ runs on a phone)
+  const minGap = W < 520 ? 46 : 40, shown = new Set();
+  [si, h.length - 1, 0, ...h.map((_, i) => i)].forEach(i => {
+    if (i < 0 || shown.has(i)) return;
+    if ([...shown].every(j => Math.abs(x(i) - x(j)) >= minGap)) shown.add(i);
+  });
+  const sub = r => r.business_date ? dayShort(r.business_date).replace(/^\w+, /, '') : shortDate(r.started_at);
   $('trend').innerHTML = `
     <svg class="trend" viewBox="0 0 ${W} ${H}" role="group" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
       <g class="grid">${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>
@@ -737,14 +799,14 @@ function renderTrend() {
           <circle class="hit" cx="${x(i)}" cy="${y(+r.score)}" r="16" tabindex="0" role="button"
             aria-label="Run ${r.run_id}: score ${r.score}, ${r.status}${i === si ? ', currently viewing' : '. View this run'}"></circle>
           <circle class="pt" cx="${x(i)}" cy="${y(+r.score)}" r="5" pointer-events="none"></circle>
-          <text class="x-label" x="${x(i)}" y="${H - m.b + 20}" text-anchor="middle"${i === si ? ' font-weight="700"' : ''}>Run #${r.run_id}</text>
-          <text class="axis-label" x="${x(i)}" y="${H - m.b + 34}" text-anchor="middle">${shortDate(r.started_at)}</text>
+          ${shown.has(i) ? `<text class="x-label" x="${x(i)}" y="${H - m.b + 20}" text-anchor="middle"${i === si ? ' font-weight="700"' : ''}>${h.length > 8 ? '#' : 'Run #'}${r.run_id}</text>
+          <text class="axis-label" x="${x(i)}" y="${H - m.b + 34}" text-anchor="middle">${sub(r)}</text>` : ''}
         </g>`).join('')}
       ${si >= 0 ? `<text class="pt-label" x="${x(si)}" y="${y(+h[si].score) - 15}" text-anchor="middle">${Number(h[si].score).toFixed(1)}</text>` : ''}
     </svg>`;
 }
 const trendTip = i => { const r = S.runs[i];
-  return `<div class="t-title">Run #${r.run_id} · ${fmtDate(r.started_at)}</div>
+  return `<div class="t-title">Run #${r.run_id} · ${r.business_date ? 'data for ' + dayShort(r.business_date) : fmtDate(r.started_at)}</div>
     <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
     <div class="t-row"><span>Status</span><span>${r.status}</span></div>
     <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>
@@ -893,12 +955,13 @@ function drawChecks() {
 /* =====================================================================
    v3: tabs, column profiles, daily volume timeline, rule catalogue
    ===================================================================== */
-const TABS = ['overview', 'columns', 'volume', 'rules'];
-const C = { profile: {}, volume: {}, rules: null, events: null };   // cache: per-run files keyed by run id
+const TABS = ['overview', 'columns', 'volume', 'rules', 'incidents'];
+const C = { profile: {}, volume: {}, incidents: {}, rules: null, events: null };   // cache: per-run files keyed by run id
 const cached = async (bucket, key, path) => (bucket[key] ??= load(path).catch(e => { delete bucket[key]; throw e; }));
 const getProfile = id => cached(C.profile, id, `runs/${id}/profile.json`);
 const getVolume = id => cached(C.volume, id, `runs/${id}/volume.json`);
 const getRules = () => (C.rules ??= load('rules.json'));
+const getIncidents = id => (C.incidents[id] ??= load(`runs/${id}/incidents.json`).catch(() => []));   // runs before daily loads have none
 const getEvents = () => (C.events ??= load('events.json'));
 const SERIES_NAME = { ...AREA, agents_logged_in: 'Agents logged in' };
 const tabFromUrl = () => { const t = new URL(location.href).searchParams.get('tab'); return TABS.includes(t) ? t : 'overview'; };
@@ -924,6 +987,87 @@ function renderActiveTab() {
   if (S.tab === 'columns') getProfile(run).then(p => { if (S.selected === run) renderColumns(p); }).catch(e => fail('c-summary', e));
   if (S.tab === 'volume') Promise.all([getVolume(run), getEvents()]).then(([v, ev]) => { if (S.selected === run) renderVolume(v, ev); }).catch(e => fail('v-chart', e));
   if (S.tab === 'rules') getRules().then(r => renderRules(r)).catch(e => fail('r-list', e));
+  if (S.tab === 'incidents') getIncidents(run).then(list => { if (S.selected === run) { S.incidents = list; drawIncidents(); } });
+}
+
+/* ---------- v3.1: daily load card (Overview) and Incidents tab ---------- */
+const INC_BADGE = { Open: ['Fail', 'Open'], Resolved: ['Pass', 'Resolved'], Accepted: ['Info', 'Explained'] };
+const incBadge = st => badge(...(INC_BADGE[st] || ['Warn', st]));
+const LOAD_KIND = { Daily: 'Daily file', Late: 'Late file', Correction: 'Correction' };
+const loadStatus = l => l.status === 'Missing' ? badge('Fail', 'Missing') : l.status === 'Count mismatch' ? badge('Warn', 'Count mismatch')
+  : l.held ? badge('Warn', 'Loaded, some held') : badge('Pass', 'Loaded');
+const incLink = i => `<a href="?run=${S.selected}&tab=incidents#inc-${i.id}" data-inc="${i.id}">#${i.id} ${esc(i.title)}</a>`;
+const ISSUE_URL = 'https://github.com/robbiegerber-nu/happenbankdemo/issues/';
+
+function renderLoad() {
+  const s = S.data.summary, loads = s.loads || [], run = S.selected;
+  $('load-section').hidden = !loads.length;
+  if (!loads.length) { $('inc-count').hidden = true; return; }
+  const bd = s.run.business_date;
+  $('h-load').textContent = `Daily load · data for ${dayShort(bd)}`;
+  const daily = loads.filter(l => l.kind === 'Daily');
+  $('load-sub').textContent = `${daily.filter(l => l.status !== 'Missing').length} of ${daily.length} daily files arrived` +
+    (loads.length > daily.length ? `, plus ${loads.length - daily.length} late or correction file${loads.length - daily.length > 1 ? 's' : ''} for earlier days.` : '.');
+  const counts = l => {
+    const bits = [];
+    if (l.inserted) bits.push(`${fmtInt(l.inserted)} added`);
+    if (l.replaced) bits.push(`${fmtInt(l.replaced)} replaced`);
+    if (l.deleted) bits.push(`${fmtInt(l.deleted)} removed`);
+    if (l.held) bits.push(`${fmtInt(l.held)} held (waiting for their contact)`);
+    if (l.released) bits.push(`${fmtInt(l.released)} held rows released`);
+    return bits.join(' · ');
+  };
+  const table = `<div class="table-wrap scroll"><table class="loads"><thead><tr><th>File</th><th>Type</th><th>Status</th>
+      <th class="num">Rows received</th><th class="num">Sender declared</th><th>What happened</th></tr></thead><tbody>` +
+    loads.map(l => `<tr><td><code>${esc(l.file)}</code><div class="why">${esc(AREA[l.feed] || l.feed)}</div></td>
+      <td>${LOAD_KIND[l.kind]}${l.kind !== 'Daily' ? `<div class="why">for ${dayShort(l.business_date)}</div>` : ''}</td>
+      <td>${loadStatus(l)}</td>
+      <td class="num">${l.status === 'Missing' ? '—' : fmtInt(l.received)}</td><td class="num">${l.expected == null ? '—' : fmtInt(l.expected)}</td>
+      <td>${esc(counts(l)) || (l.status === 'Missing' ? 'Never arrived' : '')}${l.kind !== 'Daily' && (l.fix || l.reason) ? `<div class="why">${esc(l.fix || l.reason)}</div>` : ''}</td></tr>`).join('') +
+    '</tbody></table></div>';
+  $('load-card').innerHTML = table + '<div class="load-inc" id="load-inc"></div>';
+  getIncidents(run).then(list => {
+    if (S.selected !== run) return;
+    S.incidents = list;
+    const open = list.filter(i => i.status === 'Open');
+    $('inc-count').hidden = !open.length; $('inc-count').textContent = open.length;
+    $('inc-count').setAttribute('aria-label', `${open.length} open`);
+    const opened = list.filter(i => i.opened_run === run), resolved = list.filter(i => i.resolved_run === run && i.status === 'Resolved');
+    const parts = [];
+    if (opened.length) parts.push(`<span><b>New:</b> ${opened.map(i => `${incBadge(i.status)} ${incLink(i)}`).join(' ')}</span>`);
+    if (resolved.length) parts.push(`<span><b>Resolved:</b> ${resolved.map(i => `${incBadge('Resolved')} ${incLink(i)}`).join(' ')}</span>`);
+    parts.push(`<span>${open.length ? `${open.length} incident${open.length > 1 ? 's' : ''} open` : 'No incidents open'}</span>`);
+    $('load-inc').innerHTML = parts.join('');
+  });
+}
+
+function drawIncidents() {
+  const list = S.incidents || [], f = $('i-status').value;
+  const shown = list.filter(i => !f || i.status === f);
+  $('i-count').textContent = `${shown.length} of ${list.length} incidents`;
+  if (!list.length) { $('i-list').innerHTML = `<div class="card empty">No incidents yet. Incidents start with the daily loads from 1 Nov 2026 (run #6 onward).</div>`; return; }
+  $('i-list').innerHTML = shown.map(i => {
+    const last = (i.updates || [])[i.updates.length - 1] || {};
+    const now = (last.checks || []).filter(c => +c.records > 0);
+    const first = (i.updates || [])[0] || {};
+    return `<article class="card inc" id="inc-${i.id}">
+      <div class="inc-head">${incBadge(i.status)}<span class="inc-title">#${i.id} ${esc(i.title)}</span>
+        ${i.github_issue ? `<a href="${ISSUE_URL}${i.github_issue}">GitHub issue #${i.github_issue}</a>` : ''}</div>
+      <div class="inc-meta">Data for ${dayShort(i.business_date)} · found by run #${i.opened_run}${i.resolved_run ? ` · ${i.status === 'Accepted' ? 'explained' : 'resolved'} in run #${i.resolved_run}` : ''}</div>
+      <div class="inc-grid">
+        <div class="inc-box"><p><b>What was wrong:</b> ${esc(i.impact)}</p>
+          <p><b>Checks affected:</b></p><ul>${(first.checks || []).map(c => `<li><code>${esc(c.rule_id)}</code> ${esc(((i.checks || []).find(x => x.rule_id === c.rule_id) || {}).problem || '')}: ${fmtInt(c.records)} ${esc(PLAIN_UNIT[c.unit] ? PLAIN_UNIT[c.unit][+c.records === 1 ? 0 : 1] : c.unit)}</li>`).join('')}</ul>
+          ${i.status === 'Open' ? `<p><b>Still affected now:</b> ${now.length ? now.map(c => `${esc(c.rule_id)} ${fmtInt(c.records)}`).join(' · ') : 'none'}</p>` : ''}
+          ${i.cause ? `<p><b>Cause:</b> ${esc(i.cause)}</p>` : i.status === 'Open' ? '<p><b>Cause:</b> not known yet; waiting for the sender.</p>' : ''}
+          ${i.fix ? `<p><b>Fix:</b> ${esc(i.fix)}</p>` : ''}
+          ${i.fix_file ? `<p><b>Fixing file:</b> <code>${esc(i.fix_file.file)}</code> (${esc(i.fix_file.kind.toLowerCase())} file, arrived ${dayShort(i.fix_file.arrived_on)}${
+              [['replaced', 'replaced'], ['deleted', 'removed'], ['inserted', 'added'], ['released', 'held rows released']].filter(([k]) => i.fix_file[k]).map(([k, w]) => `, ${fmtInt(i.fix_file[k])} ${w}`).join('')})</p>` : ''}</div>
+        <div class="inc-box"><b>Day by day</b><ol class="timeline">${(i.updates || []).map(u =>
+          `<li class="${esc(u.status)}"><span class="when">Run #${u.run} · ${dayShort(u.business_date)}</span><br>${esc(u.note)}</li>`).join('')}</ol></div>
+      </div></article>`;
+  }).join('') || `<div class="card empty">No incidents match this filter.</div>`;
+  const target = location.hash && document.querySelector(location.hash);
+  if (target && target.classList.contains('inc')) target.scrollIntoView({ block: 'start' });
 }
 
 /* ---------- Columns: profile explorer ---------- */
@@ -1185,7 +1329,7 @@ function drawRules() {
 
 /* ---------- switching runs ---------- */
 function renderAll() {
-  renderHeader(); renderTiles(); renderTrend(); renderChanges(); renderHeat();
+  renderHeader(); renderTiles(); renderLoad(); renderTrend(); renderChanges(); renderHeat();
   refreshTableOptions(); drawChecks(); renderActiveTab();
 }
 async function showRun(id, { push = true } = {}) {
@@ -1256,6 +1400,13 @@ function wire() {
     tip.classList.add('wide'); showTip(volTip(i), r.left + p.cx * r.width / g.W, r.top + p.cy * r.height / g.H);
   });
   vc.addEventListener('focusout', () => { hideTip(); tip.classList.remove('wide'); });
+
+  /* incidents: filter, and links from the Overview's load card */
+  $('i-status').addEventListener('change', drawIncidents);
+  $('load-card').addEventListener('click', e => {
+    const a = e.target.closest('[data-inc]'); if (!a) return;
+    e.preventDefault(); history.replaceState(null, '', `#inc-${a.dataset.inc}`); setTab('incidents');
+  });
 
   /* rules */
   ['r-status', 'r-dim', 'r-sev', 'r-hist'].forEach(id => $(id).addEventListener('change', drawRules));

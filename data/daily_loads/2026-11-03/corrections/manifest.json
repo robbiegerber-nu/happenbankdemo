@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-03",
+    "business_date":  "2026-11-02",
+    "cause":  "The 2 Nov contact extract ran twice after a timeout, and both copies went out in one file. The second copy was given new contact IDs.",
+    "fix":  "Delete file removes the second copy of each 2 Nov contact (contact IDs from 15,000,000).",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact_delete.csv",
+                      "action":  "delete",
+                      "rows":  8926
+                  }
+              ]
+}

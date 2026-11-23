@@ -1,0 +1,29 @@
+complaint_id,customer_id,contact_id,opened_ts,closed_ts,date_key,days_to_close,channel_received,category,severity,regulatory_flag,root_cause,launch_id,status
+10265279,28688,,2026-11-08 02:15:09.728448-06,2026-11-10 16:30:29.225384-06,20261108,2.6,Branch,Fees & Charges,Low,f,Communication unclear,,Closed
+10265280,57350,,2026-11-08 02:57:26.836173-06,2026-11-10 18:37:02.937259-06,20261108,2.7,Branch,Lending,Low,f,Policy limitation,,Closed
+10265281,377645,,2026-11-08 03:13:35.03916-06,2026-11-21 23:20:57.502411-06,20261108,13.8,Branch,Digital Banking,Medium,f,App / online defect,,Closed
+10265282,364573,,2026-11-08 03:27:33.577745-06,2026-11-10 05:14:13.543146-06,20261108,2.1,Web Form,Service Quality,Low,f,Agent knowledge,,Closed
+10265283,341933,,2026-11-08 04:16:10.182643-06,2026-11-11 18:53:58.904176-06,20261108,3.6,Web Form,Fees & Charges,Medium,f,Fee policy,,Closed
+10265284,125275,,2026-11-08 06:08:31.107978-06,2026-11-12 16:36:08.297128-06,20261108,4.4,Branch,Service Quality,Medium,f,Long wait / hard to reach,,Closed
+10265285,357062,,2026-11-08 06:34:00.477005-06,2026-11-10 15:17:55.004323-06,20261108,2.4,Web Form,Fraud & Disputes,Medium,t,Process error,,Closed
+10265286,170475,,2026-11-08 06:38:24.810446-06,2026-11-09 14:26:52.380178-06,20261108,1.3,Web Form,Service Quality,Low,f,Process error,,Closed
+10265287,249601,,2026-11-08 07:58:41.764982-06,2026-11-10 08:20:09.491423-06,20261108,2.0,Branch,Service Quality,Low,f,Agent knowledge,,Closed
+10265288,222843,,2026-11-08 08:15:30.284778-06,2026-11-13 19:16:29.557695-06,20261108,5.5,Web Form,Fees & Charges,Low,f,Communication unclear,,Closed
+10265289,343096,,2026-11-08 10:40:39.583827-06,2026-11-11 07:27:19.23013-06,20261108,2.9,Web Form,Digital Banking,Low,f,App / online defect,,Closed
+10265290,77665,,2026-11-08 14:15:50.115559-06,2026-11-12 04:33:07.701654-06,20261108,3.6,Social Media,Digital Banking,Medium,f,Process error,,Closed
+10265291,364721,,2026-11-08 15:11:01.413966-06,2026-11-26 18:55:26.45367-06,20261108,18.2,Web Form,Fees & Charges,High,f,Fee policy,,Closed
+10265292,337055,,2026-11-08 15:34:31.572285-06,2026-11-15 00:58:55.41209-06,20261108,6.4,Branch,Digital Banking,Medium,f,Process error,,Closed
+10265293,69099,,2026-11-08 16:38:26.958788-06,2026-11-13 00:12:45.037064-06,20261108,4.3,Branch,Digital Banking,Low,f,Communication unclear,,Closed
+10265294,186297,,2026-11-08 17:40:49.256828-06,2026-11-18 01:48:52.376957-06,20261108,9.3,Social Media,Fees & Charges,Medium,f,Fee policy,,Closed
+10265295,366247,,2026-11-08 18:01:47.367267-06,2026-11-10 04:56:35.154113-06,20261108,1.5,Web Form,Digital Banking,Low,f,Communication unclear,,Closed
+10265296,323077,,2026-11-08 18:18:18.109499-06,2026-11-15 15:37:57.945099-06,20261108,6.9,Branch,Lending,Medium,f,Agent knowledge,,Closed
+10265297,339576,,2026-11-08 18:25:22.556025-06,2026-11-14 13:37:48.013403-06,20261108,5.8,Branch,Lending,Medium,f,Policy limitation,,Closed
+10265298,306864,,2026-11-08 18:56:35.207363-06,2026-11-09 23:08:18.772061-06,20261108,1.2,Regulator Referral,Lending,Low,f,Agent knowledge,,Closed
+10265299,378771,,2026-11-08 18:57:29.004032-06,2026-11-13 04:24:07.58345-06,20261108,4.4,Web Form,Digital Banking,Medium,f,Process error,,Closed
+10265300,178025,,2026-11-08 19:01:14.498876-06,2026-11-13 07:53:52.838517-06,20261108,4.5,Branch,Fees & Charges,Medium,f,Fee policy,,Closed
+10265301,66840,,2026-11-08 21:09:43.439309-06,2026-11-12 21:10:59.945414-06,20261108,4.0,Branch,Digital Banking,Low,f,App / online defect,,Closed
+10265302,179344,,2026-11-08 21:33:06.061241-06,2026-11-10 22:35:12.85397-06,20261108,2.0,Branch,Lending,Low,f,Agent knowledge,,Closed
+10265303,348756,,2026-11-08 22:13:28.591026-06,2026-11-18 03:41:53.74469-06,20261108,9.2,Branch,Fraud & Disputes,Low,f,Policy limitation,,Closed
+10265304,103497,,2026-11-08 22:34:12.725177-06,2026-11-18 07:41:38.191112-06,20261108,9.4,Web Form,Lending,Medium,f,Policy limitation,,Closed
+10265305,325072,,2026-11-08 22:56:02.102202-06,2026-11-10 09:26:33.710196-06,20261108,1.4,Branch,Digital Banking,Low,f,Communication unclear,,Closed
+10265306,339880,,2026-11-08 23:48:09.215224-06,2026-11-18 09:23:50.438772-06,20261108,9.4,Web Form,Lending,Medium,f,Process error,,Closed

@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS discovery.dq_event (
   description text NOT NULL
 );
 COMMENT ON TABLE discovery.dq_event IS 'Known business and operational events shown on the daily volume timeline.';
+-- v3.1: data incidents are added here too (kind 'Data'), so the timeline shows when a feed went wrong
+ALTER TABLE discovery.dq_event ADD COLUMN IF NOT EXISTS incident_id int REFERENCES discovery.dq_incident;
 
 DELETE FROM discovery.dq_event WHERE kind IN ('Incident', 'Staffing');
 INSERT INTO discovery.dq_event (start_date, end_date, kind, title, description) VALUES

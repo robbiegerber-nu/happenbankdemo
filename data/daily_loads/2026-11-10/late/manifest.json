@@ -1,0 +1,15 @@
+{
+    "kind":  "Late",
+    "arrived_on":  "2026-11-10",
+    "business_date":  "2026-11-09",
+    "cause":  "The 9 Nov contact file failed to transfer because a certificate on the file server had expired.",
+    "fix":  "File re-sent after the certificate was renewed. IVR calls, surveys and complaints held for its contacts load with it.",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact.csv",
+                      "action":  "insert",
+                      "rows":  7098
+                  }
+              ]
+}

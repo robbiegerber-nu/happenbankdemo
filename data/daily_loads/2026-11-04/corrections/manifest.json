@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-04",
+    "business_date":  "2026-11-03",
+    "cause":  "A routing-platform change on 3 Nov stopped writing the agent ID on some answered contacts.",
+    "fix":  "Update file re-sends the affected 3 Nov contacts with the agent restored.",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact_update.csv",
+                      "action":  "upsert",
+                      "rows":  773
+                  }
+              ]
+}

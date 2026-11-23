@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-11",
+    "business_date":  "2026-11-10",
+    "cause":  "An email-parsing change on 10 Nov stopped matching emails, secure messages and callbacks to customers.",
+    "fix":  "Update file re-sends the affected 10 Nov contacts with the customer restored.",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact_update.csv",
+                      "action":  "upsert",
+                      "rows":  850
+                  }
+              ]
+}

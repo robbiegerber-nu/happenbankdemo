@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-13",
+    "business_date":  "2026-11-12",
+    "cause":  "The survey vendor\u0027s new matching logic on 12 Nov credited surveys to the wrong agent.",
+    "fix":  "Replacement file re-sends the 12 Nov surveys with the agent who handled each contact.",
+    "files":  [
+                  {
+                      "feed":  "survey_response",
+                      "file":  "survey_replace.csv",
+                      "action":  "upsert",
+                      "rows":  633
+                  }
+              ]
+}

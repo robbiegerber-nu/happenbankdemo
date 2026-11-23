@@ -1,0 +1,15 @@
+{
+    "kind":  "Correction",
+    "arrived_on":  "2026-11-15",
+    "business_date":  "2026-11-14",
+    "cause":  "After a routing-system change on 14 Nov, some contacts were assigned to recycled agent IDs that belonged to agents who had left.",
+    "fix":  "Update file re-sends the affected 14 Nov contacts with the correct agent.",
+    "files":  [
+                  {
+                      "feed":  "contact",
+                      "file":  "contact_update.csv",
+                      "action":  "upsert",
+                      "rows":  522
+                  }
+              ]
+}

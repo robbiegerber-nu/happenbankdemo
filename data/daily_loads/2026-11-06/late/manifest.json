@@ -1,0 +1,21 @@
+{
+    "kind":  "Late",
+    "arrived_on":  "2026-11-06",
+    "business_date":  "2026-11-04",
+    "cause":  "The agent activity extract job for 4 Nov failed, so no activity was sent and the agent-day summary was built from an empty extract (0 minutes logged in).",
+    "fix":  "The rest of 4 Nov\u0027s activity was re-extracted, and the agent-day summary was rebuilt and re-sent.",
+    "files":  [
+                  {
+                      "feed":  "agent_activity",
+                      "file":  "agent_activity_afternoon.csv",
+                      "action":  "insert",
+                      "rows":  1411
+                  },
+                  {
+                      "feed":  "agent_daily",
+                      "file":  "agent_daily_rebuilt.csv",
+                      "action":  "upsert",
+                      "rows":  166
+                  }
+              ]
+}

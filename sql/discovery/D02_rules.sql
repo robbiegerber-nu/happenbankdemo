@@ -1,6 +1,8 @@
 -- Data quality rules, stored as data. Each check_sql returns ONE number (the measured value).
 -- Status: measured > fail_above => Fail; measured > warn_above => Warn; otherwise Pass.
 -- {run_id} is replaced with the current run id (used by rules that read this run's daily volume).
+-- Dates (v3.1): discovery.period_end() is the latest business day loaded (31 Oct 2026 before daily loads began);
+-- discovery.snapshot_date() is the date of the monthly customer and product snapshot, which is not a daily feed.
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 DELETE FROM discovery.dq_rule;
@@ -120,7 +122,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  $$SELECT count(*) FROM cc.contact WHERE handle_sec <> talk_sec + hold_sec + wrap_sec$$,'rows',0,0,'High',NULL),
 ('VAL-004','contact','offered_ts','Validity','Contacts inside the reporting period',
  'Contacts offered before 1 Jan 2024 or after 31 Oct 2026.',
- $$SELECT count(*) FROM cc.contact WHERE offered_ts < '2024-01-01' OR offered_ts >= '2026-11-01'$$,'rows',0,0,'High',NULL),
+ $$SELECT count(*) FROM cc.contact WHERE offered_ts < '2024-01-01' OR offered_ts >= discovery.period_end() + 1$$,'rows',0,0,'High',NULL),
 ('VAL-005','contact','offered_ts','Validity','Phone and chat offered only in opening hours',
  'Customers can only join the phone or chat queue Mon-Fri 7:00-21:00 and Sat 8:00-17:00, never on a closed day.',
  $$SELECT count(*) FROM cc.contact c JOIN cc.dim_date d ON d.full_date = c.offered_ts::date
@@ -170,7 +172,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
 ('VAL-017','contact','agent_id','Validity','Agents handle contacts only while employed',
  'Contacts answered by an agent before their hire date or after they left.',
  $$SELECT count(*) FROM cc.contact c JOIN cc.dim_agent a USING (agent_id)
-   WHERE c.answered_ts::date < a.hire_date OR c.answered_ts::date >= coalesce(a.term_date, date '2026-11-01')$$,'rows',0,0,'High',NULL),
+   WHERE c.answered_ts::date < a.hire_date OR c.answered_ts::date >= a.term_date$$,'rows',0,0,'High',NULL),
 ('VAL-018','contact','abandoned','Validity','Abandoned contacts have no handling',
  'Abandoned contacts with talk time, wrap-up time or marked answered.',
  $$SELECT count(*) FROM cc.contact WHERE abandoned AND (answered OR talk_sec > 0 OR wrap_sec > 0)$$,'rows',0,0,'Critical',NULL),
@@ -196,7 +198,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  'Products launched in the period whose openings fall on fewer than half of the days the product has been available (capped at 100 days): real customers do not all open accounts on the same few dates.',
  $$SELECT count(*) FROM (SELECT cp.product_id, min(p.introduced_date) AS intro FROM cc.customer_product cp JOIN cc.dim_product p USING (product_id)
      WHERE p.is_new_in_period GROUP BY 1
-     HAVING count(DISTINCT cp.open_date) < 0.5 * least(100, date '2026-10-31' - min(p.introduced_date))) x$$,'products',0,0,'Medium',
+     HAVING count(DISTINCT cp.open_date) < 0.5 * least(100, discovery.snapshot_date() - min(p.introduced_date))) x$$,'products',0,0,'Medium',
  'Run 4: P2P Payments, High-Yield Savings and others opened on as few as 4 distinct days (generator defect, fixed by 07b_customer_products.sql).'),
 
 -- ======================= CONSISTENCY =======================
@@ -208,7 +210,9 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  $$SELECT abs((SELECT sum(answered) FROM cc.interval_volume) - (SELECT count(*) FROM cc.contact WHERE answered))$$,'rows',0,0,'Critical',NULL),
 ('CON-003','agent_daily','contacts_handled','Consistency','Agent-day contacts = answered contacts',
  'Contacts per agent per day must reconcile to the contact detail.',
- $$SELECT abs((SELECT sum(contacts_handled) FROM cc.agent_daily) - (SELECT count(*) FROM cc.contact WHERE answered))$$,'rows',0,0,'Critical',NULL),
+ $$SELECT abs((SELECT sum(contacts_handled) FROM cc.agent_daily WHERE date_key <= to_char(discovery.period_end(), 'YYYYMMDD')::int)
+            - (SELECT count(*) FROM cc.contact WHERE answered AND answered_ts::date <= discovery.period_end()))$$,'rows',0,0,'Critical',
+ 'Compares up to the latest day loaded: an email answered the day after it arrived is counted when that day is loaded.'),
 ('CON-004','survey_response','agent_id','Consistency','Survey agent matches contact agent',
  'Surveys credited to a different agent than the one who handled the contact.',
  $$SELECT count(*) FROM cc.survey_response s JOIN cc.contact c USING (contact_id) WHERE s.agent_id <> c.agent_id$$,'rows',0,0,'High',NULL),
@@ -227,9 +231,10 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
                          FROM cc.contact WHERE answered AND channel_id <> 2) x WHERE nxt < wrap_end_ts$$,'rows',0,0,'Critical',NULL),
 ('CON-009','contact','answered_ts','Consistency','Contacts handled only while agent is Available',
  'Contacts handled while the agent was on break, in training, unavailable or logged out.',
- $$SELECT count(*) FROM cc.contact c WHERE c.answered AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
+ $$SELECT count(*) FROM cc.contact c WHERE c.answered AND c.answered_ts::date <= discovery.period_end() AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
      WHERE a.agent_id = c.agent_id AND a.date_key = to_char(c.answered_ts, 'YYYYMMDD')::int
-       AND a.state = 'Available' AND c.answered_ts >= a.state_start_ts AND c.wrap_end_ts <= a.state_end_ts)$$,'rows',0,0,'Critical',NULL),
+       AND a.state = 'Available' AND c.answered_ts >= a.state_start_ts AND c.wrap_end_ts <= a.state_end_ts)$$,'rows',0,0,'Critical',
+ 'Checks contacts answered up to the latest day loaded; that day''s agent activity arrives with it.'),
 ('CON-010','agent_activity','state_start_ts','Consistency','Agent states never overlap',
  'An agent recorded in two states at the same time.',
  $$SELECT count(*) FROM (SELECT state_end_ts, lead(state_start_ts) OVER (PARTITION BY agent_id ORDER BY state_start_ts) AS nxt
@@ -300,34 +305,34 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
 -- ======================= TIMELINESS =======================
 ('TML-001','contact','offered_ts','Timeliness','Contact data up to date',
  'Days between the latest contact and the end of the reporting period (31 Oct 2026).',
- $$SELECT date '2026-10-31' - max(offered_ts)::date FROM cc.contact$$,'days',1,7,'High',NULL),
+ $$SELECT discovery.period_end() - max(offered_ts)::date FROM cc.contact$$,'days',1,7,'High',NULL),
 ('TML-002','ivr_session','start_ts','Timeliness','IVR data up to date',
  'Days between the latest IVR session and the end of the period.',
- $$SELECT date '2026-10-31' - max(start_ts)::date FROM cc.ivr_session$$,'days',1,7,'Medium',NULL),
+ $$SELECT discovery.period_end() - max(start_ts)::date FROM cc.ivr_session$$,'days',1,7,'Medium',NULL),
 ('TML-003','survey_response','survey_ts','Timeliness','Survey data up to date',
  'Days between the latest survey and the end of the period.',
- $$SELECT date '2026-10-31' - max(survey_ts)::date FROM cc.survey_response$$,'days',2,7,'Medium',NULL),
+ $$SELECT discovery.period_end() - max(survey_ts)::date FROM cc.survey_response$$,'days',2,7,'Medium',NULL),
 ('TML-004','complaint','opened_ts','Timeliness','Complaint data up to date',
  'Days between the latest complaint and the end of the period.',
- $$SELECT date '2026-10-31' - max(opened_ts)::date FROM cc.complaint$$,'days',2,7,'Medium',NULL),
+ $$SELECT discovery.period_end() - max(opened_ts)::date FROM cc.complaint$$,'days',2,7,'Medium',NULL),
 ('TML-005','interval_volume','interval_ts','Timeliness','Interval summary up to date',
  'Days between the latest interval and the end of the period.',
- $$SELECT date '2026-10-31' - max(interval_ts)::date FROM cc.interval_volume$$,'days',1,7,'High',NULL),
+ $$SELECT discovery.period_end() - max(interval_ts)::date FROM cc.interval_volume$$,'days',1,7,'High',NULL),
 ('TML-006','agent_schedule','scheduled_start_ts','Timeliness','Schedules up to date',
  'Days between the latest schedule and the end of the period.',
- $$SELECT date '2026-10-31' - max(scheduled_start_ts)::date FROM cc.agent_schedule$$,'days',1,7,'Medium',NULL),
+ $$SELECT discovery.period_end() - max(scheduled_start_ts)::date FROM cc.agent_schedule$$,'days',1,7,'Medium',NULL),
 ('TML-007','agent_activity','state_start_ts','Timeliness','Agent activity up to date',
  'Days between the latest agent activity and the end of the period.',
- $$SELECT date '2026-10-31' - max(state_start_ts)::date FROM cc.agent_activity$$,'days',1,7,'High',NULL),
+ $$SELECT discovery.period_end() - max(state_start_ts)::date FROM cc.agent_activity$$,'days',1,7,'High',NULL),
 ('TML-008','agent_daily','date_key','Timeliness','Agent-day summary up to date',
  'Days between the latest agent-day summary and the end of the period.',
- $$SELECT date '2026-10-31' - to_date(max(date_key)::text, 'YYYYMMDD') FROM cc.agent_daily$$,'days',1,7,'High',NULL),
+ $$SELECT discovery.period_end() - to_date(max(date_key)::text, 'YYYYMMDD') FROM cc.agent_daily$$,'days',1,7,'High',NULL),
 ('TML-009','customer_product','open_date','Timeliness','Product openings up to date',
  'Days between the latest product opening and the end of the period.',
- $$SELECT date '2026-10-31' - max(open_date) FROM cc.customer_product$$,'days',3,14,'Low',NULL),
+ $$SELECT discovery.snapshot_date() - max(open_date) FROM cc.customer_product$$,'days',3,14,'Low',NULL),
 ('TML-010','customer','customer_since','Timeliness','No future-dated customers',
  'Customers whose relationship starts after the end of the period.',
- $$SELECT count(*) FROM cc.customer WHERE customer_since > date '2026-10-31'$$,'rows',0,0,'Medium',NULL);
+ $$SELECT count(*) FROM cc.customer WHERE customer_since > discovery.snapshot_date()$$,'rows',0,0,'Medium',NULL);
 
 -- ======================= Business-user context =======================
 -- problem_plain: the problem in plain words, used in "What changed" headlines ("Fixed: <problem>")
@@ -368,7 +373,7 @@ UPDATE discovery.dq_rule SET evidence_sql = $$
            'detail', 'opened on only ' || x.days || ' different days (' || to_char(x.holders, 'FM999,999') || ' accounts)') ORDER BY x.days)
   FROM (SELECT p.product_name, count(DISTINCT cp.open_date) AS days, count(*) AS holders, min(p.introduced_date) AS intro
         FROM cc.customer_product cp JOIN cc.dim_product p USING (product_id) WHERE p.is_new_in_period GROUP BY 1) x
-  WHERE x.days < 0.5 * least(100, date '2026-10-31' - x.intro)$$
+  WHERE x.days < 0.5 * least(100, discovery.snapshot_date() - x.intro)$$
 WHERE rule_id = 'VAL-025';
 
 UPDATE discovery.dq_rule SET evidence_sql = $$
