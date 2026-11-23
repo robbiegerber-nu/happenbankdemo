@@ -1,9 +1,9 @@
 # Exports the JSON files the operational dashboards read (docs/data/dashboards/).
-#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers|service|workforce|coaching]
+#   powershell -File sql\dashboards\export_dashboards.ps1 [-Only executive|stability|drivers|service|workforce|coaching|cx]
 # Run after each daily load by sql\pipeline\load_day.ps1 (only when no check failed), or by hand at any time.
 # Everything is written to a temporary folder first and copied across only when every export has worked.
 # Env overrides (same as the discovery toolkit): HAPPEN_DB = database, HAPPEN_EXPORT = data folder (files go in its dashboards subfolder).
-param([ValidateSet('all', 'executive', 'stability', 'drivers', 'service', 'workforce', 'coaching')][string]$Only = 'all')
+param([ValidateSet('all', 'executive', 'stability', 'drivers', 'service', 'workforce', 'coaching', 'cx')][string]$Only = 'all')
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
@@ -91,6 +91,15 @@ if ($Only -in 'all', 'coaching') {
     "{0,-36} {1,10:N0} bytes" -f 'coaching/index.json.gz', (Get-Item (Join-Path $out 'coaching\index.json.gz')).Length
 }
 
+if ($Only -in 'all', 'cx') {
+    Invoke-SqlFile 'E15_cx_cube.sql'
+    Export-Json 'cx/index.json' 'E16_cx_index.sql'
+    $t = Get-Date
+    $months = (Get-Content (Join-Path $out 'cx\index.json') -Raw -Encoding UTF8 | ConvertFrom-Json).months
+    foreach ($m in $months) { Export-Gzip "cx/$m.json.gz" 'E17_cx_month.sql' @("m=$m") }
+    "{0,-36} {1,10:N0} bytes {2,4:N0}s" -f "cx: $($months.Count) months", (Get-ChildItem (Join-Path $out 'cx') -File | Measure-Object Length -Sum).Sum, ((Get-Date) - $t).TotalSeconds
+}
+
 # ---------- Publish the finished set to the data folder ----------
 # kpis.json is written by hand and is never touched. Month files that no longer exist in the data (after a reset) are removed.
 $changed = 0; $removed = 0
@@ -101,7 +110,7 @@ foreach ($f in $new) {
     New-Item -ItemType Directory -Force (Split-Path $dest) | Out-Null
     Copy-Item $f.FullName $dest -Force; $changed++
 }
-foreach ($sub in 'stability', 'drivers', 'service', 'workforce', 'coaching') {
+foreach ($sub in 'stability', 'drivers', 'service', 'workforce', 'coaching', 'cx') {
     if (-not (Test-Path (Join-Path $out $sub)) -or -not (Test-Path (Join-Path $final $sub))) { continue }
     Get-ChildItem (Join-Path $final $sub) -Recurse -File | Where-Object { -not (Test-Path (Join-Path $out $_.FullName.Substring($final.Length + 1))) } |
         ForEach-Object { Remove-Item $_.FullName; $removed++ }

@@ -14,6 +14,7 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 | [Service & access operations](https://robbiegerber-nu.github.io/happenbankdemo/service.html) | When and where do customers wait? |
 | [Workforce management](https://robbiegerber-nu.github.io/happenbankdemo/workforce.html) | Do we have the right people at the right time? |
 | [Agent & team coaching](https://robbiegerber-nu.github.io/happenbankdemo/coaching.html) | Who could use coaching, on what, and is it a real gap? |
+| [Customer experience](https://robbiegerber-nu.github.io/happenbankdemo/cx.html) | How do customers feel, and what drives it? |
 | [Performance driver explorer](https://robbiegerber-nu.github.io/happenbankdemo/drivers.html) | What changed, and what drove it? |
 | [Process stability monitor](https://robbiegerber-nu.github.io/happenbankdemo/stability.html) | Is this a real change or normal variation? |
 | [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/) | Can we trust the data? |

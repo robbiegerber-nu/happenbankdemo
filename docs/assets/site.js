@@ -13,7 +13,7 @@
       { name: 'Service & access', href: 'service.html', id: 'service' }, { name: 'Workforce management', href: 'workforce.html', id: 'workforce' }, { name: 'Agent & team coaching', href: 'coaching.html', id: 'coaching' }] },
     { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
-      { name: 'Customer experience', href: null }, { name: 'Customer & persona insights', href: null },
+      { name: 'Customer experience', href: 'cx.html', id: 'cx' }, { name: 'Customer & persona insights', href: null },
       { name: 'Product launch impact', href: null }, { name: 'Self-service & channel shift', href: null }] },
     { group: 'Data', items: [{ name: 'Data quality', href: 'index.html', id: 'quality' }] }
   ];
@@ -78,6 +78,7 @@
         case 'signedpct': { const r = round(v, 1); return sign(r) + Math.abs(r).toFixed(1) + '%'; }
         case 'nps': { const r = Math.round(v); return sign(r) + Math.abs(r); }
         case 'rate': return round(v, 1).toFixed(1);
+        case 'rate2': return round(v, 2).toFixed(2);
         case 'wait': return Math.round(v) < 120 ? Math.round(v) + ' s' : secs(v);
         case 'duration': return secs(v);
         case 'count': return full ? withCommas(v) : shortNum(v);
@@ -87,6 +88,7 @@
     // The value the status is decided on: exactly what is displayed (Style Guide: status uses the displayed value).
     displayed(v, f) {
       switch (f) {
+        case 'rate2': return round(v, 2);
         case 'pct': case 'signedpct': case 'rate': return round(v, 1);
         case 'nps': case 'wait': case 'duration': case 'count': return Math.round(v);
         default: return v;
@@ -100,6 +102,7 @@
       switch (f) {
         case 'pct': case 'signedpct': d = round(a - b, 1); text = Math.abs(d).toFixed(1) + (Math.abs(d) === 1 ? ' pt' : ' pts'); break;
         case 'nps': d = a - b; text = Math.abs(d) + (Math.abs(d) === 1 ? ' pt' : ' pts'); break;
+        case 'rate2': d = round(a - b, 2); text = Math.abs(d).toFixed(2); break;
         case 'rate': d = round(a - b, 1); text = Math.abs(d).toFixed(1); break;
         case 'wait': d = a - b; text = Math.abs(d) < 120 ? Math.abs(d) + ' s' : secs(Math.abs(d)); break;
         case 'duration': d = a - b; text = Math.abs(d) < 60 ? Math.abs(d) + ' s' : secs(Math.abs(d)); break;

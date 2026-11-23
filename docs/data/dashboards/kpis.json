@@ -93,7 +93,13 @@
     { "id": "transfer", "name": "Transfer rate", "short": "Transfers", "format": "pct", "better": "lower", "target": null,
       "definition": "Share of answered contacts passed to another agent or queue. No target, because it varies by contact reason.", "formula": "Transferred contacts ÷ answered contacts", "minN": 50, "wiki": "efficiency" },
     { "id": "aht", "name": "Average handle time", "short": "AHT", "format": "duration", "better": "none", "target": null,
-      "definition": "Average talk + hold + wrap-up time of all contacts the agents answered, on every channel. No target, because it varies by contact reason.", "formula": "Total handle time ÷ answered contacts", "minN": 20, "wiki": "efficiency" }
+      "definition": "Average talk + hold + wrap-up time of all contacts the agents answered, on every channel. No target, because it varies by contact reason.", "formula": "Total handle time ÷ answered contacts", "minN": 20, "wiki": "efficiency" },
+    { "id": "ces", "name": "Customer effort score", "short": "CES", "format": "rate2", "better": "higher", "target": null,
+      "definition": "Average survey answer on how easy it was to get help, from 1 to 7. 7 is very easy. No target; read the trend.", "formula": "Sum of effort scores ÷ surveys", "minN": 30, "wiki": "resolution-and-experience" },
+    { "id": "repeat", "name": "Repeat contact rate", "short": "Repeat contacts", "format": "pct", "better": "lower", "target": null,
+      "definition": "Share of contacts from identified customers followed by another contact from the same customer, on any channel, within 7 days. No target; read the trend.", "formula": "Contacts followed by another within 7 days ÷ contacts from identified customers", "exclusions": "Excludes contacts with no identified customer.", "minN": 50, "wiki": "resolution-and-experience" },
+    { "id": "response", "name": "Survey response rate", "short": "Response rate", "format": "pct", "better": "none", "target": null,
+      "definition": "Surveys answered for every 100 answered contacts. No target; it shows how many customers the scores speak for.", "formula": "Surveys ÷ answered contacts", "minN": 50, "wiki": "resolution-and-experience" }
   ],
   "sections": [
     { "id": "access", "name": "Service and access" },

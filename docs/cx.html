@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Experience · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated satisfaction, effort, repeat contacts and complaints, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=2.0"></script>
+<script src="assets/cx.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .ctls { display: contents; }
+  @media (min-width: 768px) { .filter-bar .wrap { gap: 7px; } .ctls .filter { gap: 4px; } .ctls select { padding-left: 8px; padding-right: 20px; } #f-m { width: 118px; } #f-cmp { width: 124px; } #f-ch { width: 80px; } #f-rg { width: 100px; } #f-s { width: 84px; } #f-p { width: 92px; } }
+  .phone-f { display: none; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile-top { display: flex; justify-content: space-between; gap: 6px; }
+  .tile-top button.t { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); min-height: 24px; }
+  .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
+  .chart { margin-top: 10px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .x { overflow-x: auto; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }
+  .name { border: 0; background: none; padding: 4px 0; min-height: 28px; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  h3 { margin-top: 20px; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .l1 { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; } .l2 { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1.5; } .pt.low { fill: var(--surface); stroke: var(--text-muted); } .pt.day { stroke: var(--text-primary); stroke-width: 2; }
+  .tg { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; } .wb { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .evb { fill: var(--event); fill-opacity: .12; } .evl { stroke: var(--event); stroke-opacity: .6; }
+  .ev circle { fill: var(--surface); stroke: var(--event); } .ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
+  .lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus-visible, .hm:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  @media (max-width: 767px) {
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .card { padding: 14px; }
+    .tile .v { font-size: 22px; }
+    .name, .chip { min-height: 44px; }
+  }
+  .tiles { grid-template-columns: repeat(auto-fit, minmax(156px, 1fr)); } .tile { padding: 12px; }
+  .d0 { fill: var(--brand-blue); } .d1 { fill: var(--control); fill-opacity: .55; } .sep2 { stroke: var(--control); } .bb { fill: var(--brand-blue); } .bw { fill: var(--brand-purple); }
+  td div { font-size: 12.5px; } td svg { vertical-align: middle; } .tools .filter { color: var(--text-secondary); }
+  @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .card .btn, .tools .filter select { min-height: 44px; } .tools .filter { flex: none; } }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+  <div class="ctls" id="ctls">
+    <label class="filter"><span class="flabel">Month</span><select id="f-m"></select></label>
+    <label class="filter"><span class="flabel">Compare to</span><select id="f-cmp"><option value="prior">Prior month</option><option value="year">Same month last year</option></select></label>
+    <label class="filter"><span class="flabel">Channel</span><select id="f-ch"></select></label>
+    <label class="filter"><span class="flabel">Reason group</span><select id="f-rg"></select></label>
+    <label class="filter"><span class="flabel">Segment</span><select id="f-s"></select></label>
+    <label class="filter"><span class="flabel">Persona</span><select id="f-p"></select></label>
+    <button class="link-btn" id="f-reset" type="button">Reset</button>
+  </div>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<main class="wrap" id="main">
+  <h1>Customer experience</h1>
+  <p class="sub" id="s-page"></p>
+  <div class="chips" id="chips"></div>
+  <p class="note" id="loading">Loading customer experience data…</p>
+  <div id="content" hidden>
+    <div class="tiles" id="tiles"></div>
+    <p class="note" id="n-tiles"></p>
+    <section class="card" aria-labelledby="t-tr">
+      <div class="head"><div><h2 id="t-tr"></h2><div class="sub" id="s-tr"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-tr" type="button">Download CSV</button><button class="btn" id="tb-tr" type="button">View as table</button></div></div>
+      <div class="chart" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="t-grp">
+      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-grp"></div><p class="note" id="n-grp"></p>
+    </section>
+    <section class="card" aria-labelledby="t-mom">
+      <div class="head"><div><h2 id="t-mom"></h2><div class="sub" id="s-mom"></div></div><div class="tools"><button class="btn" id="csv-mom" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-mom"></div><p class="note">These happened on the contact the survey is about, or in the 7 days after it. They show what goes together, not what causes what: hard problems are both transferred more and rated lower.</p>
+    </section>
+    <section class="card" aria-labelledby="t-dist">
+      <div class="head"><div><h2 id="t-dist"></h2><div class="sub" id="s-dist"></div></div><div class="tools"><button class="btn" id="csv-dist" type="button">Download CSV</button><button class="btn" id="tb-dist" type="button">View as table</button></div></div>
+      <div class="chart" id="c-dist"></div><div class="legend" id="lg-dist"></div><div class="tbl" id="tbl-dist" tabindex="0" role="region" aria-label="Score mix by month" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="t-th">
+      <div class="head"><div><h2 id="t-th">What customers said</h2><div class="sub" id="s-th"></div></div><div class="tools"><button class="btn" id="csv-th" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-th"></div>
+    </section>
+    <section class="card" aria-labelledby="t-cp">
+      <div class="head"><div><h2 id="t-cp"></h2><div class="sub" id="s-cp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-cdim"><option value="cat">Category</option><option value="cause">Root cause</option><option value="sev">Severity</option><option value="via">Received through</option></select></label><button class="btn" id="csv-cp" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-cp"></div><p class="note" id="n-cp"></p>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), M = CX.METRICS;
+  Site.renderChrome('cx');
+  const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason' }, S = { ...DEF };
+  let IDX, KPI, EV, TR, NOW, WAS, QCH, RG, req = 0, events = true, cur = {}; const tbl = { tr: false, dist: false }, files = {};
+  const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
+  const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
+  const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/cx/${m}.json.gz`);
+  const nameOf = (list, id) => { const x = list.find((y) => String(y[0]) === String(id)); return x ? x[1] : 'Not identified'; };
+  const FULL = () => { const t = IDX.data_through; return IDX.months.filter((m) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10) <= t; }); };
+  const shift = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); };
+  // dimension -> code of a row (q, r, s, p), label and the filter a click sets
+  const DIMS = {
+    channel: { name: 'Channel', key: (q) => QCH[q] || 0, label: (k) => nameOf(IDX.channels, k), f: 'ch' },
+    queue: { name: 'Queue', key: (q) => q, label: (k) => nameOf(IDX.queues, k), f: 'q' },
+    group: { name: 'Reason group', key: (q, r) => RG[r] || '', label: (k) => k, f: 'rg' },
+    reason: { name: 'Contact reason', key: (q, r) => r, label: (k) => nameOf(IDX.reasons, k), f: 'r' },
+    segment: { name: 'Segment', key: (q, r, s) => s, label: (k) => IDX.names.segment[k] || 'Not identified', f: 's' },
+    persona: { name: 'Persona', key: (q, r, s, p) => p, label: (k) => nameOf(IDX.personas, k), f: 'p' }
+  };
+  Promise.all([file('data/dashboards/kpis.json'), file('data/dashboards/cx/index.json'), file('data/dashboards/events.json')]).then(([k, i, e]) => {
+    KPI = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); IDX = i; EV = e.events;
+    QCH = Object.fromEntries(i.queues.map((x) => [x[0], x[2]])); RG = Object.fromEntries(i.reasons.map((x) => [x[0], x[2]]));
+    const opt = (id, rows, all = 'All') => { $(id).innerHTML = `<option value="">${all}</option>` + rows.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(''); };
+    const full = FULL(); DEF.m = S.m = full[full.length - 1];
+    $('f-m').innerHTML = [...full].reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    opt('f-ch', i.channels); opt('f-rg', [...new Set(i.reasons.map((x) => x[2]))].sort().map((x) => [x, x])); opt('f-s', Object.entries(i.names.segment)); opt('f-p', i.personas);
+    $('f-dim').innerHTML = Object.entries(DIMS).map(([id, d]) => `<option value="${id}">${d.name}</option>`).join('');
+    const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v);
+    if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried();
+    for (const key of ['cmp', 'ch', 'rg', 's', 'p', 'dim']) if (one('f-' + key, p.get(key))) S[key] = p.get(key);
+    if (i.queues.some((x) => String(x[0]) === p.get('q'))) S.q = p.get('q');
+    if (i.reasons.some((x) => String(x[0]) === p.get('r'))) S.r = p.get('r');
+    if (M.includes(p.get('metric'))) S.metric = p.get('metric');
+    Site.setDataThrough(i.data_through);
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.0`;
+    return update();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer experience data could not be loaded. ' + e.message; }
+  const kpi = (m) => KPI[m], F = (m) => kpi(m).format, V = (m, v) => fmt.value(v, F(m), true), low = (m, t) => !t || t[m].n < kpi(m).minN;
+  const ok = (q, r, s, p) => (!S.ch || String(QCH[q]) === S.ch) && (!S.q || String(q) === S.q) && (!S.rg || RG[r] === S.rg) && (!S.r || String(r) === S.r) && (!S.s || String(s) === S.s) && (!S.p || String(p) === S.p);
+  const each = (c, fn) => { for (let j = 0; j < (c.q || []).length; j++) if (ok(c.q[j], c.r[j], c.s[j], c.p[j])) fn(j); };
+  function parts(d, dim) {   // part sets by key of a dimension, or one total under key 'all'
+    const out = new Map(), key = dim ? DIMS[dim].key : () => 'all', at = (c, j) => { const k = key(c.q[j], c.r[j], c.s[j], c.p[j]); return out.get(k) || (out.set(k, CX.blank()), out.get(k)); };
+    if (!dim) out.set('all', CX.blank());
+    each(d.c, (j) => CX.contact(at(d.c, j), d.c, j)); each(d.v, (j) => CX.survey(at(d.v, j), d.v, j)); each(d.x, (j) => CX.complaint(at(d.x, j)));
+    return out;
+  }
+  async function update() {
+    const r = ++req, ms = []; for (let i = 12; i >= 0; i--) { const m = shift(S.m, -i); if (IDX.months.includes(m)) ms.push(m); }
+    const cm = shift(S.m, S.cmp === 'year' ? -12 : -1), ds = await Promise.all(ms.map(month)); if (r !== req) return;
+    TR = ms.map((m, i) => ({ m, d: ds[i], t: parts(ds[i]).get('all') })); NOW = TR[TR.length - 1]; WAS = TR.find((x) => x.m === cm) || null;
+    $('loading').hidden = true; $('content').hidden = false;
+    controls(); writeUrl(); renderTiles(); renderTrend(); renderGroups(); renderMoments(); renderDist(); renderThemes(); renderComplaints();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); };
+  const cmpName = () => (S.cmp === 'year' ? 'same month last year' : 'prior month');
+  function controls() {
+    for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p', 'dim']) $('f-' + k).value = S[k];
+    const L = { ch: ['Channel', DIMS.channel], q: ['Queue', DIMS.queue], rg: ['Reason group', DIMS.group], r: ['Reason', DIMS.reason], s: ['Segment', DIMS.segment], p: ['Persona', DIMS.persona] };
+    const c = Object.keys(L).filter((k) => S[k]).map((k) => [k, `${L[k][0]}: ${L[k][1].label(S[k])}`]);
+    $('chips').innerHTML = c.map(([k, t]) => `<button type="button" class="chip" data-q="${k}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join(''); cur.filters = c.map((x) => x[1]).join('; ') || 'none';
+    const n = c.length + ['m', 'cmp'].filter((k) => S[k] !== DEF[k]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
+    $('s-page').textContent = `${fmt.month(S.m)} · ${WAS ? `compared with ${fmt.month(WAS.m)}` : `no ${cmpName()} to compare`}`;
+    const part = IDX.months[IDX.months.length - 1]; $('n-tiles').textContent = [part !== DEF.m ? `${fmt.month(part)} is left out until the month is complete (data through ${fmt.dateShort(IDX.data_through)}).` : '', S.ch || S.q || S.rg || S.r ? 'Complaints with no contact (branch, web form, social media, regulator) are left out while a channel, queue or reason is selected.' : '', S.s || S.p ? 'Only contacts from identified customers have a segment and persona.' : ''].filter(Boolean).join(' ');
+  }
+  function writeUrl() { const p = new URLSearchParams(); for (const k of Object.keys(DEF)) if (S[k] !== DEF[k] || (k === 'm' && carried())) p.set(k, S[k]); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '')); }
+  // ---------- Tiles ----------
+  function chg(m, now, was) { const a = CX.value(m, now), b = was && !low(m, was) ? CX.value(m, was) : null, c = a == null || b == null ? null : fmt.change(a, b, F(m)); return c && { c, q: low(m, now) || !CX.beyond(m, now, was) ? 'neutral' : changeQuality(kpi(m), a, b, c), real: CX.beyond(m, now, was) }; }
+  const arrow = (x) => (x.c.flat ? '– No change' : `${x.c.delta > 0 ? '▲' : '▼'} ${x.c.text}`);
+  function renderTiles() {
+    const host = $('tiles'); host.innerHTML = '';
+    for (const m of M) {
+      const k = kpi(m), t = NOW.t, v = CX.value(m, t), lo = low(m, t), x = WAS && chg(m, t, WAS.t), st = k.target == null ? '' : `<span class="status ${lo ? 'none' : statusOf(k, v)}">${lo ? 'Too few' : STATUS_WORD[statusOf(k, v)]}</span>`;
+      const d = document.createElement('div'); d.className = 'tile' + (S.metric === m ? ' sel' : '');
+      d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${V(m, v)}</div>${st}<div class="m">${k.target == null ? 'No target' : 'Target ' + esc(k.targetLabel)}${lo ? ` · n = ${fmt.count(t[m].n)}, below ${k.minN}` : ''}</div>${x ? `<span class="chg ${x.q}">${arrow(x)} vs ${cmpName()}${!lo && Site.QUALITY_WORD[x.q] ? ' · ' + Site.QUALITY_WORD[x.q] : ''}</span>${x.c.flat || lo ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
+      d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d);
+    }
+  }
+  // ---------- Chart helpers ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const tick = (m, v) => (F(m) === 'pct' ? +v.toFixed(1) + '%' : F(m) === 'nps' ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) : String(+v.toFixed(2)));
+  function tip(node, html, click) {
+    const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); };
+    node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
+    if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
+  }
+  function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
+  const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
+  function swap(k, ids) { ids.forEach((i) => ($(i).hidden = tbl[k])); $('tbl-' + k).hidden = !tbl[k]; $('tb-' + k).textContent = tbl[k] ? 'View as chart' : 'View as table'; $('tb-' + k).setAttribute('aria-pressed', tbl[k]); }
+  const span = () => `${fmt.month(TR[0].m)} – ${fmt.month(S.m)}`, DAY = 864e5, ts = (s) => Date.parse(s + 'T00:00:00Z');
+  // ---------- Trend ----------
+  function renderTrend() {
+    const m = S.metric, k = kpi(m), host = $('c-tr'), pts = TR.map((x, i) => ({ ...x, i, v: CX.value(m, x.t), low: low(m, x.t) })).filter((x) => x.v != null); cur.tr = pts;
+    $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · select a month to show it`;
+    swap('tr', ['c-tr', 'lg-tr']);
+    if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">n</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${fmt.month(x.m)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v)}${x.low ? ' (too few)' : ''}</td>${k.target == null ? '' : `<td>${x.low ? '–' : STATUS_WORD[statusOf(k, x.v)]}</td>`}<td>${fmt.count(x.t[m].n)}</td></tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; $('lg-tr').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
+    const w = host.clientWidth || 800, narrow = w < 560, H = 270, G = { t: 40, r: narrow ? 10 : 92, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, tg = k.target == null ? [] : [k.target], vs = [...src.map((x) => x.v), ...tg, ...(tg.length ? [k.watch] : [])];
+    let a = Math.min(...vs), b = Math.max(...vs); const pad = (b - a || 1) * .12; a -= pad; b += pad;
+    const step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih, t0 = ts(TR[0].m + '-01'), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return G.l + (i + (d.getUTCDate() - .5) / len) * step; };
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(a, b, 5)) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    TR.forEach((q, i) => { if (!narrow || (TR.length - 1 - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), '', 'middle'); });
+    const tEnd = ts(lastDay(S.m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
+    if (tg.length) { el('rect', { class: 'wb', x: G.l, width: iw, y: y(Math.max(k.watch, k.target)), height: Math.abs(y(k.watch) - y(k.target)) }, s); el('line', { class: 'tg', x1: G.l, x2: G.l + iw, y1: y(k.target), y2: y(k.target) }, s); if (!narrow) text(s, G.l + iw + 8, y(k.target) + 4, 'Target ' + tick(m, k.target), 'lab'); }
+    el('path', { class: 'l1', d: src.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.v)}`).join('') }, s);
+    pts.forEach((q) => { const on = q.m === S.m; el('circle', { class: 'pt' + (q.low ? ' low' : '') + (on ? ' day' : ''), cx: x(q.i), cy: y(q.v), r: on ? 6 : 4 }, s);
+      const h = el('rect', { class: 'hit', x: x(q.i) - step / 2, y: G.t, width: step, height: ih, tabindex: on ? 0 : -1, 'data-k': 'tr|' + q.m, role: 'button', 'aria-pressed': on, 'aria-label': `${fmt.month(q.m)}: ${V(m, q.v)}${k.target == null || q.low ? '' : ', ' + STATUS_WORD[statusOf(k, q.v)]}. Show this month` }, s);
+      tip(h, () => `<b>${fmt.month(q.m)}</b><br>${esc(k.name)}: <b>${V(m, q.v)}</b>${k.target == null || q.low ? '' : ' · ' + STATUS_WORD[statusOf(k, q.v)]}<br><span class="muted">n = ${fmt.count(q.t[m].n)}${q.low ? ', below ' + k.minN : ''}</span>${EV.filter((e) => e.start.slice(0, 7) <= q.m && e.end.slice(0, 7) >= q.m).map((e) => `<br><span class="muted">Event: ${esc(e.name)}</span>`).join('')}`, () => { S.m = q.m; carried(q.m); go(); }); });
+    arrows(s);
+    let last = -99; for (const [e, n, ex] of marks) { const mx = Math.max(ex, last + 17); last = mx; const q = el('g', { class: 'ev', transform: `translate(${mx},${G.t - 14})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, n); tip(q, () => `<b>${n}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
+    $('lg-tr').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : []), ...(pts.some((q) => q.low) ? [['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']] : [])]);
+  }
+  const lastDay = (m) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); };
+  // ---------- By group ----------
+  const gapText = (m, a, b) => { const c = fmt.change(a, b, F(m)); return c ? (c.flat ? '0' : c.text) : '–'; };
+  const pullText = (m, v) => { const a = Math.abs(v), d = m === 'ces' ? 3 : 2, t = a.toFixed(d); return (+t === 0 ? '' : v > 0 ? '+' : '−') + t; };
+  function renderGroups() {
+    const m = S.metric, k = kpi(m), D = DIMS[S.dim], now = parts(NOW.d, S.dim), was = WAS ? parts(WAS.d, S.dim) : new Map(), all = NOW.t, dir = k.better === 'lower' ? -1 : 1, av = CX.value(m, all);
+    const rows = [...now].filter(([, t]) => t[m].n > 0).map(([id, t]) => ({ id, name: D.label(id), t, v: CX.value(m, t), pull: CX.pull(m, t, all), low: low(m, t), real: CX.beyond(m, t, CX.minus(all, t)), x: was.get(id) ? chg(m, t, was.get(id)) : null })).sort((a, b) => a.low - b.low || dir * (a.pull - b.pull)); cur.grp = rows;
+    $('t-grp').textContent = `${k.name} by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${fmt.month(S.m)} · ${k.better === 'none' ? 'lowest pull first' : 'largest downside first'} · click a name to filter`;
+    const b = k.better === 'none' ? null : true, max = Math.max(...rows.filter((r) => !r.low).map((r) => Math.abs(r.pull)), 1e-9);
+    const bar = (r) => { const w = Math.max(1, Math.abs(r.pull) / max * 34), worse = b && dir * r.pull < 0; return `<svg width="76" height="14" aria-hidden="true"><line x1="38" x2="38" y2="14" class="sep2"/><rect class="${worse ? 'bw' : 'bb'}" x="${r.pull < 0 ? 38 - w : 38}" y="3" width="${w}" height="8"/></svg>`; };
+    $('tbl-grp').innerHTML = rows.length ? `<table><thead><tr><th scope="col">${D.name}</th><th scope="col">${esc(k.short)}</th><th scope="col">vs all ${V(m, av)}</th><th scope="col">Reading</th><th scope="col">Pull on overall</th><th scope="col">vs ${cmpName()}</th><th scope="col">n</th></tr></thead><tbody>${rows.map((r) => { const diff = dir * (r.v - av); return `<tr><td>${r.id === 0 || r.id === '' ? esc(r.name) : `<button type="button" class="name" data-k="grp|${esc(r.id)}" data-v="${esc(r.id)}">${esc(r.name)}</button>`}</td><td class="${r.low ? 'low' : ''}">${V(m, r.v)}</td><td>${gapText(m, r.v, av)}</td><td>${r.low ? '<span class="muted">too few</span>' : !r.real || !b ? (r.real ? 'beyond chance' : '<span class="muted">within chance</span>') : diff < 0 ? '<b>worse than the rest</b>' : 'better than the rest'}</td><td>${r.low ? '' : bar(r)} ${pullText(m, r.pull)}</td><td>${r.x ? `<span class="chg ${r.x.q}">${arrow(r.x)}${Site.QUALITY_WORD[r.x.q] ? ' · ' + r.x.q : ''}</span>${r.x.real || r.x.c.flat ? '' : '<div class="muted">within chance</div>'}` : '–'}</td><td>${fmt.count(r.t[m].n)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No data for these filters.</p>';
+    $('n-grp').textContent = `Pull on overall is how far the group moves the result: its share of the total times its gap. Pulls add up to zero, so the largest show where fixing things would matter most. Beyond chance means at least 3 standard errors.${m === 'complaints' ? ' Complaints count against the group the complaint came from.' : ''}`;
+  }
+  // ---------- What goes with the scores ----------
+  const SV = () => (['csat', 'nps', 'ces'].includes(S.metric) ? S.metric : 'csat');
+  const MOM = [['Resolved on first contact', 1, true], ['Not transferred', 2, false], ['Not escalated', 4, false], ['Answered within the service level', 8, true], ['No repeat contact within 7 days', 16, false]];
+  function renderMoments() {
+    const m = SV(), k = kpi(m), all = NOW.t, rows = MOM.map(([name, bit, yes]) => { const g = CX.blank(), o = CX.blank(); each(NOW.d.v, (j) => CX.survey((!!(NOW.d.v.hap[j] & bit)) === yes ? g : o, NOW.d.v, j)); return { name, g, o, gap: g[m].n && o[m].n ? CX.value(m, g) - CX.value(m, o) : null, share: all[m].n ? o[m].n / all[m].n * 100 : 0, lift: g[m].n && all[m].n ? CX.value(m, g) - CX.value(m, all) : null }; }).sort((a, b) => (b.lift || 0) - (a.lift || 0)); cur.mom = rows;
+    $('t-mom').textContent = `What goes with ${m === 'ces' ? 'an easier experience' : 'higher scores'}: ${k.short}`; $('s-mom').textContent = `Surveys answered in ${fmt.month(S.m)}, by what happened on the contact${m !== S.metric ? ` · ${k.short} is shown because ${kpi(S.metric).short.toLowerCase()} isn't a survey score` : ''}`;
+    $('tbl-mom').innerHTML = `<table><thead><tr><th scope="col">On the contact</th><th scope="col">${k.short} when it did</th><th scope="col">When it did not</th><th scope="col">Difference</th><th scope="col">Share that did not</th><th scope="col">Overall if all matched</th></tr></thead><tbody>${rows.map((r) => { const lo = low(m, r.g) || low(m, r.o); return `<tr><td>${r.name}</td><td>${V(m, CX.value(m, r.g))}</td><td class="${low(m, r.o) ? 'low' : ''}">${V(m, CX.value(m, r.o))}${low(m, r.o) ? ' (too few)' : ''}</td><td>${lo || r.gap == null ? '–' : `<b>${gapText(m, CX.value(m, r.g), CX.value(m, r.o))}</b>${CX.beyond(m, r.g, r.o) ? '' : '<div class="muted">within chance</div>'}`}</td><td>${r.share.toFixed(1)}%</td><td>${lo || r.lift == null ? '–' : gapText(m, CX.value(m, r.g), CX.value(m, all))}</td></tr>`; }).join('')}</tbody></table>`;
+  }
+  // ---------- Score mix ----------
+  const BANDS = { csat: [['Satisfied (4–5)', (v, j) => v.cs[j] >= 4], ['Neutral (3)', (v, j) => v.cs[j] === 3], ['Dissatisfied (1–2)', (v, j) => v.cs[j] <= 2]], nps: [['Promoters (9–10)', (v, j) => v.np[j] >= 9], ['Passives (7–8)', (v, j) => v.np[j] === 7 || v.np[j] === 8], ['Detractors (0–6)', (v, j) => v.np[j] <= 6]], ces: [['Easy (5–7)', (v, j) => v.ce[j] >= 5], ['Neutral (4)', (v, j) => v.ce[j] === 4], ['Hard (1–3)', (v, j) => v.ce[j] <= 3]] };
+  function renderDist() {
+    const m = SV(), B = BANDS[m], host = $('c-dist'), rows = TR.map((x) => { const n = [0, 0, 0]; each(x.d.v, (j) => n[B.findIndex((b) => b[1](x.d.v, j))]++); const t = n[0] + n[1] + n[2]; return { m: x.m, n, t, p: n.map((v) => (t ? v / t * 100 : 0)) }; }); cur.dist = rows;
+    $('t-dist').textContent = `${kpi(m).name}: mix of answers`; $('s-dist').textContent = `Share of surveys, monthly, ${span()}`; swap('dist', ['c-dist', 'lg-dist']);
+    if (tbl.dist) { $('tbl-dist').innerHTML = `<table><thead><tr><th scope="col">Month</th>${B.map((b) => `<th scope="col">${b[0]}</th>`).join('')}<th scope="col">Surveys</th></tr></thead><tbody>${rows.slice().reverse().map((r) => `<tr><td>${fmt.month(r.m)}</td>${r.p.map((v) => `<td class="${r.t < 30 ? 'low' : ''}">${r.t ? v.toFixed(1) + '%' : '–'}</td>`).join('')}<td>${fmt.count(r.t)}</td></tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; const w = host.clientWidth || 800, H = 220, L = 44, ih = H - 34, step = (w - L - 8) / rows.length, bw = Math.min(44, step * .7), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Mix of answers by month. Use View as table for values.' }, host), y = (v) => 6 + (100 - v) / 100 * ih;
+    const df = el('defs', {}, s), pt = el('pattern', { id: 'hx', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: 'fill:var(--brand-purple)' }, pt);
+    const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const t of [0, 25, 50, 75, 100]) { el('line', { x1: L, x2: w - 8, y1: y(t), y2: y(t) }, g); text(ax, L - 6, y(t) + 4, t + '%', '', 'end'); }
+    rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { if (r.t) el('rect', { class: ['d0', 'd1', 'd2'][j], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)), ...(j === 2 ? { fill: 'url(#hx)' } : {}) }, s); base += v; });
+      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m), '', 'middle');
+      const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${B.map((b, j) => `${b[0]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${B.map((b, j) => `${b[0]}: <b>${r.p[j].toFixed(1)}%</b>`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} surveys${r.t < 30 ? ', too few' : ''}</span>`); });
+    arrows(s); $('lg-dist').innerHTML = leg([['<rect class="d0" width="20" height="14"/>', B[0][0]], ['<rect class="d1" width="20" height="14"/>', B[1][0]], ['<rect fill="url(#hx)" width="20" height="14" style="stroke:var(--brand-purple)"/>', B[2][0]]]);
+  }
+  // ---------- Themes ----------
+  function themes(d) { const o = new Map(); let n = 0; each(d.v, (j) => { n++; const k = d.v.t[j]; CX.survey(o.get(k) || (o.set(k, CX.blank()), o.get(k)), d.v, j); }); return { o, n }; }
+  function renderThemes() {
+    const a = themes(NOW.d), b = WAS ? themes(WAS.d) : null, rows = [...a.o].map(([id, t]) => ({ name: IDX.names.theme[id], t, n: t.csat.n, share: t.csat.n / a.n * 100, was: b && b.n ? (b.o.get(id) ? b.o.get(id).csat.n : 0) / b.n * 100 : null })).sort((x, y) => CX.value('csat', x.t) - CX.value('csat', y.t) || y.n - x.n); cur.th = rows;
+    $('s-th').textContent = `Theme of each survey comment, ${fmt.month(S.m)} · ${fmt.count(a.n)} surveys · themes from dissatisfied or neutral customers first`;
+    $('tbl-th').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Theme</th><th scope="col">Surveys</th><th scope="col">Share</th><th scope="col">vs ${cmpName()}</th><th scope="col">CSAT</th><th scope="col">CES</th></tr></thead><tbody>${rows.map((r) => { const lo = r.n < 30, v = (m) => `<td class="${lo ? 'low' : ''}">${V(m, CX.value(m, r.t))}</td>`; return `<tr><td>${esc(r.name)}${lo ? ' <span class="muted">(too few)</span>' : ''}</td><td>${fmt.count(r.n)}</td><td>${r.share.toFixed(1)}%</td><td>${r.was == null ? '–' : gapText('csat', r.share, r.was)}</td>${v('csat')}${v('ces')}</tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No surveys for these filters.</p>';
+  }
+  // ---------- Complaints ----------
+  function comps(d, dim) { const o = new Map(); let n = 0; each(d.x, (j) => { n++; const k = d.x[dim][j], p = o.get(k) || (o.set(k, { n: 0, reg: 0, hi: 0, open: 0, days: [] }), o.get(k)); p.n++; p.reg += d.x.reg[j]; p.hi += d.x.sev[j] === 1; if (d.x.d[j] == null) p.open++; else p.days.push(d.x.d[j]); }); return { o, n }; }
+  const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
+  function renderComplaints() {
+    const dim = $('f-cdim').value, NM = { cat: 'category', cause: 'cause', sev: 'severity', via: 'via' }[dim], a = comps(NOW.d, dim), b = WAS ? comps(WAS.d, dim) : null, offered = NOW.t.complaints.n, offWas = WAS ? WAS.t.complaints.n : 0;
+    const rows = [...a.o].map(([id, p]) => ({ id, name: IDX.names[NM][id], ...p, rate: offered ? p.n / offered * 1000 : null, wasRate: b && offWas ? (b.o.get(id) ? b.o.get(id).n : 0) / offWas * 1000 : null, med: median(p.days) })).sort((x, y) => (dim === 'sev' ? x.id - y.id : y.n - x.n)); cur.cp = rows;
+    $('t-cp').textContent = `Complaints by ${$('f-cdim').selectedOptions[0].textContent.toLowerCase()}`; $('s-cp').textContent = `Opened in ${fmt.month(S.m)} · ${fmt.count(a.n)} complaints · rates are per 1,000 contacts offered`;
+    const real = (r) => { if (!b) return false; const n1 = r.n, n0 = b.o.get(r.id) ? b.o.get(r.id).n : 0; return Math.abs(n1 / offered - n0 / offWas) >= 3 * Math.sqrt(n1 / offered ** 2 + n0 / offWas ** 2); };
+    $('tbl-cp').innerHTML = rows.length ? `<table><thead><tr><th scope="col">${$('f-cdim').selectedOptions[0].textContent}</th><th scope="col">Complaints</th><th scope="col">Share</th><th scope="col">Per 1,000</th><th scope="col">vs ${cmpName()}</th>${dim === 'sev' ? '' : '<th scope="col">High severity</th>'}<th scope="col">Regulatory</th><th scope="col">Median days to close</th><th scope="col">Closed within 7 days</th><th scope="col">Still open</th></tr></thead><tbody>${rows.map((r) => { const c = r.wasRate == null ? null : fmt.change(r.rate, r.wasRate, 'rate2'), rl = c && real(r), q = c && !c.flat ? (c.delta < 0 ? 'better' : 'worse') : 'neutral', few = r.n < 30; return `<tr><td>${esc(r.name)}</td><td>${fmt.count(r.n)}</td><td>${(r.n / a.n * 100).toFixed(1)}%</td><td>${r.rate == null ? '–' : r.rate.toFixed(2)}</td><td>${c ? `<span class="chg ${rl ? q : 'neutral'}">${c.flat ? '– No change' : (c.delta > 0 ? '▲ ' : '▼ ') + c.text + (rl ? ' · ' + q : '')}</span>${rl || c.flat ? '' : '<div class="muted">within chance</div>'}` : '–'}</td>${dim === 'sev' ? '' : `<td class="${few ? 'low' : ''}">${(r.hi / r.n * 100).toFixed(1)}%</td>`}<td class="${few ? 'low' : ''}">${(r.reg / r.n * 100).toFixed(1)}%</td><td class="${few ? 'low' : ''}">${r.med == null ? '–' : r.med.toFixed(1)}</td><td class="${few ? 'low' : ''}">${(r.days.filter((x) => x <= 7).length / r.n * 100).toFixed(1)}%</td><td>${fmt.count(r.open)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No complaints for these filters.</p>';
+    $('n-cp').textContent = `Open and closed are as of ${fmt.date(IDX.data_through)}. Median days to close counts closed complaints only, so it can read low for a recent month with complaints still open. Closed within 7 days counts every complaint. Regulatory is the share flagged as a regulatory matter. Grey percentages come from fewer than 30 complaints.`;
+  }
+  // ---------- Events ----------
+  for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') carried(S.m); if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
+  $('f-dim').addEventListener('change', (e) => { S.dim = e.target.value; writeUrl(); renderGroups(); }); $('f-cdim').addEventListener('change', renderComplaints);
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { S[b.dataset.q] = ''; go(); } });
+  $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const k = DIMS[S.dim].f, v = b.dataset.v; S[k] = S[k] === v ? '' : v; go(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carried(null); events = $('t-events').checked = true; $('f-cdim').value = 'cat'; go(); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
+  $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
+  $('tb-tr').addEventListener('click', () => { tbl.tr = !tbl.tr; renderTrend(); }); $('tb-dist').addEventListener('click', () => { tbl.dist = !tbl.dist; renderDist(); });
+  const csv = (n, w, h, r) => Site.downloadCsv(`cx_${n}`, IDX.data_through, `Customer experience · ${w} · ${S.m} · filters: ${cur.filters} · data through ${IDX.data_through}`, h, r);
+  $('csv-tr').addEventListener('click', () => csv('trend', kpi(S.metric).name + ' by month', ['month', S.metric, 'n'], cur.tr.slice().reverse().map((x) => [x.m, x.v, x.t[S.metric].n])));
+  $('csv-grp').addEventListener('click', () => csv('by-' + S.dim, `${kpi(S.metric).name} by ${DIMS[S.dim].name}`, [S.dim, S.metric, 'pull_on_overall', 'beyond_chance', 'n'], cur.grp.map((r) => [r.name, r.v, r.pull, r.real, r.t[S.metric].n])));
+  $('csv-mom').addEventListener('click', () => { const m = SV(); csv('what-goes-with-scores', kpi(m).name, ['on_the_contact', m + '_when_it_did', 'n_did', m + '_when_it_did_not', 'n_did_not'], cur.mom.map((r) => [r.name, CX.value(m, r.g), r.g[m].n, CX.value(m, r.o), r.o[m].n])); });
+  $('csv-dist').addEventListener('click', () => { const B = BANDS[SV()]; csv('score-mix', kpi(SV()).name + ' mix', ['month', ...B.map((b) => b[0]), 'surveys'], cur.dist.slice().reverse().map((r) => [r.m, ...r.n, r.t])); });
+  $('csv-th').addEventListener('click', () => csv('themes', 'survey themes', ['theme', 'surveys', 'share_pct', 'comparison_share_pct', 'csat', 'ces'], cur.th.map((r) => [r.name, r.n, r.share, r.was, CX.value('csat', r.t), CX.value('ces', r.t)])));
+  $('csv-cp').addEventListener('click', () => csv('complaints', $('t-cp').textContent, ['group', 'complaints', 'per_1000', 'comparison_per_1000', 'high_severity', 'regulatory', 'median_days_to_close', 'still_open'], cur.cp.map((r) => [r.name, r.n, r.rate, r.wasRate, r.hi, r.reg, r.med, r.open])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (TR) { renderTrend(); renderDist(); } }, 150); });
+})();
+</script>
+</body>
+</html>
