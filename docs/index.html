@@ -849,6 +849,8 @@ function renderChanges() {
   const kindOf = c => {
     if (!c.prev_status) return { label: 'New check', cls: 'neutral' };
     if (c.prev_status === c.status) return { label: 'Check refined', cls: 'neutral' };
+    // the check itself changed (its wording or what it measures), not the data
+    if (c.prev_rule && c.prev_rule !== c.rule) return { label: 'Check refined', cls: rank[c.status] < rank[c.prev_status] ? 'better' : 'worse' };
     if (rank[c.status] < rank[c.prev_status]) return c.status === 'Pass' ? { label: 'Fixed', cls: 'better' } : { label: 'Improved', cls: 'better' };
     return c.prev_status === 'Pass' ? { label: c.status === 'Warn' ? 'New warning' : 'New problem', cls: 'worse' } : { label: 'Got worse', cls: 'worse' };
   };
@@ -895,6 +897,9 @@ function beforeHtml(c) {
 }
 function nowHtml(c) {
   if (Number(c.value) > 0) return `<div class="ch-what">${esc(plainFound(c.value, c.unit))}</div>${evList(c.evidence)}`;
+  // nothing counts now, but explained or reviewed findings are still listed with their reason
+  const explained = (c.evidence || []).filter(e => e.explained);
+  if (explained.length) return `<div class="ch-what">Nothing unexplained · ${explained.length} explained or reviewed</div>${evList(explained)}`;
   // nothing flagged now: show how the data fields that were flagged last time look in this run
   const fu = (c.followup || []).map(f => {
     const name = `${esc(AREA[f.t] || f.t)} › ${esc(humanize(f.c))}`;
