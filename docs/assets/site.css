@@ -21,6 +21,7 @@
   --watch-wash: #F2A900; --watch-ink: #7A5200;
   --off-wash: #FD4621;   --off-ink: #B8260B;
   --wash-op: 0.12;
+  --control: #8A8580;  /* control borders: 3:1 on cards and page */
   --on-ink: #FFFFFF;   /* icon color on a filled ink shape */
   --event: #636363;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -37,7 +38,7 @@
     --good-wash: #2FD39A; --good-ink: #2FD39A;
     --watch-wash: #F2B92E; --watch-ink: #F2B92E;
     --off-wash: #FF6E4F; --off-ink: #FF6E4F;
-    --wash-op: 0.12; --on-ink: #141313; --event: #9E9A97;
+    --wash-op: 0.12; --control: #7E7B78; --on-ink: #141313; --event: #9E9A97;
     --shadow: none;
     color-scheme: dark;
   }
@@ -51,14 +52,17 @@
   --good-wash: #2FD39A; --good-ink: #2FD39A;
   --watch-wash: #F2B92E; --watch-ink: #F2B92E;
   --off-wash: #FF6E4F; --off-ink: #FF6E4F;
-  --wash-op: 0.12; --on-ink: #141313; --event: #9E9A97;
+  --wash-op: 0.12; --control: #7E7B78; --on-ink: #141313; --event: #9E9A97;
   --shadow: none;
   color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 120px; }   /* keep focused items clear of the sticky bar */
+.skip { position: absolute; left: 16px; top: -60px; z-index: 100; padding: 10px 16px; background: var(--surface); border: 2px solid var(--brand-blue); border-radius: 8px; font-weight: 600; }
+.skip:focus { top: 8px; }
+main:focus { outline: none; }
 body {
   margin: 0; background: var(--page); color: var(--text-secondary);
   font-family: var(--font); font-size: 15px; line-height: 1.5;
@@ -111,7 +115,7 @@ button { font: inherit; color: inherit; }
 }
 .fresh-badge:hover { color: var(--text-primary); border-color: var(--text-muted); }
 .icon-btn {
-  min-width: 44px; min-height: 44px; border: 1px solid var(--border); background: var(--surface); border-radius: 8px;
+  min-width: 44px; min-height: 44px; border: 1px solid var(--control); background: var(--surface); border-radius: 8px;
   cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary);
 }
 .icon-btn:hover { border-color: var(--text-muted); color: var(--text-primary); }
@@ -128,7 +132,7 @@ button { font: inherit; color: inherit; }
 .filter { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
 .filter select {
   font: inherit; font-size: 14px; color: var(--text-primary); background: var(--surface); min-height: 40px;
-  border: 1px solid var(--border); border-radius: 8px; padding: 6px 30px 6px 10px; cursor: pointer;
+  border: 1px solid var(--control); border-radius: 8px; padding: 6px 30px 6px 10px; cursor: pointer;
 }
 .filter-bar .spacer { flex: 1; }
 .link-btn {
@@ -138,7 +142,7 @@ button { font: inherit; color: inherit; }
 .link-btn:hover { color: var(--brand-blue-hover); text-decoration: underline; }
 .btn {
   font-size: 14px; font-weight: 600; min-height: 40px; padding: 8px 14px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface); color: var(--text-primary);
+  border: 1px solid var(--control); background: var(--surface); color: var(--text-primary);
 }
 .btn:hover { border-color: var(--text-muted); }
 
@@ -179,7 +183,7 @@ button { font: inherit; color: inherit; }
 
 /* ---------- Tooltip ---------- */
 .tooltip {
-  position: fixed; z-index: 60; pointer-events: none; padding: 8px 10px; font-size: 12.5px; line-height: 1.45;
+  position: fixed; z-index: 60; padding: 8px 10px; font-size: 12.5px; line-height: 1.45;
   background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: 8px;
   box-shadow: 0 6px 20px rgba(0,0,0,.16); max-width: 280px;
 }

@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.1">
-<script src="assets/site.js?v=1.2"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.2">
+<script src="assets/site.js?v=1.5"></script>
 <style>
   /* Colors, type, header and buttons come from assets/site.css. These aliases map this page's names onto the shared tokens. */
   :root {
@@ -168,6 +168,11 @@
 
   /* ---- Tile tooltips (score explanation, warning / failure lists) ---- */
   .has-tip { cursor: help; border-radius: 6px; }
+  .runs .run-btn, .run-btn { min-height: 24px; }
+  .label.has-tip { display: inline-flex; align-items: center; min-height: 24px; }
+  span.has-tip { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; }
+  .inc-head a, .load-inc a { display: inline-block; min-height: 24px; }
+  details.sql > summary { min-height: 24px; }
   .has-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
   .checks th .has-tip, .heat th .has-tip { white-space: nowrap; }
   .info { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%;
@@ -178,7 +183,7 @@
   .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin-bottom: 12px; }
   .filters label { display: flex; flex-direction: column; font-size: 0.78rem; color: var(--text-secondary); gap: 3px; }
   .filters select, .filters input { font: inherit; font-size: 0.88rem; padding: 6px 10px; border-radius: 8px; min-height: 40px; max-width: 100%;
-            border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); min-width: 150px; }
+            border: 1px solid var(--control); background: var(--surface); color: var(--text-primary); min-width: 150px; }
   .filters .count { margin-left: auto; font-size: 0.85rem; color: var(--text-muted); }
   .checks { min-width: 860px; font-size: 0.86rem; }
   .checks th { text-align: left; font-size: 0.76rem; color: var(--text-secondary); font-weight: 600; padding: 10px 12px;
@@ -202,7 +207,7 @@
   .tabs button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; border-radius: 6px 6px 0 0; }
   [role="tabpanel"][hidden] { display: none; }
   .sub-h { font-size: 0.95rem; margin: 22px 0 8px; }
-  .seg { min-height: 40px; display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; align-self: end; }
+  .seg { min-height: 40px; display: inline-flex; border: 1px solid var(--control); border-radius: 8px; overflow: hidden; align-self: end; }
   .seg button { font: inherit; font-size: 0.85rem; padding: 6px 11px; border: 0; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--text-primary); font-weight: 650; }
@@ -540,6 +545,7 @@ function showTip(html, x, y) {
   tip.style.top = Math.max(8, Math.min(y + 14, innerHeight - r.height - 8)) + 'px';
 }
 const hideTip = () => tip.classList.remove('show');
+addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
 
 /* ---------- header: run picker, meta, "older run" banner ---------- */
 function renderPicker() {
@@ -576,12 +582,12 @@ function renderTiles() {
   }
   $('tiles').innerHTML = `
     <div class="card tile hero"><div class="label has-tip" data-ktip="score">Overall health score<i class="info" aria-hidden="true">i</i></div>
-      <div class="value has-tip" data-ktip="score" tabindex="0" aria-label="Overall health score ${Number(o.score).toFixed(1)} out of 100. How is this calculated?">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
+      <div class="value has-tip" data-ktip="score" tabindex="0" role="button" aria-describedby="tip" aria-label="Overall health score ${Number(o.score).toFixed(1)} out of 100. How is this calculated?">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
       <div class="note">${badge(o.status)} ${delta}</div></div>
     <div class="card tile"><div class="label">Checks run</div><div class="value">${fmtInt(o.checks)}</div>
       <div class="counts"><span>${badge('Pass')} ${fmtInt(o.passed)}</span>
-        <span class="has-tip" data-ktip="Warn" tabindex="0" aria-label="${o.warned} warnings. Show which checks">${badge('Warn')} ${fmtInt(o.warned)}</span>
-        <span class="has-tip" data-ktip="Fail" tabindex="0" aria-label="${o.failed} failures. Show which checks">${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
+        <span class="has-tip" data-ktip="Warn" tabindex="0" role="button" aria-describedby="tip" aria-label="${o.warned} warnings. Show which checks">${badge('Warn')} ${fmtInt(o.warned)}</span>
+        <span class="has-tip" data-ktip="Fail" tabindex="0" role="button" aria-describedby="tip" aria-label="${o.failed} failures. Show which checks">${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
     <div class="card tile"><div class="label">Tables monitored</div><div class="value">${fmtInt(s.tables_monitored)}</div>
       <div class="note">${fmtInt(s.columns_profiled)} columns profiled</div></div>
     <div class="card tile"><div class="label">Rows monitored</div><div class="value">${(s.rows_monitored / 1e6).toFixed(1)}M</div>
@@ -816,7 +822,7 @@ function renderTrend() {
     </svg>`;
 }
 function renderTrendTable() {
-  $('trend-tbl').innerHTML = `<table class="runs"><thead><tr><th>Run</th><th>Data through</th><th class="num">Score</th><th>Status</th><th class="num">Pass</th><th class="num">Warn</th><th class="num">Fail</th></tr></thead><tbody>` +
+  $('trend-tbl').innerHTML = `<table class="runs"><thead><tr><th scope="col">Run</th><th scope="col">Data through</th><th scope="col" class="num">Score</th><th scope="col">Status</th><th scope="col" class="num">Pass</th><th scope="col" class="num">Warn</th><th scope="col" class="num">Fail</th></tr></thead><tbody>` +
     S.runs.slice().reverse().map(r => `<tr class="${r.run_id === S.selected ? 'current' : ''}" data-run="${r.run_id}"><td><button type="button" class="run-btn">#${r.run_id}</button></td><td>${r.data_to ? Site.fmt.date(r.data_to) : '—'}</td><td class="num">${Number(r.score).toFixed(1)}</td><td>${badge(r.status)}</td><td class="num">${r.passed}</td><td class="num">${r.warned}</td><td class="num">${r.failed}</td></tr>`).join('') + '</tbody></table>';
 }
 const trendTip = i => { const r = S.runs[i];
@@ -918,7 +924,7 @@ function renderHeat() {
       ${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></button>`;
   };
   const colHead = (key, label, cls = '') =>
-    `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-htip="${key}" tabindex="0"
+    `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-htip="${key}" tabindex="0" role="button" aria-describedby="tip"
       aria-label="${label}: what does this check?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
   let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => colHead(d, d)).join('')}${colHead('Table score', 'Table score', 'total')}</tr></thead><tbody>`;
   for (const t of tables) {
@@ -985,7 +991,7 @@ function filteredChecks() {
 function drawChecks() {
   const checks = S.data.checks, rows = filteredChecks();
   $('f-count').textContent = `${rows.length} of ${checks.length} checks`;
-  const hd = (label, cls = '') => `<th${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-chtip="${label}" tabindex="0"
+  const hd = (label, cls = '') => `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-chtip="${label}" tabindex="0" role="button" aria-describedby="tip"
       aria-label="${label}: what is in this column?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
   $('checks').innerHTML = `<thead><tr>${hd('Status')}${hd('Rule')}${hd('Check')}${hd('Table · column')}
     ${hd('Dimension')}${hd('Severity')}${hd('Measured', 'num')}${hd('Warn / fail above', 'num')}</tr></thead><tbody>` +
@@ -1067,8 +1073,8 @@ function renderLoad() {
     if (l.released) bits.push(`${fmtInt(l.released)} held rows released`);
     return bits.join(' · ');
   };
-  const table = `<div class="table-wrap scroll"><table class="loads"><thead><tr><th>File</th><th>Type</th><th>Status</th>
-      <th class="num">Rows received</th><th class="num">Sender declared</th><th>What happened</th></tr></thead><tbody>` +
+  const table = `<div class="table-wrap scroll"><table class="loads"><thead><tr><th scope="col">File</th><th scope="col">Type</th><th scope="col">Status</th>
+      <th scope="col" class="num">Rows received</th><th scope="col" class="num">Sender declared</th><th scope="col">What happened</th></tr></thead><tbody>` +
     loads.map(l => `<tr><td><code>${esc(l.file)}</code><div class="why">${esc(AREA[l.feed] || l.feed)}</div></td>
       <td>${LOAD_KIND[l.kind]}${l.kind !== 'Daily' ? `<div class="why">for ${dayShort(l.business_date)}</div>` : ''}</td>
       <td>${loadStatus(l)}</td>
@@ -1176,12 +1182,12 @@ function drawColumns() {
     ${t.description ? `<div style="margin-top:4px">${esc(t.description)}</div>` : ''}`;
   const cols = filteredCols(t);
   $('c-count').textContent = `${cols.length} of ${t.columns.length} fields`;
-  $('c-table-view').innerHTML = `<thead><tr><th>Field</th><th>Filled in</th><th class="num">Different values</th>
-    <th>Typical values</th><th>What it means</th></tr></thead><tbody>` +
+  $('c-table-view').innerHTML = `<thead><tr><th scope="col">Field</th><th scope="col">Filled in</th><th scope="col" class="num">Different values</th>
+    <th scope="col">Typical values</th><th scope="col">What it means</th></tr></thead><tbody>` +
     (cols.length ? cols.map(c => {
       const filled = c.rows ? 100 - Number(c.null_pct) : 0, flag = colFlag(c);
       return `<tr class="${flag ? 'flagged' : ''}">
-        <td><span class="fname has-tip" tabindex="0" data-col="${esc(c.column)}" aria-label="${esc(c.column)}: show details">${esc(c.column)}</span><span class="ftype">${esc(c.type)}</span>
+        <td><span class="fname has-tip" tabindex="0" role="button" aria-describedby="tip" data-col="${esc(c.column)}" aria-label="${esc(c.column)}: show details">${esc(c.column)}</span><span class="ftype">${esc(c.type)}</span>
           ${flag ? `<div style="margin-top:4px">${badge('Warn', flag)}</div>` : ''}</td>
         <td><span class="fill"><span class="bar" aria-hidden="true"><span style="width:${filled.toFixed(1)}%"></span></span>${pct(filled)}</span>
           ${c.nulls ? `<div class="desc">${fmtInt(c.nulls)} blank</div>` : ''}</td>
@@ -1293,7 +1299,7 @@ function drawVolume() {
     <span class="lg">${sw('<path d="M11,1l4,5l-4,5l-4,-5z" fill="var(--text-muted)"/>')}Holiday</span>`;
   // table twin: unusual days in range
   const rows = outs.slice().reverse();
-  $('v-days').innerHTML = `<thead><tr><th>Day</th><th class="num">Records</th><th class="num">Normal for that weekday</th><th class="num">Difference</th><th>Likely explanation</th></tr></thead><tbody>` +
+  $('v-days').innerHTML = `<thead><tr><th scope="col">Day</th><th scope="col" class="num">Records</th><th scope="col" class="num">Normal for that weekday</th><th scope="col" class="num">Difference</th><th scope="col">Likely explanation</th></tr></thead><tbody>` +
     (rows.length ? rows.map(i => { const b = s.base[i], d = b ? s.rows[i] / b - 1 : null, why = explain(days[i], ev);
       return `<tr><td style="white-space:nowrap">${longDay(days[i])}</td><td class="num">${fmtInt(s.rows[i])}</td><td class="num">${b ? fmtInt(Math.round(b)) : '—'}</td>
         <td class="num"><span class="delta ${d > 0 ? 'up' : 'down'}" style="color:var(--text-primary)"><span aria-hidden="true">${d > 0 ? '▲' : '▼'}</span> ${d == null ? '—' : signed(d * 100) + '%'}</span></td>
@@ -1303,7 +1309,7 @@ function drawVolume() {
   // table view of the same days
   $('v-chart').hidden = $('v-legend').hidden = V.table; $('v-tbl').hidden = $('vol-csv').hidden = !V.table;
   $('v-astable').setAttribute('aria-pressed', V.table); $('v-astable').textContent = V.table ? 'View as chart' : 'View as table';
-  $('v-tbl').innerHTML = !V.table ? '' : `<table class="checks" style="min-width:0"><thead><tr><th>Day</th><th class="num">Records</th><th class="num">Normal for that weekday</th><th>Status</th></tr></thead><tbody>` +
+  $('v-tbl').innerHTML = !V.table ? '' : `<table class="checks" style="min-width:0"><thead><tr><th scope="col">Day</th><th scope="col" class="num">Records</th><th scope="col" class="num">Normal for that weekday</th><th scope="col">Status</th></tr></thead><tbody>` +
     open.slice().reverse().map(i => `<tr><td>${longDay(days[i])}</td><td class="num">${fmtInt(s.rows[i])}</td><td class="num">${s.base[i] ? fmtInt(Math.round(s.base[i])) : '—'}</td><td>${s.out[i] ? badge('Warn', 'Unusual') : 'Normal'}</td></tr>`).join('') + '</tbody></table>';
 }
 function volTip(i) {
@@ -1380,7 +1386,7 @@ function drawRules() {
         ${r.problem ? `<p><b>If it doesn't pass:</b> ${esc(r.problem.replace(/^./, c => c.toUpperCase()))}</p>` : ''}
         <p><b>Limits:</b> a warning above ${esc(fmtNum(r.warn_above, r.unit))}, a failure above ${esc(fmtNum(r.fail_above, r.unit))}.</p>
         ${r.expected_note ? `<p><b>Note:</b> ${esc(r.expected_note)}</p>` : ''}
-        <table class="r-hist"><thead><tr><th>Run</th><th>Result</th><th class="num">Found</th><th>Check as worded then</th></tr></thead><tbody>
+        <table class="r-hist"><thead><tr><th scope="col">Run</th><th scope="col">Result</th><th scope="col" class="num">Found</th><th scope="col">Check as worded then</th></tr></thead><tbody>
           ${r.history.map(h => `<tr><td>#${h.run}${h.run === S.selected ? ' (viewing)' : ''}</td><td>${badge(h.status === 'Error' ? 'Fail' : h.status)}</td>
             <td class="num">${esc(fmtNum(h.value, r.unit))}</td><td>${h.rule === r.rule ? '<span style="color:var(--text-muted)">same</span>' : esc(h.rule)}</td></tr>`).join('')}
         </tbody></table>

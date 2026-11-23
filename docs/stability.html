@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.1">
-<script src="assets/site.js?v=1.2"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.2">
+<script src="assets/site.js?v=1.5"></script>
 <script src="assets/spc.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -19,7 +19,7 @@
   .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
   .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
-  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-height: 40px; }
+  .seg { display: inline-flex; border: 1px solid var(--control); border-radius: 8px; overflow: hidden; min-height: 40px; }
   .seg button { font-size: 14px; padding: 6px 12px; border: 0; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
   .seg button + button { border-left: 1px solid var(--border); }
   .seg button[aria-pressed="true"] { background: var(--surface-warm); color: var(--brand-blue); font-weight: 700; box-shadow: inset 0 -2px 0 var(--brand-blue); }
@@ -30,7 +30,7 @@
   .filter-bar .ctl select { max-width: 140px; }
   .filter-bar #f-metric { max-width: 215px; }
   .sm .c-run { stroke-width: 1.5; }
-  .filter input[type=range] { width: 90px; accent-color: var(--brand-blue); }
+  .filter input[type=range] { height: 24px; width: 90px; accent-color: var(--brand-blue); }
   .filter output { color: var(--text-primary); font-weight: 700; min-width: 34px; font-variant-numeric: tabular-nums; }
   .more { position: relative; }
   .more summary { list-style: none; }
@@ -39,7 +39,7 @@
   .more .panel .filter { justify-content: space-between; }
   .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .chips:empty { display: none; }
-  .chip { border: 1px solid var(--border); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
   .chip:hover { border-color: var(--text-muted); }
   .line { margin-top: 10px; font-size: 14px; }
   .line b { color: var(--text-primary); }
@@ -51,8 +51,8 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-top: 12px; }
   .panel-c { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 8px; min-width: 0; cursor: pointer; transition: opacity .15s; }
   .panel-c:hover { border-color: var(--text-muted); }
-  .grid.has-sel .panel-c:not(.sel) { opacity: .3; }
-  .grid.has-sel .panel-c:not(.sel):hover, .grid.has-sel .panel-c:not(.sel):focus-within { opacity: 1; }
+  .grid.has-sel .panel-c:not(.sel) .chart { opacity: .3; }   /* only the marks fade; text keeps its contrast */
+  .grid.has-sel .panel-c:not(.sel):hover .chart, .grid.has-sel .panel-c:not(.sel):focus-within .chart { opacity: 1; }
   .panel-c.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
   .panel-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   .panel-h button { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); }
@@ -123,20 +123,20 @@
         <div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label>
           <button class="btn" type="button" id="csv-main" hidden>Download CSV</button><button class="btn" type="button" id="tb-main">View as table</button></div></div>
       <div class="line" id="l-main" aria-live="polite"></div>
-      <div class="chart" id="c-main"></div><div class="legend" id="lg-main"></div><div class="tbl" id="tbl-main" hidden></div>
+      <div class="chart" id="c-main"></div><div class="sr-only" id="live" aria-live="polite"></div><div class="legend" id="lg-main"></div><div class="tbl" id="tbl-main" tabindex="0" role="region" aria-label="Values over time" hidden></div>
       <div class="note" id="n-main"></div>
     </section>
     <section class="card" id="split" aria-labelledby="t-split">
       <div class="head"><div><h2 id="t-split"></h2><div class="sub" id="s-split"></div></div>
         <div class="tools"><button class="btn" type="button" id="csv-split" hidden>Download CSV</button><button class="btn" type="button" id="tb-split">View as table</button></div></div>
       <div class="line" id="l-split" aria-live="polite"></div>
-      <div id="c-split"></div><div class="tbl" id="tbl-split" hidden></div>
+      <div id="c-split"></div><div class="tbl" id="tbl-split" tabindex="0" role="region" aria-label="Values by category" hidden></div>
     </section>
     <details class="how card"><summary>How the limits and signals work</summary><ul>
       <li><b>Center line:</b> the metric's level in the baseline period (shaded). <b>Limits:</b> the center plus or minus the number of standard deviations (σ) you choose. Lower settings catch smaller changes but raise more false alarms.</li>
       <li><b>Percentages</b> such as service level use a Laney p′ chart. Its limits move with each day's volume and with the day-to-day variation seen in the baseline.</li>
       <li><b>Times, counts, NPS, adherence, occupancy and staffing</b> use an individuals (XmR) chart, with limits from the average change between neighboring points.</li>
-      <li><b>Outside the limits</b> (red-orange): a sharp break. <b>Run rules</b> (amber ring): 8 points in a row on one side of the center, 6 in a row rising or falling, or 2 of 3 beyond 2σ on the same side. The ring marks the point that completes a pattern and any that continue it.</li>
+      <li><b>Outside the limits</b> (red-orange diamond): a sharp break. <b>Run rules</b> (amber ring): 8 points in a row on one side of the center, 6 in a row rising or falling, or 2 of 3 beyond 2σ on the same side. The ring marks the point that completes a pattern and any that continue it.</li>
       <li><b>By category</b> asks whether each category's result for the whole period is further from the whole-center result than its own day-to-day variation explains. A real, lasting difference will show as a signal.</li>
       <li><b>Limits are not targets.</b> They show what the process normally does, so targets are left off these charts. A metric can be stable and still miss its target.</li>
       <li><b>Days of the week differ,</b> which can create daily patterns, so charts open on weekly data. Weeks start on Sunday and only complete weeks are shown. Closed days are skipped.</li>
@@ -284,7 +284,7 @@
     $('n-main').textContent = [r.extended && r.lim ? `The baseline was extended back to ${fmt.date(iso(r.bs))}; control limits need at least ${SPC.MIN_BASELINE} points.` : '', sunday ? 'Sundays have few contacts, all by email or secure message, which widens the daily limits. Use the weekly grain for this metric.' : weekday ? 'This metric changes by day of the week. The weekly grain removes that pattern.' : ''].filter(Boolean).join(' ');
     $('c-main').hidden = $('lg-main').hidden = tblMain; $('tbl-main').hidden = $('csv-main').hidden = !tblMain;
     $('tb-main').textContent = tblMain ? 'View as chart' : 'View as table'; $('tb-main').setAttribute('aria-pressed', tblMain);
-    if (tblMain) $('tbl-main').innerHTML = `<table><thead><tr><th>${isWeek() ? 'Week' : 'Day'}</th><th>${esc(M.k.short)}</th><th>Center</th><th>LCL</th><th>UCL</th><th class="l">Signal</th></tr></thead><tbody>` +
+    if (tblMain) $('tbl-main').innerHTML = `<table><thead><tr><th scope="col">${isWeek() ? 'Week' : 'Day'}</th><th scope="col">${esc(M.k.short)}</th><th scope="col">Center</th><th scope="col">LCL</th><th scope="col">UCL</th><th scope="col" class="l">Signal</th></tr></thead><tbody>` +
       r.pts.slice().reverse().map((p) => `<tr><td>${dateName(p.t)}${p.inPeriod ? '' : ' (baseline)'}</td><td class="${p.low ? 'low' : ''}">${V(p.v, true)}${p.low ? ' (too few)' : ''}</td>${r.lim ? [r.lim.center, p.l.lcl, p.l.ucl].map((v) => `<td>${V(v, true)}</td>`).join('') : '<td>–</td><td>–</td><td>–</td>'}<td class="l">${sigHtml(p)}</td></tr>`).join('') + '</tbody></table>';
     else { chart($('c-main'), r, false); legend(r); }
   }
@@ -292,7 +292,7 @@
   function legend(r) {
     const i = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`;
     $('lg-main').innerHTML = [[`<line class="c-line" x1="0" x2="20" y1="7" y2="7"/>`, M.k.short], ['<line class="c-cl" x1="0" x2="20" y1="7" y2="7"/>', 'Center line'], ['<line class="c-lim" x1="0" x2="20" y1="7" y2="7"/>', `Limits (${+S.sigma}σ)`],
-      ['<circle class="c-out" cx="10" cy="7" r="5.5"/>', 'Outside the limits'], ['<circle class="c-run" cx="10" cy="7" r="4.5"/>', 'Run-rule signal'], ['<circle class="c-low" cx="10" cy="7" r="3.5"/>', 'Too few to rate'],
+      ['<path class="c-out" d="M10,0L17,7L10,14L3,7Z"/>', 'Outside the limits'], ['<circle class="c-run" cx="10" cy="7" r="4.5"/>', 'Run-rule signal'], ['<circle class="c-low" cx="10" cy="7" r="3.5"/>', 'Too few to rate'],
       ...(S.base === 'self' ? [] : [['<rect class="c-base" style="fill-opacity:.18" width="20" height="14"/>', 'Baseline']])].map(([a, b]) => `<span>${i(a)}${esc(b)}</span>`).join('');
   }
 
@@ -312,16 +312,16 @@
     const hit = list.filter((r) => r.out.length + r.run.length), top = hit.slice().sort((a, b) => b.out.length - a.out.length || b.run.length - a.run.length)[0];
     $('l-split').innerHTML = hit.length ? `<b>${hit.length} of ${list.length} ${PLURAL[S.dim]}</b> show signals. ${top.out.length ? `Most points outside the limits: ${esc(top.name)}, with ${top.out.length}.` : `No points are outside the limits. Most run-rule signals: ${esc(top.name)}, with ${top.run.length}.`}` : `<b>No signals</b> in ${list.length} ${PLURAL[S.dim]}.`;
     if (tblSplit) {
-      $('tbl-split').innerHTML = `<table><thead><tr><th>${esc(S.dim)}</th><th>Period value</th><th>Center</th><th>Outside limits</th><th>Run rules</th><th>Usable ${unit()}s</th></tr></thead><tbody>` +
+      $('tbl-split').innerHTML = `<table><thead><tr><th scope="col">${esc(S.dim)}</th><th scope="col">Period value</th><th scope="col">Center</th><th scope="col">Outside limits</th><th scope="col">Run rules</th><th scope="col">Usable ${unit()}s</th></tr></thead><tbody>` +
         list.map((r) => `<tr><td>${esc(r.name)}</td><td>${V(total(r), true)}</td><td>${r.lim ? V(r.lim.center, true) : 'No limits'}</td><td>${r.lim ? r.out.length : '–'}</td><td>${r.lim ? r.run.length : '–'}</td><td>${r.usable}</td></tr>`).join('') + '</tbody></table>';
       return;
     }
     const host = $('c-split'); host.innerHTML = `<div class="grid${S.member ? ' has-sel' : ''}"></div>`;
     for (const r of list) {
       const el = document.createElement('div'); el.className = 'panel-c' + (S.member === r.name ? ' sel' : '');
-      el.innerHTML = `<div class="panel-h"><button type="button" aria-pressed="${S.member === r.name}">${esc(r.name)}</button></div>
+      el.innerHTML = `<div class="panel-h"><button type="button" data-k="${esc(r.name)}" aria-pressed="${S.member === r.name}">${esc(r.name)}</button></div>
         <div class="panel-s">${!r.lim ? 'No limits: too few points with enough data' : !r.out.length && !r.run.length ? '<span class="status none">No signals</span>' : (r.out.length ? `<span class="status off">${r.out.length} outside</span>` : '') + (r.run.length ? `<span class="status watch">${count(r.run.length, 'run rule')}</span>` : '')}</div><div class="chart sm"></div>`;
-      el.addEventListener('click', () => { S.member = S.member === r.name ? null : r.name; hideTip(); render(); if (S.member) $('t-main').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
+      el.addEventListener('click', () => { S.member = S.member === r.name ? null : r.name; hideTip(); const fk = Site.focusKey(); render(); Site.restoreFocus(fk); if (S.member) $('t-main').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
       host.firstChild.append(el);
       chart(el.querySelector('.chart'), r, true);
     }
@@ -340,33 +340,34 @@
     const far = out.slice().sort((a, b) => Math.abs(b.value - b.center) - Math.abs(a.value - a.center))[0];
     $('l-split').innerHTML = out.length ? `<b>${out.length} of ${list.length} ${PLURAL[S.dim]}</b> differ from the center by more than their daily variation explains. Furthest: ${esc(far.name)} at ${V(far.value)}.` : `<b>No ${esc(S.dim.toLowerCase())}</b> differs from the center by more than its daily variation explains.`;
     if (tblSplit) {
-      $('tbl-split').innerHTML = `<table><thead><tr><th>${esc(S.dim)}</th><th>${esc(M.k.short)}</th><th>Center</th><th>LCL</th><th>UCL</th><th class="l">Signal</th><th>Days</th></tr></thead><tbody>` +
+      $('tbl-split').innerHTML = `<table><thead><tr><th scope="col">${esc(S.dim)}</th><th scope="col">${esc(M.k.short)}</th><th scope="col">Center</th><th scope="col">LCL</th><th scope="col">UCL</th><th scope="col" class="l">Signal</th><th scope="col">Days</th></tr></thead><tbody>` +
         list.map((r) => `<tr><td>${esc(r.name)}</td><td class="${r.low ? 'low' : ''}">${V(r.value, true)}</td><td>${V(r.center, true)}</td><td>${V(r.lcl, true)}</td><td>${V(r.ucl, true)}</td><td class="l">${r.low ? 'Too few to rate' : r.out ? `<span class="status off">${r.value > r.ucl ? 'Above' : 'Below'} the limits</span>` : 'Within limits'}</td><td>${r.days}</td></tr>`).join('') + '</tbody></table>';
       return;
     }
     const host = $('c-split'); host.innerHTML = '<div class="chart"></div>'; const box = host.firstChild;
     const W = box.clientWidth, H = 360, m = { t: 16, r: 96, b: 74, l: 60 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / list.length;
     const vals = list.flatMap((r) => [r.value, r.lcl, r.ucl]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - v) / (b - a) * ih, x = (i) => m.l + step * (i + .5);
-    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${M.k.name} by ${S.dim}. ${out.length} of ${list.length} outside the limits. Use View as table for values.` }, box);
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${M.k.name} by ${S.dim}. ${out.length} of ${list.length} outside the limits. Use View as table for values.` }, box);
     axis(s, a, b, y, m.l, m.l + iw);
     el('line', { class: 'c-cl', x1: m.l, x2: m.l + iw, y1: y(center.value), y2: y(center.value) }, s);
     text(s, m.l + iw + 8, y(center.value) + 4, 'Center ' + V(center.value), 'c-lab');
     list.forEach((r, i) => {
       const l = m.l + step * i + 3, q = l + step - 6;
       for (const v of [r.lcl, r.ucl]) el('line', { class: 'c-lim', x1: l, x2: q, y1: y(v), y2: y(v) }, s);
-      el('circle', { class: r.low ? 'c-low' : r.out ? 'c-out' : 'c-pt', cx: x(i), cy: y(r.value), r: r.out ? 7 : 5 }, s);
+      if (r.out) el('path', { class: 'c-out', d: diamond(x(i), y(r.value), 8) }, s); else el('circle', { class: r.low ? 'c-low' : 'c-pt', cx: x(i), cy: y(r.value), r: 5 }, s);
       wrap(r.name, Math.max(8, Math.floor(step / 6.4))).slice(0, 4).forEach((line, j) => { const g = el('g', { class: 'ax' }, s); text(g, x(i), H - m.b + 20 + j * 14, line, '', 'middle'); });
       const hit = el('rect', { x: m.l + step * i, y: m.t, width: step, height: ih, fill: 'transparent', tabindex: 0, role: 'img', 'aria-label': `${r.name}: ${V(r.value, true)}, limits ${V(r.lcl)} to ${V(r.ucl)}${r.out ? ', outside the limits' : ''}` }, s);
       const tip = (ev) => { const bx = hit.getBoundingClientRect(); showTip(`<b>${esc(r.name)}</b><br>${esc(M.k.short)}: <b>${V(r.value, true)}</b><br>Center ${V(r.center)} · limits ${V(r.lcl)} to ${V(r.ucl)}<br>${r.low ? 'Too few to rate' : r.out ? `<span class="status off">${r.value > r.ucl ? 'Above' : 'Below'} the limits</span>` : 'Within limits'}<br>${r.days} days · ${nText(r)}`, ev.clientX ?? bx.left, ev.clientY ?? bx.top); };
       hit.addEventListener('mousemove', tip); hit.addEventListener('focus', tip); hit.addEventListener('mouseleave', hideTip); hit.addEventListener('blur', hideTip);
     });
-    const lg = document.createElement('div'); lg.className = 'legend'; lg.innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><line class="c-lim" x2="20" y1="7" y2="7"/></svg>Limits (${+S.sigma}σ)</span><span><svg width="20" height="14" aria-hidden="true"><circle class="c-out" cx="10" cy="7" r="6"/></svg>Outside the limits</span><span><svg width="20" height="14" aria-hidden="true"><circle class="c-pt" cx="10" cy="7" r="5"/></svg>Within limits</span>`; host.append(lg);
+    const lg = document.createElement('div'); lg.className = 'legend'; lg.innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><line class="c-lim" x2="20" y1="7" y2="7"/></svg>Limits (${+S.sigma}σ)</span><span><svg width="20" height="14" aria-hidden="true"><path class="c-out" d="M10,0L17,7L10,14L3,7Z"/></svg>Outside the limits</span><span><svg width="20" height="14" aria-hidden="true"><circle class="c-pt" cx="10" cy="7" r="5"/></svg>Within limits</span>`; host.append(lg);
   }
   const wrap = (s, n) => s.split(' ').reduce((o, w) => { const l = o[o.length - 1]; if (l && (l + ' ' + w).length <= n) o[o.length - 1] = l + ' ' + w; else o.push(w); return o; }, []);
 
   // ---------- Time chart ----------
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  const diamond = (x, y, r) => `M${x},${y - r}L${x + r},${y}L${x},${y + r}L${x - r},${y}Z`;
   function pad(a, b) { const d = (b - a || Math.abs(b) || 1) * .08, [lo, hi] = bounds() || [-Infinity, Infinity]; return [Math.max(lo, a - d), Math.min(hi, b + d)]; }
   function tick(v) {
     switch (M.k.format) {
@@ -393,7 +394,7 @@
     const x = (t) => m.l + (t - t0) / (t1 - t0) * iw;
     const shown = pts.filter((p) => !p.low), src = shown.length ? shown : pts;
     const vals = src.flatMap((p) => p.l ? [p.v, p.l.lcl, p.l.ucl] : [p.v]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih;
-    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${M.k.name}, ${r.name}, ${grainWord()}, ${range(r.w.s, r.w.e)}. ${r.lim ? `${r.out.length} outside the limits, ${r.run.length} run-rule signals.` : 'No limits.'} Use View as table for values.` }, host);
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: small ? 'img' : 'group', 'aria-label': `${M.k.name}, ${r.name}, ${grainWord()}, ${range(r.w.s, r.w.e)}. ${r.lim ? `${r.out.length} outside the limits, ${r.run.length} run-rule signals.` : 'No limits.'} Use View as table for values.` }, host);
     if (S.base !== 'self' && r.be > t0) el('rect', { class: 'c-base', x: m.l, y: m.t, width: Math.max(0, x(r.w.s) - m.l), height: ih }, s);
     axis(s, a, b, y, m.l, m.l + iw, small ? 3 : 5);
     // month labels, thinned so they never collide
@@ -427,7 +428,8 @@
     const gap = iw / Math.max(1, pts.length), f = small ? .72 : 1;
     pts.forEach((p) => {
       const c = p.low ? 'c-low' : p.sig.includes('outside') ? 'c-out' : p.sig.length ? 'c-run' : 'c-pt';
-      el('circle', { class: c, cx: x(p.t), cy: y(p.v), r: f * (c === 'c-out' ? 5.5 : c === 'c-run' ? 4 : c === 'c-low' ? 2.6 : gap > 10 ? 4 : 2) }, s);
+      if (c === 'c-out') el('path', { class: c, d: diamond(x(p.t), y(p.v), f * 7) }, s);
+      else el('circle', { class: c, cx: x(p.t), cy: y(p.v), r: f * (c === 'c-run' ? 4 : c === 'c-low' ? 2.6 : gap > 10 ? 4 : 2) }, s);
     });
     // hover and keyboard: nearest point
     const cross = el('line', { class: 'c-cross', y1: m.t, y2: m.t + ih, visibility: 'hidden' }, s);
@@ -439,9 +441,9 @@
     const move = (ev) => { const bx = s.getBoundingClientRect(), tx = t0 + ((ev.clientX - bx.left) * W / bx.width - m.l) / iw * (t1 - t0); at = pts.reduce((best, p, i) => (Math.abs(p.t - tx) < Math.abs(pts[best].t - tx) ? i : best), 0); tip(pts[at], ev.clientX, ev.clientY); };
     const off = () => { cross.setAttribute('visibility', 'hidden'); hideTip(); };
     hit.addEventListener('mousemove', move); hit.addEventListener('mouseleave', off); hit.addEventListener('blur', off);
-    hit.addEventListener('keydown', (ev) => { const n = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: pts.length - 1 }[ev.key]; if (n == null) return; ev.preventDefault(); at = Math.max(0, Math.min(pts.length - 1, n)); const bx = s.getBoundingClientRect(); tip(pts[at], bx.left + x(pts[at].t) * bx.width / W, bx.top + y(pts[at].v)); });
+    hit.addEventListener('keydown', (ev) => { const n = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: pts.length - 1 }[ev.key]; if (n == null) return; ev.preventDefault(); at = Math.max(0, Math.min(pts.length - 1, n)); $('live').textContent = `${dateName(pts[at].t)}: ${V(pts[at].v, true)}${pts[at].sig.length ? ', ' + pts[at].sig.map((q) => RULE[q]).join(', ') : ''}`; const bx = s.getBoundingClientRect(); tip(pts[at], bx.left + x(pts[at].t) * bx.width / W, bx.top + y(pts[at].v)); });
     for (const k of marks) {
-      const g = el('g', { class: 'c-ev', transform: `translate(${k.x},${k.y})`, tabindex: 0, role: 'img', 'aria-label': `${k.e.name}, ${range(ts(k.e.start), ts(k.e.end))}` }, s); el('circle', { r: 8 }, g); text(g, 0, 3.5, k.num);
+      const g = el('g', { class: 'c-ev', transform: `translate(${k.x},${k.y})`, tabindex: 0, role: 'img', 'aria-label': `${k.e.name}, ${range(ts(k.e.start), ts(k.e.end))}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, g); el('circle', { r: 8 }, g); text(g, 0, 3.5, k.num);
       const show = (ev) => { const bx = g.getBoundingClientRect(); showTip(`<b>${k.num}. ${esc(k.e.name)}</b><br>${k.e.start === k.e.end ? fmt.date(k.e.start) : range(ts(k.e.start), ts(k.e.end))}<br><span class="muted">${esc(k.e.description)}</span>`, ev.clientX ?? bx.left, ev.clientY ?? bx.top); };
       g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('mouseleave', hideTip); g.addEventListener('blur', hideTip);
     }
@@ -452,7 +454,7 @@
   for (const q of ['metric', 'dim', 'grain', 'period', 'base', 'end']) $('f-' + q).addEventListener('change', (e) => set(q, e.target.value));
   $('f-sigma').addEventListener('input', (e) => set('sigma', +e.target.value));
   $('f-view').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && !b.disabled) set('view', b.dataset.v); });
-  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) set(b.dataset.q, DEF[b.dataset.q]); });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { const fk = Site.focusKey(); set(b.dataset.q, DEF[b.dataset.q]); Site.restoreFocus(fk, '.more summary'); } });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carry(null); events = $('t-events').checked = true; load().catch(fail); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderMain(); });

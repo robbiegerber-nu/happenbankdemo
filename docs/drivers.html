@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Performance Driver Explorer · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Drill into what drives simulated contact center KPIs, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.2">
+<script src="assets/site.js?v=1.5"></script>
+<script src="assets/drivers.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  h2 { scroll-margin-top: 100px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .filter-bar .wrap { gap: 8px; }
+  .filter-bar .ctl select { max-width: 128px; }
+  .filter-bar #f-metric { max-width: 190px; }
+  .filter-bar #f-cmp { max-width: 146px; }
+  .more { position: relative; }
+  .more summary { list-style: none; }
+  .more summary::-webkit-details-marker { display: none; }
+  .more .panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 340px; display: grid; gap: 8px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+  .more .panel .filter { justify-content: space-between; }
+  .more .panel select { max-width: 200px; width: 200px; }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 14px; font-size: 14px; }
+  .crumbs button { border: 0; background: none; color: var(--brand-blue); cursor: pointer; padding: 6px 2px; min-height: 36px; border-radius: 4px; }
+  .crumbs button:hover { text-decoration: underline; }
+  .crumbs b { color: var(--text-primary); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .chip:hover { border-color: var(--text-muted); }
+  .kpi { display: flex; gap: 12px 28px; flex-wrap: wrap; margin-top: 14px; align-items: baseline; }
+  .kpi .v { font-size: 34px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1; }
+  .kpi .p { font-size: 14px; color: var(--text-muted); }
+  .line { margin-top: 10px; font-size: 14px; }
+  .line b { color: var(--text-primary); }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .chart { margin-top: 8px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 560px; overflow-y: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 7px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }   /* text keeps its contrast */
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  .name { border: 0; background: none; padding: 4px 0; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  .drill { border: 1px solid var(--control); border-radius: 6px; background: var(--surface); color: var(--brand-blue); cursor: pointer; padding: 4px 10px; min-height: 32px; }
+  .drill:hover { border-color: var(--brand-blue); }
+  .minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 12px; margin-top: 12px; }
+  .mini { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; min-width: 0; }
+  .how { margin-top: 20px; }
+  .how summary { cursor: pointer; font-weight: 600; color: var(--text-primary); min-height: 44px; display: flex; align-items: center; }
+  .how li { margin: 6px 0; }
+  .phone-note { display: none; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .d-line { fill: none; stroke: var(--brand-blue); stroke-width: 2; }
+  .d-pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 2; }
+  .d-low { fill: var(--surface); stroke: var(--text-muted); }
+  .d-target { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .d-watch { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .d-evband { fill: var(--event); fill-opacity: .12; } .d-evline { stroke: var(--event); stroke-opacity: .6; }
+  .d-ev circle { fill: var(--surface); stroke: var(--event); } .d-ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
+  .d-cmp { fill: var(--surface); stroke: var(--text-primary); stroke-width: 2; }
+  .d-sel { fill: var(--brand-blue); fill-opacity: .06; }
+  .w-end { fill: var(--text-muted); } .w-up { fill: var(--brand-blue); } .w-down { fill: url(#hatch); stroke: var(--brand-purple); stroke-width: 1.5; } .hatch-l { stroke: var(--brand-purple); stroke-width: 2.5; } .w-link { stroke: var(--text-muted); stroke-dasharray: 2 2; }
+  .w-zero { stroke: var(--text-muted); }
+  .t { fill: var(--text-secondary); font-size: 12.5px; font-family: var(--font); } .t.s { fill: var(--text-primary); font-weight: 600; } .t.m { fill: var(--text-muted); }
+  .bar { fill: var(--brand-blue); } .bar.low { fill: var(--text-muted); fill-opacity: .35; } .tick0 { stroke: var(--text-primary); stroke-width: 2; }
+  .hit { fill: transparent; cursor: pointer; } .hit:focus-visible { outline: 2px solid var(--brand-blue); }
+  .row-f rect, .row-f line { opacity: .3; } .row-f .t { fill: var(--text-muted); font-weight: 400; }
+  @media (max-width: 767px) {
+    .filter-bar .ctl, .more, #f-reset, #c-break, #c-minis, .card .tools, .crumbs, .chips, .how { display: none !important; }
+    .phone-note { display: block; } .card { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <label class="filter ctl"><span class="sr-only">Month</span><select id="f-month"></select></label>
+  <label class="filter ctl"><span class="flabel">Compare to</span><select id="f-cmp"><option value="prior">Prior month</option><option value="year">Same month last year</option></select></label>
+  <label class="filter ctl"><span class="flabel">Metric</span><select id="f-metric"></select></label>
+  <label class="filter ctl"><span class="flabel">Break down by</span><select id="f-by"></select></label>
+  <details class="more"><summary class="btn">More filters</summary><div class="panel" id="f-dims"></div></details>
+  <button class="link-btn" id="f-reset" type="button">Reset to default</button>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="hatch-l" x1="0" y1="0" x2="0" y2="6"/></pattern></defs></svg>
+<main class="wrap" id="main">
+  <h1>Performance driver explorer</h1>
+  <p class="sub">What changed, and which parts of the business drove it? Click anything to filter, and drill down through the breakdown table.</p>
+  <p class="note phone-note">Open on a larger screen to drill down and compare.</p>
+  <div class="crumbs" id="crumbs" aria-label="Drill-down path"></div><div class="chips" id="chips"></div>
+  <p class="note" id="note" role="status"></p>
+  <p class="note" id="loading">Loading the explorer…</p>
+  <div id="content" hidden>
+    <section class="card" aria-labelledby="t-head">
+      <div class="head"><div><h2 id="t-head"></h2><div class="sub" id="s-head"></div></div>
+        <div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-trend" type="button" hidden>Download CSV</button><button class="btn" id="tb-trend" type="button">View as table</button></div></div>
+      <div class="kpi" id="kpi"></div><div class="line" id="so"></div>
+      <div class="chart" id="trend"></div><div class="legend" id="lg-trend"></div><div class="tbl" tabindex="0" role="region" aria-label="Values by month" id="tbl-trend" hidden></div>
+    </section>
+    <section class="card" id="c-water" aria-labelledby="t-water"><h2 id="t-water"></h2><div class="sub" id="s-water"></div><div class="line" id="l-water"></div><div class="chart" id="water"></div><div class="legend" id="lg-water"></div></section>
+    <section class="card" id="c-break" aria-labelledby="t-break">
+      <div class="head"><div><h2 id="t-break"></h2><div class="sub" id="s-break"></div></div><div class="tools"><button class="btn" id="csv-break" type="button">Download CSV</button></div></div>
+      <div class="tbl" tabindex="0" role="region" aria-label="Breakdown" id="tbl-break"></div><p class="note" id="n-break"></p></section>
+    <section class="card" id="c-minis" aria-labelledby="t-minis"><h2 id="t-minis">Other ways to look at it</h2><div class="sub" id="s-minis"></div><div class="minis" id="minis"></div></section>
+    <details class="card how"><summary>How the drivers are calculated</summary><ul>
+      <li><b>Two periods are compared.</b> The change is split across the members of the breakdown, and the parts add up to the change exactly.</li>
+      <li><b>Mix:</b> the member's share of contacts changed. More contacts in a member that sits below average pulls the result down, even if nobody's performance changed.</li>
+      <li><b>Rate:</b> the member's own result changed, weighted by its average share of contacts in the two periods.</li>
+      <li><b>Volume</b> has no mix or rate, only each member's own change.</li>
+      <li><b>A driver is arithmetic, not proof of cause.</b> It shows where the change is concentrated. A different breakdown can tell a different part of the story.</li>
+      <li><b>Small samples</b> (below the metric's minimum in either period) are grouped as "Other (small samples)" in the waterfall, greyed in the table, and left out of the findings.</li>
+      <li><b>Site, team and agent</b> apply to handle time, first contact resolution, CSAT and NPS, because abandoned contacts never reach an agent. Agents can be combined with queue and reason, but not with customer filters.</li>
+      <li><b>Surveys</b> count in the month they were answered, as on the scorecard.</li>
+    </ul></details>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD } = Site, $ = (id) => document.getElementById(id), D = Drivers;
+  Site.renderChrome('drivers');
+  const PATHS = [['Channel', 'Queue', 'Reason group', 'Reason'], ['Site', 'Team', 'Agent'], ['Persona', 'Segment', 'Age band']];
+  const DIMS = PATHS.flat(), WORK = ['Site', 'Team', 'Agent'], CUST = PATHS[2], PL = { Channel: 'channels', Queue: 'queues', 'Reason group': 'reason groups', Reason: 'reasons', Site: 'sites', Team: 'teams', Agent: 'agents', Persona: 'personas', Segment: 'segments', 'Age band': 'age bands' };
+  const S = { month: null, cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} };
+  let IDX, KPIS, SECTIONS, EV, N = {}, META = {}, events = true, tblTrend = false, req = 0, cur = null;
+  const files = {}, carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
+  const K = () => KPIS.find((k) => k.id === S.metric), P = () => D.PARTS[S.metric], allowed = (d) => !WORK.includes(d) || !!P().agent;
+  const json = (u) => fetch(u, { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error(u + ': ' + r.status); return r.json(); });
+
+  Promise.all([json('data/dashboards/kpis.json'), json('data/dashboards/drivers/index.json'), json('data/dashboards/events.json')]).then(([k, i, e]) => {
+    KPIS = k.kpis.filter((q) => D.PARTS[q.id]); SECTIONS = k.sections; IDX = i; EV = e.events;
+    const by = (key) => Object.fromEntries((i.names[key] || []).map((x) => [x.id, x]));
+    META = { q: by('q'), c: by('c'), r: by('r'), t: by('t'), site: by('site'), p: by('p'), s: by('s'), a: by('a'), g: by('g') };
+    const none = 'Unidentified customer', noAgent = 'No agent';
+    // how each dimension reads its member name from a row
+    N = { Channel: (c, j) => META.c[META.q[c.q[j]].parent].name, Queue: (c, j) => META.q[c.q[j]].name, 'Reason group': (c, j) => META.r[c.r[j]].extra, Reason: (c, j) => META.r[c.r[j]].name,
+      Team: (c, j) => { const t = META.t[c.t ? c.t[j] : META.g[c.g[j]].parent]; return t ? t.name : noAgent; },
+      Site: (c, j) => { const t = META.t[c.t ? c.t[j] : META.g[c.g[j]].parent]; return t ? META.site[t.parent].name : noAgent; },
+      Agent: (c, j) => META.g[c.g[j]].name, Persona: (c, j) => (META.p[c.p[j]] || { name: none }).name, Segment: (c, j) => (META.s[c.s[j]] || { name: none }).name, 'Age band': (c, j) => (META.a[c.a[j]] || { name: none }).name };
+    $('f-month').innerHTML = i.months.slice(1).reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    $('f-metric').innerHTML = SECTIONS.map((s) => { const o = KPIS.filter((q) => q.section === s.id); return o.length ? `<optgroup label="${esc(s.name)}">${o.map((q) => `<option value="${q.id}">${esc(q.name)}</option>`).join('')}</optgroup>` : ''; }).join('');
+    const p = new URLSearchParams(location.search), months = i.months.slice(1);
+    S.month = [p.get('m'), carried(), months[months.length - 1]].find((m) => months.includes(m));
+    if (p.get('cmp') === 'year') S.cmp = 'year';
+    if (D.PARTS[p.get('metric')]) S.metric = p.get('metric');
+    if (DIMS.includes(p.get('by'))) S.by = p.get('by');
+    for (const d of DIMS) if (p.getAll(d).length) S.f[d] = p.getAll(d);
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.0`;
+    return update();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The explorer data could not be loaded. ' + e.message; }
+
+  // ---------- Data ----------
+  async function month(m, agent) {
+    const u = `data/dashboards/drivers/${agent ? 'agents/' : ''}${m}.json.gz`;
+    return (files[u] ??= (async () => {
+      const r = await fetch(u); if (!r.ok) throw new Error(u + ': ' + r.status);
+      const b = new Uint8Array(await r.arrayBuffer());
+      const text = b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b);
+      return JSON.parse(text).cols;
+    })().catch((e) => { delete files[u]; throw e; }));
+  }
+  const agentMode = () => S.by === 'Agent' || !!S.f.Agent;
+  function shift(m, by) { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + by, 1)).toISOString().slice(0, 7); }
+  const cmpMonth = () => shift(S.month, S.cmp === 'year' ? -12 : -1);
+  function split(cols, dim, skip) {   // parts by member of dim, with every filter except skip's
+    const tests = Object.entries(S.f).filter(([d]) => d !== skip).map(([d, v]) => { const set = new Set(v); return (j) => set.has(N[d](cols, j)); });
+    return D.group(cols, S.metric, tests, dim ? (j) => N[dim](cols, j) : () => 'All', (j) => META.q[cols.q[j]].parent);
+  }
+
+  // Make the filters valid for the metric and the data they need, and say what was removed
+  function tidy() {
+    const gone = [];
+    for (const d of Object.keys(S.f)) if (!allowed(d)) { gone.push(d); delete S.f[d]; }
+    if (!allowed(S.by)) S.by = 'Queue';
+    if (agentMode()) { for (const d of CUST) if (S.f[d]) { gone.push(d); delete S.f[d]; } if (CUST.includes(S.by)) S.by = 'Queue'; }
+    $('note').textContent = gone.length ? `The ${gone.map((d) => d.toLowerCase()).join(' and ')} filter was removed: ${gone.some((d) => CUST.includes(d)) ? 'agent results cannot be combined with customer filters' : `${K().short} cannot be split by site, team or agent, because abandoned contacts never reach one`}.` : '';
+  }
+  async function update() {
+    const r = ++req;
+    tidy(); controls(); writeUrl();
+    const ag = agentMode(), m = S.month, c = cmpMonth();
+    const hasCmp = IDX.months.includes(c);
+    const [now, was] = await Promise.all([month(m, ag), hasCmp ? month(c, ag) : null]);
+    if (r !== req) return;
+    $('loading').hidden = true; $('content').hidden = false;
+    cur = { now, was, ag, m, c, hasCmp, tot: D.decompose(split(now, null), was ? split(was, null) : new Map(), P().scale) };
+    // the breakdown keeps every member of its own dimension; the headline uses the filtered set
+    cur.by = was ? D.decompose(split(now, S.by, S.by), split(was, S.by, S.by), P().scale) : null;
+    cur.byF = !was ? null : S.f[S.by] ? D.decompose(split(now, S.by), split(was, S.by), P().scale) : cur.by;
+    renderHead(); renderWater(); renderBreak(); renderMinis();
+    const end = IDX.months.indexOf(m), list = IDX.months.slice(Math.max(0, end - 12), end + 1);
+    $('trend').setAttribute('aria-busy', 'true');
+    const cols = await Promise.all(list.map((x) => month(x, ag)));
+    if (r !== req) return;
+    cur.trend = list.map((x, i) => { const p = D.sum(split(cols[i], null)); return { m: x, v: D.value(p, P().scale), n: p.n }; });
+    $('trend').removeAttribute('aria-busy'); renderTrend();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#crumbs button')).catch(fail); };
+
+  // ---------- Text ----------
+  const V = (v, full) => fmt.value(v, K().format, full), unit = () => K().format;
+  const sign = (v) => (v > 0 ? '+' : v < 0 ? '−' : '');
+  // a contribution, in the KPI's unit. Two decimals for rates: many real drivers are under 0.1
+  function C(v) {
+    if (v == null) return '–';
+    const a = Math.abs(v), f = unit();
+    const s = f === 'count' ? fmt.count(a) : f === 'wait' || f === 'duration' ? a.toFixed(1) + ' s' : a.toFixed(2) + ' pts';
+    return (/[1-9]/.test(s) ? sign(v) : '') + s;
+  }
+  const lowRow = (r) => r.n1 < K().minN || r.n0 < K().minN;
+  const good = (d) => (K().better === 'none' || K().better === 'range' || !d ? 'neutral' : (d > 0) === (K().better === 'higher') ? 'better' : 'worse');
+  const slice = () => Object.entries(S.f).map(([, v]) => v.join(' or ')).join(' · ');
+  const cmpName = () => fmt.month(cur.c);
+  function eventsIn(m) { return EV.filter((e) => e.start <= m + '-31' && e.end >= m + '-01'); }
+
+  function renderHead() {
+    const t = cur.tot, k = K(), ch = cur.hasCmp ? fmt.change(t.R1, t.R0, k.format) : null, where = slice();
+    const small = t.n1 < k.minN || (cur.hasCmp && t.n0 < k.minN);
+    let title = `${k.name}${where ? ', ' + where : ''}: ${t.R1 == null ? 'no data' : V(t.R1) + ' in ' + fmt.month(cur.m)}`;
+    if (t.R1 != null && ch && !small) title = `${k.name}${where ? ' for ' + where : ''} ${ch.flat ? 'was unchanged at' : (ch.delta > 0 ? 'rose ' : 'fell ') + ch.text.replace(/^[+−]/, '') + ' to'} ${V(t.R1)} in ${fmt.month(cur.m)}`;
+    $('t-head').textContent = title;
+    $('s-head').textContent = `${k.short}, monthly · compared with ${cmpName()}${k.target == null || where ? '' : ' · target ' + k.targetLabel}${small ? ` · small sample: n = ${fmt.count(t.n1)} and ${fmt.count(t.n0)}, below ${k.minN}` : ''}`;
+    $('s-head').append(Site.infoButton(k));
+    const st = small ? 'none' : statusOf(k, t.R1), q = ch ? (ch.flat ? 'flat' : good(ch.delta)) : 'neutral';
+    const bf = cur.byF, mix = bf ? bf.rows.reduce((s, r) => s + r.mix, 0) : null, rate = bf ? bf.rows.reduce((s, r) => s + r.rate, 0) : null;
+    $('kpi').innerHTML = `<span class="v">${V(t.R1)}</span>${k.target == null ? '' : `<span class="status ${st}">${small ? 'Too few to rate' : STATUS_WORD[st]}</span>`}
+      <span class="chg ${small ? 'neutral' : q}">${!ch ? 'No earlier month to compare' : ch.flat ? 'No change vs ' + cmpName() : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text} vs ${cmpName()}${!small && Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}`}</span>
+      ${cur.hasCmp && P().scale != null && bf && bf.change != null ? `<span class="p">By ${esc(S.by.toLowerCase())}: mix ${C(mix)} · rate ${C(rate)}</span>` : ''}`;
+    $('so').innerHTML = soWhat(small);
+  }
+  // Largest driver in the direction of the change, only when it is a real share of it
+  function soWhat(small) {
+    const d = cur.byF; if (small || !d || !d.change) return '';
+    const rows = d.rows.filter((r) => !lowRow(r) && Math.sign(r.total) === Math.sign(d.change)).sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+    if (d.rows.length < 2 || !rows.length || fmt.change(d.R1, d.R0, unit())?.flat) return '';
+    const r = rows[0]; if (Math.abs(r.total) < Math.abs(d.change) * .2) return '';
+    const kind = P().scale == null ? '' : Math.abs(r.rate) >= 2 * Math.abs(r.mix) ? ', mostly from its own rate' : Math.abs(r.mix) >= 2 * Math.abs(r.rate) ? ', mostly from a change in its share' : '';
+    const ev = eventsIn(cur.m).filter((e) => e.span === 'Period' || e.kind !== 'Feature');
+    return `<b>Largest ${esc(S.by.toLowerCase())}:</b> ${esc(r.key)}, ${C(r.total)} toward a net change of ${C(d.change)}${kind}${ev.length ? `; coincides with ${ev.map((e) => esc(e.name)).join(' and ')}` : ''}.`;
+  }
+
+  // ---------- Controls ----------
+  function options(dim) {   // members of a dimension, in their natural order
+    const u = (a) => [...new Set(a)];
+    const o = { Channel: () => Object.values(META.c).map((x) => x.name), Queue: () => Object.values(META.q).map((x) => x.name), 'Reason group': () => u(Object.values(META.r).map((x) => x.extra)).sort(), Reason: () => Object.values(META.r).map((x) => x.name).sort(),
+      Site: () => Object.values(META.site).map((x) => x.name), Team: () => Object.values(META.t).map((x) => x.name).sort(), Agent: () => Object.values(META.g).map((x) => x.name).sort(),
+      Persona: () => Object.values(META.p).map((x) => x.name).sort(), Segment: () => Object.values(META.s).map((x) => x.name).sort(), 'Age band': () => Object.values(META.a).map((x) => x.name) }[dim]();
+    return CUST.includes(dim) ? [...o, 'Unidentified customer'] : o;
+  }
+  function controls() {
+    $('f-month').value = S.month; $('f-cmp').value = S.cmp; $('f-metric').value = S.metric;
+    const okBy = DIMS.filter(allowed);
+    $('f-by').innerHTML = PATHS.map((p, i) => { const o = p.filter((d) => okBy.includes(d)); return o.length ? `<optgroup label="${['Contact', 'Workforce', 'Customer'][i]}">${o.map((d) => `<option>${d}</option>`).join('')}</optgroup>` : ''; }).join('');
+    $('f-by').value = S.by;
+    $('f-dims').innerHTML = okBy.map((d) => `<label class="filter">${d}<select data-d="${d}"><option value="">All</option>${S.f[d] && S.f[d].length > 1 ? `<option value="*" selected>${S.f[d].length} selected</option>` : ''}${options(d).map((n) => `<option${S.f[d] && S.f[d].length === 1 && S.f[d][0] === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`).join('');
+    const path = PATHS.find((p) => p.includes(S.by)), done = path.filter((d) => S.f[d]);
+    $('crumbs').innerHTML = `<button type="button" data-up="">All contacts</button>` + done.map((d) => `<span aria-hidden="true">›</span><button type="button" data-up="${d}">${esc(S.f[d].join(' or '))}</button>`).join('') + `<span aria-hidden="true">›</span><b aria-current="location">By ${S.by.toLowerCase()}</b>`;
+    const ch = Object.entries(S.f).flatMap(([d, v]) => v.map((x) => [d, x]));
+    $('chips').innerHTML = ch.map(([d, x]) => `<button type="button" class="chip" data-d="${d}" data-v="${esc(x)}" aria-label="Remove ${esc(d)} ${esc(x)}">${esc(d)}: ${esc(x)} ×</button>`).join('');
+  }
+  function writeUrl() {
+    const p = new URLSearchParams(), last = IDX.months[IDX.months.length - 1];
+    if (S.month !== last || carried()) p.set('m', S.month);
+    if (S.cmp !== 'prior') p.set('cmp', S.cmp);
+    if (S.metric !== 'sl_phone') p.set('metric', S.metric);
+    if (S.by !== 'Queue') p.set('by', S.by);
+    for (const [d, v] of Object.entries(S.f)) v.forEach((x) => p.append(d, x));
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+  // click filters; Ctrl or Cmd + click adds; clicking a selected member clears it
+  function toggle(d, v, add) {
+    const f = S.f[d] || [];
+    const next = f.includes(v) ? (add ? f.filter((x) => x !== v) : f.length > 1 ? [v] : []) : add ? [...f, v] : [v];
+    if (next.length) S.f[d] = next; else delete S.f[d];
+    go();
+  }
+  function nextLevel(d, v) {
+    const path = PATHS.find((p) => p.includes(d)); let i = path.indexOf(d) + 1;
+    while (i < path.length && S.f[path[i]]) i++;
+    return path[i] && allowed(path[i]) ? path[i] : null;
+  }
+  function drill(d, v) { const n = nextLevel(d, v); if (!n) return; S.f[d] = [v]; S.by = n; go(); $('t-head').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
+
+  // ---------- Charts ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function tick(v) {
+    switch (unit()) { case 'pct': return +v.toFixed(1) + '%'; case 'nps': return sign(v) + Math.abs(+v.toFixed(1)); case 'wait': case 'duration': return V(v); case 'count': return fmt.shortNum(v); default: return String(+v.toFixed(1)); }
+  }
+  function ticks(a, b, n) { const raw = (b - a) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  function tipOn(node, html, click) {
+    const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.right, ev.clientY ?? b.top); };
+    node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
+    if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
+  }
+  function renderTrend() {
+    const pts = cur.trend, k = K(), host = $('trend');
+    host.hidden = $('lg-trend').hidden = tblTrend; $('tbl-trend').hidden = $('csv-trend').hidden = !tblTrend;
+    $('tb-trend').textContent = tblTrend ? 'View as chart' : 'View as table'; $('tb-trend').setAttribute('aria-pressed', tblTrend);
+    if (tblTrend) { $('tbl-trend').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.short)}</th><th scope="col">Sample (n)</th></tr></thead><tbody>${pts.slice().reverse().map((p) => `<tr><td>${fmt.month(p.m)}</td><td class="${p.n < k.minN ? 'low' : ''}">${V(p.v, true)}</td><td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; const W = host.clientWidth || 800, narrow = W < 560, H = 260, m = { t: 44, r: narrow ? 10 : 92, b: 26, l: 58 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / pts.length;
+    const ok = pts.filter((p) => p.v != null); if (!ok.length) { host.textContent = 'No data for these filters.'; return; }
+    const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch);
+    let a = Math.min(...ok.map((p) => p.v), ...tg, ...wb), b = Math.max(...ok.map((p) => p.v), ...tg, ...wb); const pad = (b - a || 1) * .1; a -= pad; b += pad;
+    const x = (i) => m.l + step * (i + .5), y = (v) => m.t + (b - v) / (b - a) * ih;
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(cur.m)}. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(a, b, 4)) { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, g); text(ax, m.l - 8, y(t) + 4, tick(t), '', 'end'); }
+    let last = Infinity; for (let i = pts.length - 1; i >= 0; i--) { const lab = i === 0 || pts[i].m.endsWith('-01') ? fmt.month(pts[i].m).replace(' 20', " '") : fmt.monthShort(pts[i].m); if (last - x(i) < 34 + (lab.length > 3 ? 16 : 0)) continue; text(ax, x(i), H - 6, lab, '', 'middle'); last = x(i); }
+    const xd = (iso) => { const i = pts.findIndex((p) => p.m === iso.slice(0, 7)); const dd = +iso.slice(8), [yy, mo] = iso.split('-').map(Number); return i < 0 ? (iso < pts[0].m ? m.l : m.l + iw) : m.l + step * (i + (dd - 1) / new Date(Date.UTC(yy, mo, 0)).getUTCDate()); };
+    const marks = [];
+    if (events) { let num = 0, lx = -99, row = 0; for (const e of EV.filter((q) => q.end >= pts[0].m + '-01' && q.start <= cur.m + '-31')) { const ea = xd(e.start), eb = xd(e.end); num++; if (e.span === 'Period') el('rect', { class: 'd-evband', x: ea, y: m.t, width: Math.max(3, eb - ea), height: ih }, s); else el('line', { class: 'd-evline', x1: ea, x2: ea, y1: m.t, y2: m.t + ih }, s); row = ea - lx < 18 ? 1 - row : 0; lx = ea; marks.push([e, num, ea, m.t - 12 - row * 17]); } }
+    if (tg.length) (k.better === 'range' ? [[k.watch[0], k.target[0]], [k.target[1], k.watch[1]]] : [[k.watch, k.target]]).forEach(([p, q]) => el('rect', { class: 'd-watch', x: m.l, width: iw, y: y(Math.max(p, q)), height: Math.abs(y(p) - y(q)) }, s));
+    for (const t of tg) { el('line', { class: 'd-target', x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, s); if (!narrow) text(s, m.l + iw + 8, y(t) + 4, 'Target ' + tick(t), 't'); }
+    el('rect', { class: 'd-sel', x: m.l + step * (pts.length - 1), y: m.t, width: step, height: ih }, s);
+    let d = '', pen = false; pts.forEach((p, i) => { if (p.v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(p.v).toFixed(1); pen = true; }); el('path', { class: 'd-line', d }, s);
+    pts.forEach((p, i) => {
+      if (p.v != null) el('circle', { class: p.n < k.minN ? 'd-low' : p.m === cur.c ? 'd-cmp' : 'd-pt', cx: x(i), cy: y(p.v), r: p.m === cur.m ? 6 : p.m === cur.c ? 5 : 4 }, s);
+      const can = IDX.months.indexOf(p.m) > 0;
+      const h = el('rect', { class: 'hit', x: m.l + step * i, y: m.t, width: step, height: ih, tabindex: 0, 'data-k': 't|' + p.m, role: 'button', 'aria-label': `${fmt.month(p.m)}: ${V(p.v)}. Show this month` }, s);
+      tipOn(h, () => `<b>${fmt.month(p.m)}</b>${p.m === cur.c ? ' · comparison' : ''}<br>${esc(k.short)}: <b>${V(p.v, true)}</b><br>n = ${fmt.count(p.n)}${p.n < k.minN ? ', below ' + k.minN : ''}${eventsIn(p.m).length ? `<br><span class="muted">Events: ${eventsIn(p.m).map((e) => esc(e.name)).join(', ')}</span>` : ''}`, can ? () => { S.month = p.m; carried(p.m); go(); } : null);
+    });
+    for (const [e, num, ex, ey] of marks) { const q = el('g', { class: 'd-ev', transform: `translate(${ex},${ey})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, num); tipOn(q, () => `<b>${num}. ${esc(e.name)}</b><br>${e.start === e.end ? fmt.date(e.start) : fmt.date(e.start) + ' – ' + fmt.date(e.end)}<br><span class="muted">${esc(e.description)}</span>`); }
+    const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`;
+    $('lg-trend').innerHTML = [[`<line class="d-line" x2="20" y1="7" y2="7"/>`, k.short], ['<circle class="d-pt" cx="10" cy="7" r="6"/>', fmt.month(cur.m)], ...(pts.some((p) => p.m === cur.c) ? [['<circle class="d-cmp" cx="10" cy="7" r="5"/>', 'Comparison']] : []), ...(tg.length ? [['<line class="d-target" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="d-watch" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : [])].map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
+  }
+
+  function renderWater() {
+    const d = cur.by, k = K(), host = $('water'); host.innerHTML = ''; $('lg-water').innerHTML = ''; $('l-water').textContent = '';
+    $('t-water').textContent = d && d.change != null && !fmt.change(d.R1, d.R0, unit()).flat ? waterTitle(d) : `Change in ${k.name.charAt(0).toLowerCase() + k.name.slice(1)} by ${S.by.toLowerCase()}`;
+    $('s-water').textContent = `${k.short}, ${cmpName()} to ${fmt.month(cur.m)}, by ${S.by.toLowerCase()}`;
+    if (!d || d.change == null) { host.textContent = 'There is no earlier month with data to compare.'; return; }
+    const big = d.rows.filter((r) => !lowRow(r)).sort((a, b) => Math.abs(b.total) - Math.abs(a.total)), small = d.rows.filter(lowRow), top = big.slice(0, 8), rest = big.slice(8);
+    const steps = top.map((r) => ({ name: r.key, v: r.total, r }));
+    if (rest.length) steps.push({ name: `Other ${PL[S.by]} (${rest.length})`, v: rest.reduce((s, r) => s + r.total, 0) });
+    if (small.length) steps.push({ name: 'Other (small samples)', v: small.reduce((s, r) => s + r.total, 0) });
+    const W = host.clientWidth || 800, narrow = W < 560, rowH = 30, n = steps.length + 2, H = n * rowH + 8, lw = narrow ? 120 : 250, vw = narrow ? 84 : 130, iw = W - lw - vw;
+    let acc = d.R0, lo = Math.min(d.R0, d.R1), hi = Math.max(d.R0, d.R1); for (const q of steps) { q.a = acc; acc += q.v; q.b = acc; lo = Math.min(lo, acc); hi = Math.max(hi, acc); }
+    const pad = (hi - lo || 1) * .06; lo -= pad; hi += pad; const x = (v) => lw + (v - lo) / (hi - lo) * iw;
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `From ${V(d.R0)} to ${V(d.R1)}. The breakdown table below lists each part.` }, host);
+    const label = (name, i) => text(s, lw - 10, 4 + i * rowH + 19, name.length > (narrow ? 17 : 36) ? name.slice(0, narrow ? 16 : 35) + '…' : name, 't', 'end');
+    // the two totals are points on the axis, not bars: a bar that doesn't start at zero would mislead
+    const end = (name, v, i) => { label(name, i); el('circle', { class: 'w-end', cx: x(v), cy: 4 + i * rowH + 15, r: 6 }, s); text(s, W - vw + 10, 4 + i * rowH + 19, V(v), 't s'); };
+    end(fmt.month(cur.c), d.R0, 0);
+    steps.forEach((q, j) => {
+      const i = j + 1, yy = 4 + i * rowH, fade = S.f[S.by] && !S.f[S.by].includes(q.name);
+      const g = el('g', fade ? { class: 'row-f' } : {}, s);
+      label(q.name, i); el('line', { class: 'w-link', x1: x(q.a), x2: x(q.a), y1: yy - 8, y2: yy + 6 }, g);
+      el('rect', { class: q.v >= 0 ? 'w-up' : 'w-down', x: Math.min(x(q.a), x(q.b)), y: yy + 6, width: Math.max(1.5, Math.abs(x(q.b) - x(q.a))), height: rowH - 12, rx: 2 }, g);
+      text(g, W - vw + 10, yy + 19, C(q.v), 't s');
+      const h = el('rect', { class: 'hit', x: 0, y: yy, width: W, height: rowH, ...(q.r ? { tabindex: 0, 'data-k': 'w|' + q.name, role: 'button', 'aria-label': `${q.name}: ${C(q.v)}. Filter to this ${S.by.toLowerCase()}` } : {}) }, s);
+      if (!q.r) h.style.cursor = 'default';
+      tipOn(h, () => q.r ? rowTip(q.r) : `<b>${esc(q.name)}</b><br>Contribution: <b>${C(q.v)}</b>`, q.r ? (e) => toggle(S.by, q.name, e.ctrlKey || e.metaKey) : null);
+    });
+    end(fmt.month(cur.m), d.R1, n - 1); el('line', { class: 'w-link', x1: x(d.R1), x2: x(d.R1), y1: 4 + (n - 1) * rowH - 8, y2: 4 + (n - 1) * rowH + 9 }, s);
+    $('lg-water').innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><rect class="w-up" y="2" width="20" height="10"/></svg>Raised the result (+)</span><span><svg width="20" height="14" aria-hidden="true"><rect class="w-down" y="2" width="20" height="10"/></svg>Lowered the result (−)</span><span><svg width="20" height="14" aria-hidden="true"><circle class="w-end" cx="10" cy="7" r="6"/></svg>Result for the month</span><span>Scale starts at ${V(lo)}</span>`;
+    if (S.f[S.by]) $('l-water').textContent = `Showing every ${S.by.toLowerCase()} so the selection can be compared; the headline above is filtered.`;
+  }
+  function waterTitle(d) {
+    const big = d.rows.filter((r) => !lowRow(r)).sort((a, b) => Math.abs(b.total) - Math.abs(a.total)), same = big.filter((r) => Math.sign(r.total) === Math.sign(d.change)), against = big.filter((r) => Math.sign(r.total) === -Math.sign(d.change));
+    if (!same.length) return `Change in ${K().name.charAt(0).toLowerCase() + K().name.slice(1)} by ${S.by.toLowerCase()}`;
+    return `${same[0].key} contributed ${C(same[0].total)} to a net change of ${C(d.change)} in ${fmt.month(cur.m)}${against.length && Math.abs(against[0].total) >= Math.abs(d.change) * .2 ? `, offset by ${against[0].key} (${C(against[0].total)})` : ''}`;
+  }
+  function rowTip(r) {
+    const k = K();
+    return `<b>${esc(r.key)}</b><br>${fmt.month(cur.m)}: <b>${V(r.v1, true)}</b> (n = ${fmt.count(r.n1)})<br>${cmpName()}: ${V(r.v0, true)} (n = ${fmt.count(r.n0)})<br>Contribution: <b>${C(r.total)}</b>${P().scale == null ? '' : `<br>Mix ${C(r.mix)} · rate ${C(r.rate)}`}${lowRow(r) ? `<br>Below the minimum sample of ${k.minN}` : ''}<br><span class="muted">Click to filter; Ctrl + click adds</span>`;
+  }
+
+  function renderBreak() {
+    const d = cur.by, k = K(), dim = S.by;
+    $('t-break').textContent = `${k.name} by ${dim.toLowerCase()}, ${fmt.month(cur.m)} vs ${cmpName()}`;
+    $('s-break').textContent = 'Largest contribution first. Click a name to filter every chart; Drill down goes to the next level.';
+    if (!d) { $('tbl-break').innerHTML = ''; return; }
+    const rows = d.rows.slice().sort((a, b) => lowRow(a) - lowRow(b) || Math.abs(b.total) - Math.abs(a.total)), sel = S.f[dim], ratio = P().scale != null;
+    $('tbl-break').innerHTML = `<table><thead><tr><th scope="col">${dim}</th><th scope="col">${fmt.month(cur.m)}</th><th scope="col">${cmpName()}</th><th scope="col">Share now</th><th scope="col">Share before</th>${ratio ? '<th scope="col">Mix</th><th scope="col">Rate</th>' : ''}<th scope="col">Contribution</th><th scope="col">Sample (n)</th><th scope="col"><span class="sr-only">Drill down</span></th></tr></thead><tbody>` +
+      rows.map((r, i) => { const low = lowRow(r), n = nextLevel(dim, r.key), st = low ? 'none' : statusOf(k, r.v1), ic = low || k.target == null ? '' : ' ' + { good: '✓', watch: '!', off: '✕' }[st];
+        const sup = dim === 'Team' ? (Object.values(META.t).find((t) => t.name === r.key) || {}).extra : null;
+        return `<tr class="${sel ? (sel.includes(r.key) ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="b|${esc(r.key)}" data-i="${i}" aria-pressed="${!!(sel && sel.includes(r.key))}">${esc(r.key)}</button>${sup ? `<div class="muted">Supervisor: ${esc(sup)}</div>` : ''}</td>
+        <td class="${low ? 'low' : ''}">${V(r.v1, true)}${ic ? `<span aria-hidden="true">${ic}</span><span class="sr-only"> ${STATUS_WORD[st]}</span>` : ''}${low ? ' (too few)' : ''}</td><td class="${low ? 'low' : ''}">${V(r.v0, true)}</td><td>${(r.s1 * 100).toFixed(1)}%</td><td>${(r.s0 * 100).toFixed(1)}%</td>${ratio ? `<td>${C(r.mix)}</td><td>${C(r.rate)}</td>` : ''}<td><b>${C(r.total)}</b></td><td>${fmt.count(r.n1)}</td><td>${n ? `<button type="button" class="drill" data-drill="${i}" aria-label="Drill down into ${esc(r.key)} by ${n.toLowerCase()}">Drill down ▸</button>` : ''}</td></tr>`; }).join('') +
+      `</tbody></table>`;
+    cur.rows = rows;
+    const skipAgent = ['Team', 'Site'].includes(dim) && CUST.some((c) => S.f[c]);
+    $('n-break').textContent = `Contributions add up to ${C(d.change)}. ${ratio ? 'Shares are of the contacts this metric counts. ' : ''}${skipAgent ? 'Drilling to agents removes customer filters.' : ''}`;
+  }
+
+  function renderMinis() {
+    const ag = cur.ag, want = ['Queue', 'Reason group', 'Team', 'Persona', 'Segment', 'Channel', 'Age band'].filter((d) => d !== S.by && allowed(d) && !(ag && CUST.includes(d)) && !(d === 'Channel' && P().ch && P().ch.length < 2)).slice(0, 4), k = K();
+    $('s-minis').textContent = `${k.short}, ${fmt.month(cur.m)}${cur.hasCmp ? `; the dark tick marks ${cmpName()}` : ''}. Largest by contacts first. Click a bar to filter.`;
+    const host = $('minis'); host.innerHTML = '';
+    const boxes = want.map(() => { const b = document.createElement('div'); b.className = 'mini'; host.append(b); return b; });   // all placed first, so widths are final
+    want.forEach((dim, w) => {
+      const now = split(cur.now, dim, dim), was = cur.was ? split(cur.was, dim, dim) : new Map();
+      const rows = [...now].map(([key, p]) => ({ key, p, v: D.value(p, P().scale), w: D.value(was.get(key), P().scale), low: p.n < k.minN })).filter((r) => r.v != null).sort((a, b) => b.p.n - a.p.n).slice(0, 8);
+      const box = boxes[w]; box.innerHTML = `<h3>${esc(k.short)} by ${dim.toLowerCase()}</h3><div class="chart"></div>`;
+      if (!rows.length) { box.lastChild.textContent = 'No data for these filters.'; return; }
+      const ch = box.lastChild, W = ch.clientWidth, rowH = 26, H = rows.length * rowH + 4, lw = Math.min(150, W * .4), vw = 74, vals = rows.flatMap((r) => [r.v, r.w ?? r.v]), lo = Math.min(0, ...vals), hi = Math.max(0, ...vals) || 1, x = (v) => lw + (v - lo) / (hi - lo || 1) * (W - lw - vw);
+      const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.short} by ${dim}` }, ch), sel = S.f[dim];
+      rows.forEach((r, i) => {
+        const yy = 2 + i * rowH, g = el('g', sel && !sel.includes(r.key) ? { class: 'row-f' } : {}, s), nm = r.key.length > 22 ? r.key.slice(0, 21) + '…' : r.key;
+        text(g, lw - 8, yy + 17, nm, 't', 'end'); el('rect', { class: 'bar' + (r.low ? ' low' : ''), x: Math.min(x(0), x(r.v)), y: yy + 6, width: Math.max(1, Math.abs(x(r.v) - x(0))), height: rowH - 12, rx: 2 }, g);
+        if (r.w != null) el('line', { class: 'tick0', x1: x(r.w), x2: x(r.w), y1: yy + 3, y2: yy + rowH - 3 }, g);
+        text(g, W - vw + 8, yy + 17, r.low ? 'n<' + k.minN : V(r.v), r.low ? 't m' : 't s');
+        const h = el('rect', { class: 'hit', x: 0, y: yy, width: W, height: rowH, tabindex: 0, 'data-k': 'm|' + dim + '|' + r.key, role: 'button', 'aria-pressed': !!(sel && sel.includes(r.key)), 'aria-label': `${r.key}: ${V(r.v)}. Filter to this ${dim.toLowerCase()}` }, s);
+        tipOn(h, () => `<b>${esc(r.key)}</b><br>${fmt.month(cur.m)}: <b>${V(r.v, true)}</b> (n = ${fmt.count(r.p.n)})${r.w != null ? `<br>${cmpName()}: ${V(r.w, true)}` : ''}${r.low ? `<br>Below the minimum sample of ${k.minN}` : ''}<br><span class="muted">Click to filter; Ctrl + click adds</span>`, (e) => toggle(dim, r.key, e.ctrlKey || e.metaKey));
+      });
+    });
+  }
+
+  // ---------- Events ----------
+  $('f-month').addEventListener('change', (e) => { S.month = e.target.value; carried(S.month); go(); });
+  $('f-cmp').addEventListener('change', (e) => { S.cmp = e.target.value; go(); });
+  $('f-metric').addEventListener('change', (e) => { S.metric = e.target.value; go(); });
+  $('f-by').addEventListener('change', (e) => { S.by = e.target.value; go(); });
+  $('f-dims').addEventListener('change', (e) => { const d = e.target.dataset.d, v = e.target.value; if (v === '*') return; if (v) S.f[d] = [v]; else delete S.f[d]; go(); });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const l = S.f[b.dataset.d].filter((x) => x !== b.dataset.v); if (l.length) S.f[b.dataset.d] = l; else delete S.f[b.dataset.d]; go(); });
+  $('crumbs').addEventListener('click', (e) => {   // going up clears the levels below and breaks down by the next one
+    const b = e.target.closest('[data-up]'); if (!b) return;
+    const path = PATHS.find((p) => p.includes(S.by)), i = path.indexOf(b.dataset.up);
+    path.slice(i + 1).forEach((d) => delete S.f[d]);
+    if (i < 0) { S.by = path.find((d) => d !== 'Channel' || !(P().ch && P().ch.length < 2)); if (S.by === undefined) S.by = path[0]; } else S.by = path[i + 1] || path[i];
+    go();
+  });
+  $('tbl-break').addEventListener('click', (e) => { const n = e.target.closest('[data-i]'), dr = e.target.closest('[data-drill]'); if (n) toggle(S.by, cur.rows[+n.dataset.i].key, e.ctrlKey || e.metaKey); if (dr) drill(S.by, cur.rows[+dr.dataset.drill].key); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} }); carried(null); events = $('t-events').checked = true; go(); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
+  $('tb-trend').addEventListener('click', () => { tblTrend = !tblTrend; if (cur && cur.trend) renderTrend(); });
+  const more = document.querySelector('.more');
+  document.addEventListener('click', (e) => { if (!more.contains(e.target) && document.contains(e.target)) more.open = false; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } });
+  const about = (w) => `Performance driver explorer · ${K().name} · ${w} · filters: ${Object.entries(S.f).map(([d, v]) => d + '=' + v.join(' or ')).join('; ') || 'none'} · data through ${IDX.data_through}`;
+  $('csv-trend').addEventListener('click', () => Site.downloadCsv('performance-drivers_' + S.metric + '_trend', IDX.data_through, about('monthly'), ['month', S.metric, 'n'], cur.trend.slice().reverse().map((p) => [p.m, p.v, p.n])));
+  $('csv-break').addEventListener('click', () => Site.downloadCsv('performance-drivers_' + S.metric + '_by-' + S.by.toLowerCase().replace(/ /g, '-'), IDX.data_through, about(`${cur.m} vs ${cur.c} by ${S.by}`), [S.by, cur.m, cur.c, 'share_now', 'share_before', 'mix', 'rate', 'contribution', 'n_now', 'n_before'], (cur.rows || []).map((r) => [r.key, r.v1, r.v0, r.s1, r.s0, r.mix, r.rate, r.total, r.n1, r.n0])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (cur) { renderWater(); renderMinis(); if (cur.trend) renderTrend(); } }, 150); });
+})();
+</script>
+</body>
+</html>

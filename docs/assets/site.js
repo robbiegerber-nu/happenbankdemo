@@ -11,7 +11,7 @@
     { group: 'Overview', items: [{ name: 'Executive scorecard', href: 'executive.html', id: 'executive' }] },
     { group: 'Operations', items: [
       { name: 'Service & access', href: null }, { name: 'Workforce management', href: null }, { name: 'Agent & team coaching', href: null }] },
-    { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: null }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
+    { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
       { name: 'Customer experience', href: null }, { name: 'Customer & persona insights', href: null },
       { name: 'Product launch impact', href: null }, { name: 'Self-service & channel shift', href: null }] },
@@ -138,6 +138,8 @@
     return 'neutral';
   }
 
+  const QUALITY_WORD = { better: 'better', worse: 'worse' };
+
   // ---------- Header, disclaimer, footer ----------
   function el(tag, attrs, html) {
     const e = document.createElement(tag);
@@ -166,7 +168,10 @@
         </div></div>`;
     const disc = el('div', { class: 'disclaimer', role: 'note' }, `<div class="wrap"><b>Demonstration only.</b> ${esc(DISCLAIMER.replace('Demonstration only. ', ''))}</div>`);
     const strip = el('div', { class: 'gradient-strip', 'aria-hidden': 'true' });
-    document.body.prepend(header, disc, strip);
+    const skip = el('a', { class: 'skip', href: '#main' }, 'Skip to content');
+    document.body.prepend(skip, header, disc, strip);
+    const main = document.getElementById('main');
+    if (main) { main.setAttribute('tabindex', '-1'); skip.addEventListener('click', (e) => { e.preventDefault(); main.focus(); main.scrollIntoView(); }); }
 
     const footer = el('footer', { class: 'site-footer' }, `<div class="wrap">
       <div><b>Demonstration only.</b> ${esc(DISCLAIMER.replace('Demonstration only. ', ''))}</div>
@@ -184,7 +189,7 @@
     const dets = [...header.querySelectorAll('details')];
     dets.forEach((d) => d.addEventListener('toggle', () => { if (d.open) dets.forEach((o) => { if (o !== d) o.open = false; }); }));
     document.addEventListener('click', (e) => { if (!header.contains(e.target)) dets.forEach((d) => (d.open = false)); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dets.forEach((d) => (d.open = false)); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dets.forEach((d) => { if (d.open) { const inside = d.contains(document.activeElement); d.open = false; if (inside) d.querySelector('summary').focus(); } }); });
 
     loadFreshness();
   }
@@ -232,16 +237,36 @@
       b.setAttribute('aria-expanded', 'true');
       openPop = { pop, btn: b };
       pop.addEventListener('click', (ev) => ev.stopPropagation());
+      // move into the popover so its link is the next Tab stop; tabbing out closes it and returns to the button
+      pop.tabIndex = -1; pop.focus({ preventScroll: true });
+      pop.addEventListener('focusout', (ev) => { if (openPop && openPop.pop === pop && ev.relatedTarget && !pop.contains(ev.relatedTarget)) closePopover(); });
     });
     return b;
   }
   document.addEventListener('click', () => { if (openPop) { openPop.pop.remove(); openPop.btn.setAttribute('aria-expanded', 'false'); openPop = null; } });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopover(); });
 
+  // ---------- Focus across redraws ----------
+  // Elements carry data-k; after a redraw the same element gets focus back, or a fallback if it is gone.
+  function focusKey() { const a = document.activeElement; return a && a.closest('#main') && a !== document.getElementById('main') ? a.dataset.k || (a.id ? '#' + a.id : 'gone') : null; }
+  function restoreFocus(key, fallback) {
+    if (!key || (document.activeElement && document.activeElement !== document.body)) return;
+    const e = key[0] === '#' ? document.getElementById(key.slice(1)) : [...document.querySelectorAll('[data-k]')].find((x) => x.dataset.k === key);
+    const t = e || (fallback && document.querySelector(fallback));
+    if (t) t.focus({ preventScroll: true });
+  }
+
   // ---------- Tooltip ----------
-  let tip = null;
+  // stays while the pointer is over it, and Esc dismisses it
+  let tip = null, tipTimer = 0;
   function showTip(html, x, y) {
-    if (!tip) { tip = el('div', { class: 'tooltip', role: 'tooltip' }); document.body.append(tip); }
+    clearTimeout(tipTimer);
+    if (!tip) {
+      tip = el('div', { class: 'tooltip', role: 'tooltip' }); document.body.append(tip);
+      tip.addEventListener('mouseenter', () => clearTimeout(tipTimer));
+      tip.addEventListener('mouseleave', hideTip);
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') tip.style.display = 'none'; });
+    }
     tip.innerHTML = html; tip.style.display = 'block';
     const w = tip.offsetWidth, h = tip.offsetHeight, vw = document.documentElement.clientWidth;
     let left = x + 14, top = y - h - 12;
@@ -249,7 +274,7 @@
     if (top < 8) top = y + 16;
     tip.style.left = Math.max(8, left) + 'px'; tip.style.top = top + 'px';
   }
-  function hideTip() { if (tip) tip.style.display = 'none'; }
+  function hideTip() { clearTimeout(tipTimer); tipTimer = setTimeout(() => { if (tip) tip.style.display = 'none'; }, 150); }
 
   // ---------- CSV and links (Style Guide: Export and sharing) ----------
   function downloadCsv(name, through, filters, header, rows) {
@@ -265,5 +290,5 @@
     else done('Copy failed');
   }
 
-  window.Site = { downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  window.Site = { focusKey, restoreFocus, QUALITY_WORD, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

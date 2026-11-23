@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.1">
-<script src="assets/site.js?v=1.2"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.2">
+<script src="assets/site.js?v=1.5"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -38,7 +38,7 @@
   .tile.off   { background: linear-gradient(to bottom, color-mix(in srgb, var(--off-wash) calc(var(--wash-op) * 50%), var(--surface)), var(--surface) 60%); }
   .tile-top { display: flex; align-items: flex-start; gap: 6px; }
   .tile-select {
-    all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); line-height: 1.3; flex: 1; min-width: 0;
+    all: unset; cursor: pointer; min-height: 24px; font-weight: 600; font-size: 14px; color: var(--text-primary); line-height: 1.3; flex: 1; min-width: 0;
   }
   .tile-select:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
   .tile-value { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -154,7 +154,7 @@
           <button class="btn" id="t-table" type="button" aria-pressed="false">View as table</button>
         </div>
       </div>
-      <div class="chart" id="trend"></div>
+      <div class="chart" id="trend"></div><div class="sr-only" id="trend-live" aria-live="polite"></div>
       <div class="legend" id="trend-legend"></div>
       <div id="trend-table" class="hidden"></div>
       <div class="drivers" id="drivers"></div>
@@ -351,15 +351,15 @@
     const qWord = { better: 'better', worse: 'worse', flat: 'no change', neutral: 'neutral' }[q];
     const sw = soWhat(kpi, m);
     t.innerHTML = `
-      <div class="tile-top"><button class="tile-select" type="button" aria-pressed="${state.kpi === kpi.id}">${esc(kpi.name)}</button></div>
+      <div class="tile-top"><button class="tile-select" type="button" data-k="${kpi.id}" aria-pressed="${state.kpi === kpi.id}">${esc(kpi.name)}</button></div>
       <div class="tile-value"><span class="v">${fmt.value(v, kpi.format)}</span><span class="status ${st}">${STATUS_WORD[st]}</span></div>
       <div class="tile-meta"><span>${kpi.target == null ? '' : 'Target ' + esc(kpi.targetLabel)}</span>
-        <span class="chg ${chg ? q : 'neutral'}" title="${chg ? 'Change: ' + qWord : ''}">${chgText}<span class="sr-only"> (${qWord})</span></span></div>
+        <span class="chg ${chg ? q : 'neutral'}" title="${chg ? 'Change: ' + qWord : ''}">${chgText}${Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span></div>
       <svg class="spark" aria-hidden="true"></svg>
       <div class="finding">${esc(finding(kpi, m))}</div>
       ${sw ? `<div class="sowhat">${sw}</div>` : ''}`;
     t.querySelector('.tile-top').append(infoButton(kpi));
-    const select = () => { state.kpi = kpi.id; state.kpiPicked = true; render(); document.getElementById('detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
+    const select = () => { state.kpi = kpi.id; state.kpiPicked = true; const fk = Site.focusKey(); render(); Site.restoreFocus(fk); document.getElementById('detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
     t.querySelector('.tile-select').addEventListener('click', (e) => { e.stopPropagation(); select(); });
     t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn')) select(); });
     requestAnimationFrame(() => sparkline(t.querySelector('.spark'), kpi, windowEnding(m, SPARK_MONTHS)));
@@ -434,7 +434,7 @@
     host.innerHTML = '';
     const W = host.clientWidth || 800, phone = W < 560, H = phone ? 260 : 320;
     const M = { t: 46, r: phone ? 12 : 92, b: 28, l: 52 };
-    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img' }, host);
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group' }, host);
     const pts = ms.map((m) => ({ m, v: val(kpi.id, m), n: nOf(kpi.id, m) }));
     const vals = pts.filter((p) => p.v != null).map((p) => p.v);
     const [lo, hi] = domain(kpi, vals);
@@ -525,7 +525,7 @@
 
     // hover layer: crosshair + tooltip per month, and event markers
     const cross = svgEl('line', { class: 'm-cross', y1: M.t, y2: M.t + ih, visibility: 'hidden' }, svg);
-    const hit = svgEl('rect', { x: M.l, y: M.t, width: iw, height: ih, fill: 'transparent' }, svg);
+    const hit = svgEl('rect', { x: M.l, y: M.t, width: iw, height: ih, fill: 'transparent', tabindex: 0, role: 'application', 'aria-label': 'Use left and right arrow keys to move between months' }, svg);
     const onMove = (cx, cy, clientX, clientY) => {
       const i = Math.max(0, Math.min(ms.length - 1, Math.floor((cx - M.l) / step)));
       const p = pts[i];
@@ -542,8 +542,19 @@
     hit.addEventListener('mousemove', (ev) => { const [cx, cy] = pos(ev); onMove(cx, cy, ev.clientX, ev.clientY); });
     hit.addEventListener('mouseleave', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
     hit.addEventListener('touchstart', (ev) => { const t = ev.touches[0]; const [cx, cy] = pos(t); onMove(cx, cy, t.clientX, t.clientY); }, { passive: true });
+    let at = ms.length - 1;
+    const live = document.getElementById('trend-live');
+    hit.addEventListener('keydown', (ev) => {
+      const n = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: ms.length - 1 }[ev.key];
+      if (n == null) return; ev.preventDefault();
+      at = Math.max(0, Math.min(ms.length - 1, n));
+      const r = svg.getBoundingClientRect(), p = pts[at];
+      onMove(x(at), 0, r.left + x(at) * r.width / W, r.top + (p.v == null ? M.t : y(p.v)) * r.height / H);
+      live.textContent = `${fmt.month(p.m)}: ${fmt.value(p.v, kpi.format, true)}${kpi.target == null ? '' : ', ' + STATUS_WORD[statusOf(kpi, p.v)]}`;
+    });
+    hit.addEventListener('blur', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
     for (const it of evs) {
-      const hz = svgEl('circle', { cx: it.x, cy: it.my, r: 10, fill: 'transparent', tabindex: 0, role: 'img', 'aria-label': `${it.e.name}, ${eventDates(it.e)}` }, svg);
+      const hz = svgEl('circle', { cx: it.x, cy: it.my, r: 12, fill: 'transparent', tabindex: 0, role: 'img', 'aria-label': `${it.e.name}, ${eventDates(it.e)}` }, svg);
       hz.style.cursor = 'help';
       const show = (ev) => { const r = hz.getBoundingClientRect(); showTip(`<b>${it.num}. ${esc(it.e.name)}</b><br>${eventDates(it.e)}<br><span class="muted">${esc(it.e.description)}</span>`, ev.clientX ?? r.left + 12, ev.clientY ?? r.top); };
       hz.addEventListener('mouseenter', show); hz.addEventListener('focus', show);
@@ -615,7 +626,7 @@
       return { m, v, n, st: low ? 'none' : statusOf(kpi, v), low };
     });
     host.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="csv-btn" type="button">Download CSV</button></div>
-      <div class="tbl-wrap"><table><thead><tr><th scope="col">Month</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
+      <div class="tbl-wrap" tabindex="0" role="region" aria-label="Values by month"><table><thead><tr><th scope="col">Month</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
       ${rows.map((r) => `<tr><td>${fmt.month(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
       </tbody></table></div>`;
     host.querySelector('#csv-btn').addEventListener('click', () => {
