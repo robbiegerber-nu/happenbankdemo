@@ -11,6 +11,7 @@
 --   4. Freshness checks (TML-001..008) count OPEN days with no data, so one missing day is caught
 --   5. Low-importance detail checks warn on any finding and fail only at a meaningful volume
 --   6. New CMP-019: fields that stopped being filled in on the latest day
+--   7. New CON-018: scheduled staff in the 15-minute summary must match the agents' schedules (v3.4, after remediation R02)
 \set ON_ERROR_STOP on
 SET client_min_messages = warning;
 
@@ -210,6 +211,49 @@ VALUES ('CMP-019', 'cc (all tables)', NULL, 'Completeness', 'No fields that stop
       ORDER BY usual_min - day_rate DESC)
     FROM discovery.fill_drops(discovery.period_end())$q$,
   'data fields that stopped being filled in')
+ON CONFLICT (rule_id) DO NOTHING;
+
+-- ---------- 7. New: 15-minute scheduled staff vs. the agents' schedules ----------
+-- One row per channel group and 15 minutes where the summary's scheduled staff differ from the open-shift minutes in the
+-- schedule by more than 0.1 FTE (each queue's share is rounded to 0.01). Slots with no forecast have no share to compare.
+-- Phone agents also cover callbacks; the third group covers email and secure message.
+CREATE OR REPLACE FUNCTION discovery.staffing_mismatches()
+RETURNS TABLE (day date, interval_id int, grp text, summary_fte numeric, schedule_fte numeric) LANGUAGE sql STABLE AS $$
+  WITH sched AS (
+    SELECT to_char(it, 'YYYYMMDD')::int AS date_key, (extract(hour FROM it) * 4 + floor(extract(minute FROM it) / 15))::int AS iv,
+           a.primary_channel_id AS g,
+           sum(extract(epoch FROM least(s.scheduled_end_ts, it + interval '15 min') - greatest(s.scheduled_start_ts, it))) / 900.0 AS fte
+    FROM cc.agent_schedule s JOIN cc.dim_agent a USING (agent_id)
+    CROSS JOIN LATERAL generate_series(date_bin('15 min', s.scheduled_start_ts, timestamptz '2024-01-01 00:00'),
+                                       s.scheduled_end_ts - interval '1 ms', interval '15 min') it
+    WHERE s.activity = 'Open Shift'
+    GROUP BY 1, 2, 3
+  ),
+  summ AS (
+    SELECT v.date_key, v.interval_id::int AS iv, CASE WHEN q.channel_id IN (1, 4) THEN 1 WHEN q.channel_id = 2 THEN 2 ELSE 3 END AS g,
+           sum(v.scheduled_fte) AS fte
+    FROM cc.interval_volume v JOIN cc.dim_queue q USING (queue_id)
+    GROUP BY 1, 2, 3 HAVING sum(v.forecast_contacts) > 0
+  )
+  SELECT to_date(u.date_key::text, 'YYYYMMDD'), u.iv, (ARRAY['Phone and callback', 'Chat', 'Email and secure message'])[u.g],
+         u.fte, round(coalesce(s.fte, 0)::numeric, 2)
+  FROM summ u LEFT JOIN sched s USING (date_key, iv, g)
+  WHERE abs(u.fte - coalesce(s.fte, 0)) > 0.1
+$$;
+
+INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule_name, description, check_sql, unit, warn_above, fail_above, severity, expected_note, evidence_sql, problem_plain)
+VALUES ('CON-018', 'interval_volume', 'scheduled_fte', 'Consistency', 'Interval scheduled staff matches agent schedules',
+  'Scheduled staff in the 15-minute summary that differ from the agents'' scheduled open-shift time by more than 0.1 full-time equivalents, per channel group and 15 minutes.',
+  $q$SELECT count(*) FROM discovery.staffing_mismatches()$q$, 'rows', 0, 0, 'High',
+  'Added after remediation R02: scheduled staff were counted in the wrong 15 minutes and no check compared the two.',
+  $q$SELECT jsonb_agg(jsonb_build_object('item', to_char(day, 'Dy Mon DD, YYYY'), 'records', n,
+      'detail', to_char(n, 'FM999,999') || ' 15-minute ' || CASE WHEN n = 1 THEN 'slot differs' ELSE 'slots differ' END || ', by up to '
+                || worst || ' staff; e.g. ' || eg) ORDER BY day DESC)
+    FROM (SELECT day, count(*) AS n, max(abs(summary_fte - schedule_fte)) AS worst,
+                 (array_agg(grp || ' at ' || to_char(time '00:00' + interval_id * interval '15 min', 'HH24:MI') || ': summary ' || summary_fte || ', schedule ' || schedule_fte
+                            ORDER BY abs(summary_fte - schedule_fte) DESC))[1] AS eg
+          FROM discovery.staffing_mismatches() GROUP BY 1 ORDER BY 1 DESC LIMIT 25) x$q$,
+  'scheduled staff that do not match the agents'' schedules')
 ON CONFLICT (rule_id) DO NOTHING;
 
 -- Every active rule must have evidence
