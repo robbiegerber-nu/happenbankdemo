@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Product Launch Impact · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated effect of product launches on contacts, handle time and satisfaction, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=2.1"></script>
+<script src="assets/launch.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile-top { display: flex; justify-content: space-between; gap: 6px; }
+  .tile-top button.t { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); min-height: 24px; }
+  .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
+  .chart { margin-top: 10px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .x { overflow-x: auto; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }
+  .name { border: 0; background: none; padding: 4px 0; min-height: 28px; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  h3 { margin-top: 20px; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .l1 { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; } .l2 { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1.5; } .pt.low { fill: var(--surface); stroke: var(--text-muted); } .pt.day { stroke: var(--text-primary); stroke-width: 2; }
+  .tg { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; } .wb { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .evb { fill: var(--event); fill-opacity: .12; } .evl { stroke: var(--event); stroke-opacity: .6; }
+  .ev circle { fill: var(--surface); stroke: var(--event); } .ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
+  .lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus-visible, .hm:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  .l3 { fill: none; stroke: var(--text-muted); stroke-width: 1.5; } .bar { fill: var(--brand-blue); } .bar.low { fill: var(--text-muted); fill-opacity: .35; } .tick0 { stroke: var(--text-primary); stroke-width: 2; }
+  @media (max-width: 767px) {
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .card { padding: 14px; }
+    .tile .v { font-size: 22px; }
+  }
+  #f-l { max-width: 420px; } .phone-note { display: none; } td div { font-size: 12.5px; }
+  .facts { margin: 12px 0 0; padding-left: 20px; } .facts li { margin: 3px 0; }
+  .rng { fill: var(--brand-blue); fill-opacity: .1; stroke: none; } .launch { stroke: var(--text-primary); stroke-width: 1.5; } .ptx { fill: var(--brand-purple); stroke: var(--surface); stroke-width: 1; } .sep { stroke: var(--grid); }
+  .l3 { fill: none; stroke: var(--text-muted); stroke-width: 1.5; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 0 20px; } .two > div { min-width: 0; }
+  @media (max-width: 767px) { .phone-note { display: block; } .wide-only { display: none; } #f-l { max-width: 100%; } .card .btn { min-height: 44px; } }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <label class="filter"><span class="flabel">Launch</span><select id="f-l" aria-label="Launch"></select></label>
+  <button class="link-btn" id="f-reset" type="button">Reset</button>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<main class="wrap" id="main">
+  <h1>Product launch impact</h1>
+  <p class="sub" id="s-page"></p>
+  <p class="note phone-note">Open on a larger screen to compare reasons, customers and launches.</p>
+  <p class="note" id="loading">Loading launch data…</p>
+  <div id="content" hidden>
+    <section class="card" aria-labelledby="t-sum"><h2 id="t-sum"></h2><p class="sub" id="s-sum"></p><ul class="facts" id="facts"></ul><p class="note" id="n-over"></p></section>
+    <div class="tiles" id="tiles"></div>
+    <p class="note" id="n-tiles">Weeks 0–3 after the launch, for the contact reasons it was expected to affect, against the 6 weeks before it was announced (weeks −8 to −3). Select a tile to chart it.</p>
+    <section class="card" aria-labelledby="t-ser">
+      <div class="head"><div><h2 id="t-ser"></h2><div class="sub" id="s-ser"></div></div><div class="tools"><button class="btn" id="csv-ser" type="button">Download CSV</button><button class="btn" id="tb-ser" type="button">View as table</button></div></div>
+      <div class="chart" id="c-ser"></div><div class="legend" id="lg-ser"></div><div class="tbl" id="tbl-ser" tabindex="0" role="region" aria-label="Values by week" hidden></div><p class="note" id="n-ser"></p>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-rea">
+      <div class="head"><div><h2 id="t-rea">Contact reasons the launch was expected to affect</h2><div class="sub" id="s-rea"></div></div><div class="tools"><button class="btn" id="csv-rea" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-rea"></div><p class="note" id="n-rea"></p>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-who">
+      <div class="head"><div><h2 id="t-who">Who contacted about it, and how</h2><div class="sub" id="s-who"></div></div><div class="tools"><button class="btn" id="csv-who" type="button">Download CSV</button></div></div>
+      <div class="two"><div><h3>Persona</h3><div class="tbl" id="tbl-per"></div></div><div><h3>Channel</h3><div class="tbl" id="tbl-cha"></div><h3>Complaints</h3><div class="tbl" id="tbl-com"></div></div></div>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-plan">
+      <div class="head"><div><h2 id="t-plan">Planned impact against what happened</h2><div class="sub">Each launch's peak week above expected, by the impact planned for it · click a point to open the launch</div></div></div>
+      <div class="chart" id="c-plan"></div>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-all">
+      <div class="head"><div><h2 id="t-all">All launches</h2><div class="sub">Newest first · click a name to open it</div></div><div class="tools"><button class="btn" id="csv-all" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-all"></div><p class="note">Bold changes are beyond chance (3 standard errors). A change can come from another launch in the same weeks; open the launch to see overlaps.</p>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, changeQuality } = Site, $ = (id) => document.getElementById(id), L = Launch;
+  Site.renderChrome('launch');
+  const DAY = 864e5, ts = (s) => Date.parse(s + 'T00:00:00Z'), iso = (t) => new Date(t).toISOString().slice(0, 10);
+  const K = {
+    volume: { name: 'Contacts', short: 'Contacts', format: 'count', better: 'none', minN: 0, definition: 'Contacts offered for the reasons the launch was expected to affect, against what was expected that week.', formula: 'Expected = baseline contacts a week × how other reasons moved that week', target: null, wiki: 'service-and-access' },
+    sl: { name: 'Service level, all channels', short: 'Service level', format: 'pct', better: 'higher', minN: 50, target: null, definition: "Share of contacts answered within their own queue's threshold, all channels together. Targets differ by channel, so none is shown.", formula: 'Answered within threshold ÷ (answered + abandoned − short abandons)', exclusions: 'Excludes abandons under 5 seconds.', wiki: 'service-and-access' }
+  };
+  let IDX, LA, EV, S = { l: null, metric: 'volume' }, DEF = {}, cur = {}, table = false; const cache = new Map();
+  const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
+  Promise.all([get('data/dashboards/kpis.json'), get('data/dashboards/launch/index.json.gz'), get('data/dashboards/events.json')]).then(([k, i, e]) => {
+    const all = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); for (const m of ['aht', 'fcr', 'csat', 'repeat']) K[m] = all[m];
+    IDX = i; LA = i.launches; EV = e.events; IDX.rowsBy = new Map();
+    for (const r of i.rows) { const o = Object.fromEntries(i.keys.map((c, j) => [c, r[j]])); (IDX.rowsBy.get(o.l) || (IDX.rowsBy.set(o.l, []), IDX.rowsBy.get(o.l))).push(o); }
+    DEF = { l: LA[LA.length - 1].id, metric: 'volume' }; S = { ...DEF };
+    $('f-l').innerHTML = [...LA].reverse().map((x) => `<option value="${x.id}">${esc(x.name)} (${fmt.date(x.date)})</option>`).join('');
+    const p = new URLSearchParams(location.search); if (LA.some((x) => String(x.id) === p.get('l'))) S.l = +p.get('l'); if (L.METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    Site.setDataThrough(i.data_through);
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)}; launches use data to ${fmt.date(i.used_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Product launch impact v1.0`;
+    update();
+  }).catch((e) => { $('loading').hidden = false; $('loading').textContent = 'The launch data could not be loaded. ' + e.message; });
+
+  const F = (m) => K[m].format, V = (m, v) => fmt.value(v, F(m), true), rName = (id) => IDX.reasons.find((x) => x[0] === id)[1];
+  const dt = (m, v, e) => { const c = fmt.change(v, e, F(m)); return c ? (c.flat ? '0' : c.text) : '–'; }, sg = (v, d = 0) => { const a = Math.abs(v), t = d ? a.toFixed(d) : fmt.count(a); return (+a.toFixed(d) === 0 ? '' : v > 0 ? '+' : '−') + t; }, wk = (w) => (w < 0 ? '−' + -w : String(w));
+  // a launch's window: its own reasons, and other reasons no launch nearby is expected to touch
+  function win(l) {
+    if (cache.has(l.id)) return cache.get(l.id);
+    const t = ts(l.date), near = LA.filter((x) => x.id !== l.id && ts(x.date) >= t - 70 * DAY && ts(x.date) <= t + 91 * DAY), touched = new Set([...l.reasons, ...near.flatMap((x) => x.reasons)]), rows = IDX.rowsBy.get(l.id) || [];
+    const aff = L.weeks(rows, (r) => l.reasons.includes(r)), oth = L.weeks(rows, (r) => !touched.has(r)), vol = L.series('volume', aff, oth), o = { l, near, rows, aff, oth, vol, sum: L.summary(vol), shared: near.filter((x) => x.reasons.some((r) => l.reasons.includes(r))) };
+    o.change = Object.fromEntries(L.METRICS.filter((m) => m !== 'volume').map((m) => [m, L.change(m, aff, oth)]));
+    // how much of a rate's change is only a different mix of the affected reasons
+    o.mix = (m) => { const c = o.change[m]; if (!c) return null; let w = 0, x = 0; for (const r of l.reasons) { const by = L.weeks(rows, (q) => q === r), p = L.total(by, [0, 1, 2, 3]), b = L.total(by, L.BASE), n = L.n(m, p), v = L.rate(m, b); if (n && v != null) { w += n; x += n * v; } } return w ? x / w - c.e : null; };
+    const tc = IDX.comp.filter((c) => c[0] === l.id && c[1] >= 0), tn = rows.reduce((a, r) => a + (r.w >= 0 ? r.t : 0), 0); o.comp = tc.reduce((a, c) => a + c[3], 0); o.tagged = tn;
+    cache.set(l.id, o); return o;
+  }
+  function update() {
+    const W = win(LA.find((x) => x.id === S.l)); cur.W = W;
+    $('loading').hidden = true; $('content').hidden = false; $('f-l').value = S.l;
+    const p = new URLSearchParams(); if (S.l !== DEF.l) p.set('l', S.l); if (S.metric !== DEF.metric) p.set('metric', S.metric); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+    const l = W.l, last = W.sum ? W.sum.last : 0;
+    $('s-page').textContent = `${l.name} · launched ${fmt.date(l.date)} · 8 weeks before to ${last + 1} ${last ? 'weeks' : 'week'} after`;
+    renderSummary(W); renderTiles(W); renderSeries(W); renderReasons(W); renderWho(W); renderPlan(); renderAll();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update(); Site.restoreFocus(k, '#tiles button'); };
+  const backText = (q) => (!q.any ? 'No week was above the normal range' : q.back != null ? `Back in the normal range from week ${q.back}` : q.last >= 12 ? 'Still above the normal range at times in week 12' : `Not back for two weeks in a row by week ${q.last}`);
+  function renderSummary(W) {
+    const l = W.l, q = W.sum; $('t-sum').textContent = l.about; $('s-sum').textContent = `${l.type} · planned impact: ${l.planned.toLowerCase()} · marketing spend: ${l.spend.toLowerCase()} · aimed at: ${l.targets}`;
+    $('facts').innerHTML = !q ? '<li>No full week after the launch yet.</li>' : [
+      `<b>${sg(q.extra4)}</b> contacts against expected in the first ${q.weeks4} ${q.weeks4 === 1 ? 'week' : 'weeks'} (${sg(q.pct4, 1)}%)`,
+      `Peak in <b>week ${q.peakW}</b>, ${sg(q.peak, 1)}% against expected`, backText(q),
+      `${fmt.count(W.tagged)} contacts and ${fmt.count(W.comp)} complaints recorded as caused by the launch, weeks 0–${q.last}`
+    ].map((x) => `<li>${x}</li>`).join('');
+    const ot = EV.filter((e) => e.kind !== l.type && !LA.some((x) => x.name === e.name) && ts(e.end) >= ts(l.date) - 56 * DAY && ts(e.start) <= ts(l.date) + 90 * DAY);
+    $('n-over').textContent = [W.shared.length ? `Read with care: ${W.shared.map((x) => `${x.name} (${fmt.date(x.date)})`).join(', ')} ${W.shared.length === 1 ? 'was' : 'were'} launched in or near this window and share${W.shared.length === 1 ? 's' : ''} some of the same contact reasons.` : '', ot.length ? `Also in this window: ${ot.map((x) => x.name).join(', ')}.` : '', q && q.last < 12 ? `Weeks after ${fmt.date(IDX.used_through)} are left out: November's simulated days repeat October's, launch contacts included.` : ''].filter(Boolean).join(' ');
+  }
+  function renderTiles(W) {
+    const host = $('tiles'); host.innerHTML = '';
+    for (const m of L.METRICS) {
+      const k = K[m], d = document.createElement('div'), c = W.change[m], q = W.sum; d.className = 'tile' + (S.metric === m ? ' sel' : '');
+      let v = '–', body = '<div class="m">No data yet</div>';
+      if (m === 'volume' && q) { v = sg(q.pct4, 1) + '%'; body = `<div class="m">${sg(q.extra4)} against expected</div><div class="m">Peak ${sg(q.peak, 1)}% in week ${q.peakW}</div>`; }
+      else if (c) {
+        const lo = c.n < k.minN, ch = fmt.change(c.v, c.e, k.format), qual = lo || !c.sure ? 'neutral' : changeQuality(k, c.v, c.e, ch), mix = W.mix(m);
+        v = V(m, c.v); body = `<span class="chg ${qual}">${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} from ${V(m, c.e)}${Site.QUALITY_WORD[qual] ? ' · ' + qual : ''}</span><div class="m">${lo ? `n = ${fmt.count(c.n)}, below ${k.minN}` : c.sure ? 'Beyond chance' : 'Within chance'}</div><div class="m">${mix == null || Math.abs(mix) < (m === 'aht' ? 1 : .1) ? '' : `${dt(m, c.e + mix, c.e)} from the mix of reasons · `}other reasons ${c.other == null ? '–' : dt(m, c.e + c.other, c.e)}</div>`;
+      }
+      d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(m === 'volume' ? 'Contacts against expected' : k.name)}</button></div><div class="v">${v}</div>${body}`;
+      d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d);
+    }
+  }
+  // ---------- Chart helpers ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const tick = (m, v) => (F(m) === 'pct' ? +v.toFixed(1) + '%' : F(m) === 'duration' ? fmt.value(v, 'duration') : fmt.shortNum(v));
+  function tip(node, html, click) {
+    const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); };
+    node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
+    if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
+  }
+  function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
+  const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
+  const wDate = (l, w) => iso(ts(l.date) + w * 7 * DAY), wName = (l, w) => `Week ${wk(w)}, from ${fmt.date(wDate(l, w))}`;
+  // ---------- Weekly series ----------
+  function renderSeries(W) {
+    const m = S.metric, k = K[m], l = W.l, s0 = L.series(m, W.aff, W.oth), pts = s0.pts.filter((p) => p.v != null).map((p) => ({ ...p, low: p.n < k.minN, base: L.BASE.includes(p.w) })), host = $('c-ser'); cur.ser = pts;
+    $('t-ser').textContent = `${k.name} for affected reasons, by week`; $('s-ser').textContent = `${k.short}, weekly from launch day, weeks −8 to ${pts.length ? wk(pts[pts.length - 1].w) : '–'} · ${l.name}`;
+    $('n-ser').textContent = m === 'volume' ? 'Expected is the baseline moved by how other reasons changed that week, so seasons and holidays are not counted as launch effect. The range is 3 standard deviations of the 6 baseline weeks; with so few weeks it is approximate.' : 'Expected is the baseline rate; the range is 3 standard deviations of the 6 baseline weeks, and approximate. If other reasons move too, the cause may be wider than the launch, or the launch may be slowing everything down.';
+    host.hidden = $('lg-ser').hidden = table; $('tbl-ser').hidden = !table; $('tb-ser').textContent = table ? 'View as chart' : 'View as table'; $('tb-ser').setAttribute('aria-pressed', table);
+    const oc = m !== 'volume';
+    if (table) { $('tbl-ser').innerHTML = `<table><thead><tr><th scope="col">Week</th><th scope="col">${esc(k.short)}</th><th scope="col">Expected</th><th scope="col">Normal range</th><th scope="col">Reading</th>${oc ? '<th scope="col">Other reasons</th>' : ''}<th scope="col">n</th></tr></thead><tbody>${pts.map((p) => `<tr><td>${wName(l, p.w)}</td><td class="${p.low ? 'low' : ''}">${V(m, p.v)}</td><td>${V(m, p.e)}</td><td>${V(m, Math.max(0, p.lo))} – ${V(m, p.hi)}</td><td>${p.low ? 'too few' : p.out ? (p.v > p.hi ? 'above range' : 'below range') : 'in range'}${p.base ? ' (baseline)' : ''}</td>${oc ? `<td>${V(m, p.other)}</td>` : ''}<td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; $('lg-ser').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for this launch.'; return; }
+    const w = host.clientWidth || 800, narrow = w < 560, H = 300, G = { t: 42, r: 14, b: 44, l: 60 }, iw = w - G.l - G.r, ih = H - G.t - G.b, w0 = pts[0].w, nW = pts[pts.length - 1].w - w0 + 1, step = iw / nW, x = (q) => G.l + (q - w0 + .5) * step;
+    const vs = pts.flatMap((p) => [p.v, p.lo, p.hi, ...(p.other != null ? [p.other] : [])]); let a = m === 'volume' ? 0 : Math.min(...vs), b = Math.max(...vs); const pad = (b - a || 1) * .08; if (m !== 'volume') a -= pad; b += pad; const y = (v) => G.t + (b - v) / (b - a) * ih;
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by week. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(a, b, 5)) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    pts.forEach((p) => { if (!narrow || p.w % 4 === 0) text(ax, x(p.w), H - 26, wk(p.w), '', 'middle'); }); text(ax, G.l + iw / 2, H - 6, 'Weeks from launch', '', 'middle');
+    el('path', { class: 'rng', d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.w)},${y(Math.max(a, p.hi))}`).join('') + [...pts].reverse().map((p) => `L${x(p.w)},${y(Math.max(a, p.lo))}`).join('') + 'Z' }, s);
+    const lx = x(0) - step / 2; el('line', { class: 'launch', x1: lx, x2: lx, y1: G.t - 6, y2: G.t + ih }, s); text(s, lx + (narrow ? 0 : 6), G.t - 12, 'Launch', 'lab', narrow ? 'middle' : 'start');
+    const xt = (t) => x(0) - step / 2 + (t - ts(l.date)) / (7 * DAY) * step; let n = 0, lastX = -99;
+    for (const e of EV) { if (e.name === l.name) continue; const p = Math.max(ts(e.start), ts(l.date) + w0 * 7 * DAY), q = Math.min(ts(e.end), ts(l.date) + (w0 + nW) * 7 * DAY - DAY); if (q < p) continue; n++; const ea = xt(p), eb = xt(q + DAY); if (e.span === 'Period') el('rect', { class: 'evb', x: ea, y: G.t, width: Math.max(2, eb - ea), height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s);
+      const mx = Math.max(ea, lastX + 17), i = n; lastX = mx; const c = el('g', { class: 'ev', transform: `translate(${mx},${G.t + 12})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, c); el('circle', { r: 8 }, c); text(c, 0, 3.5, i); tip(c, () => `<b>${i}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
+    const path = (f) => pts.filter((p) => f(p) != null).map((p, i) => `${i ? 'L' : 'M'}${x(p.w)},${y(f(p))}`).join('');
+    if (oc) el('path', { class: 'l3', d: path((p) => p.other) }, s); el('path', { class: 'l2', d: path((p) => p.e) }, s); el('path', { class: 'l1', d: path((p) => (p.low ? null : p.v)) }, s);
+    const evs = [...s.querySelectorAll('.ev')];
+    pts.forEach((p) => { if (p.out && !p.low) el('path', { class: 'ptx', d: `M${x(p.w)},${y(p.v) - 6}l6,6l-6,6l-6,-6Z` }, s); else el('circle', { class: 'pt' + (p.low ? ' low' : ''), cx: x(p.w), cy: y(p.v), r: 4 }, s);
+      const h = el('rect', { class: 'hit', x: x(p.w) - step / 2, y: G.t, width: step, height: ih, tabindex: p.w === 0 ? 0 : -1, role: 'img', 'aria-label': `${wName(l, p.w)}: ${V(m, p.v)}, expected ${V(m, p.e)}${p.low ? ', too few' : p.out ? ', outside the normal range' : ''}` }, s);
+      tip(h, () => `<b>${wName(l, p.w)}</b><br>${esc(k.name)}: <b>${V(m, p.v)}</b><br>Expected: ${V(m, p.e)} (${V(m, Math.max(0, p.lo))} – ${V(m, p.hi)})${oc ? `<br>Other reasons: ${V(m, p.other)}` : `<br>${sg(p.v - p.e)} (${sg((p.v / p.e - 1) * 100, 1)}%)`}<br><span class="muted">${p.base ? 'Baseline week' : p.out ? 'Outside the normal range' : 'In the normal range'}${p.low ? ` · n = ${fmt.count(p.n)}, below ${k.minN}` : ''}</span>`); });
+    evs.forEach((e) => s.append(e)); arrows(s);
+    if (pts.every((p) => p.w !== 0)) s.querySelector('.hit').setAttribute('tabindex', 0);
+    $('lg-ser').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Affected reasons'], ['<line class="l2" x2="20" y1="7" y2="7"/>', 'Expected'], ['<rect class="rng" width="20" height="14"/>', 'Normal range'], ['<path class="ptx" d="M10,1l6,6l-6,6l-6,-6Z"/>', 'Outside the range'], ...(oc ? [['<line class="l3" x2="20" y1="7" y2="7"/>', 'Other reasons']] : [])]);
+  }
+  // ---------- Reasons ----------
+  function renderReasons(W) {
+    const wks = [0, 1, 2, 3].filter((w) => W.aff.has(w)), ob = L.total(W.oth, L.BASE).o / 6, fac = wks.length ? L.total(W.oth, wks).o / wks.length / ob : 1;
+    const rows = W.l.reasons.map((id) => { const by = L.weeks(W.rows, (r) => r === id), b = L.total(by, L.BASE), p = L.total(by, wks), e = (b.o || 0) / 6 * fac, v = wks.length ? (p.o || 0) / wks.length : 0; return { id, e, v, x: (v - e) * wks.length, pct: e > 0 ? (v / e - 1) * 100 : null, b, p }; }).sort((a, b) => b.x - a.x); cur.rea = rows;
+    $('s-rea').textContent = `Weeks 0–${Math.max(0, wks.length - 1)} against the baseline · largest extra volume first`;
+    const ch = (m, r) => { const v = L.rate(m, r.p), e = L.rate(m, r.b); if (v == null || e == null) return '<td>–</td>'; const few = L.n(m, r.p) < K[m].minN || L.n(m, r.b) < K[m].minN; return `<td class="${few ? 'low' : ''}">${V(m, v)}<div class="muted">${few ? 'too few' : dt(m, v, e)}</div></td>`; };
+    $('tbl-rea').innerHTML = wks.length ? `<table><thead><tr><th scope="col">Contact reason</th><th scope="col">Expected a week</th><th scope="col">Actual a week</th><th scope="col">Extra contacts</th><th scope="col">Against expected</th><th scope="col">AHT</th><th scope="col">FCR</th><th scope="col">CSAT</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(rName(r.id))}</td><td>${fmt.count(r.e)}</td><td>${fmt.count(r.v)}</td><td><b>${sg(r.x)}</b></td><td>${r.pct == null ? '–' : sg(r.pct, 1) + '%'}</td>${ch('aht', r)}${ch('fcr', r)}${ch('csat', r)}</tr>`).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No full week yet.</p>';
+    $('n-rea').textContent = 'The second line is the change from the baseline. Reasons that other launches also affect show their combined effect.';
+  }
+  // ---------- Who ----------
+  function renderWho(W) {
+    const part = (k) => { const rows = IDX.who.filter((x) => x[0] === W.l.id && x[2] === k), now = new Map(), use = new Map(); for (const [, w, , id, n] of rows) { if (w == null) use.set(id, n); else if (w >= 0) now.set(id, (now.get(id) || 0) + n); } const t = [...now.values()].reduce((a, b) => a + b, 0), u = [...use.values()].reduce((a, b) => a + b, 0); return { t, rows: [...use].map(([id, n]) => ({ id, n: now.get(id) || 0, p: t ? (now.get(id) || 0) / t * 100 : 0, u: n / u * 100 })).sort((a, b) => b.n - a.n) }; };
+    const nm = (list, id) => (list.find((x) => x[0] === id) || [0, 'Not identified'])[1], tab = (d, list, tgt) => (d.t ? `<table><thead><tr><th scope="col">${tgt ? 'Persona' : 'Channel'}</th><th scope="col">Contacts</th><th scope="col">Share</th><th scope="col">Usual share</th><th scope="col">Difference</th></tr></thead><tbody>${d.rows.map((r) => { const n = nm(list, r.id), on = tgt && (W.l.targets === 'All customers' || W.l.targets.split(', ').includes(n)) && r.id; return `<tr><td>${esc(n)}${on ? ' <span class="muted">(target)</span>' : ''}</td><td>${fmt.count(r.n)}</td><td>${r.p.toFixed(1)}%</td><td>${r.u.toFixed(1)}%</td><td>${dt('csat', r.p, r.u)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No contacts recorded.</p>');
+    const per = part('persona'), cha = part('channel'), cm = new Map(); for (const c of IDX.comp) if (c[0] === W.l.id && c[1] >= 0) { const o = cm.get(c[2]) || (cm.set(c[2], { n: 0, hi: 0 }), cm.get(c[2])); o.n += c[3]; o.hi += c[4]; } cur.who = { per, cha, cm };
+    $('s-who').textContent = `Contacts recorded as caused by the launch, weeks 0–${W.sum ? W.sum.last : 0}, against the usual mix of all contacts before it`;
+    $('tbl-per').innerHTML = tab(per, IDX.personas, true); $('tbl-cha').innerHTML = tab(cha, IDX.channels, false);
+    $('tbl-com').innerHTML = cm.size ? `<table><thead><tr><th scope="col">Category</th><th scope="col">Complaints</th><th scope="col">High severity</th></tr></thead><tbody>${[...cm].sort((a, b) => b[1].n - a[1].n).map(([n, o]) => `<tr><td>${esc(n)}</td><td>${fmt.count(o.n)}</td><td>${o.n < 30 ? '<span class="muted">too few</span>' : (o.hi / o.n * 100).toFixed(1) + '%'}</td></tr>`).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No complaints recorded for this launch.</p>';
+  }
+  // ---------- All launches ----------
+  const LEVELS = ['Low', 'Medium', 'High', 'Very High'];
+  function renderPlan() {
+    const host = $('c-plan'); host.innerHTML = ''; const w = host.clientWidth || 800; if (!host.clientWidth) return;
+    const rh = 56, Lm = 100, H = LEVELS.length * rh + 30, all = LA.map(win).filter((o) => o.sum), mx = Math.max(...all.map((o) => o.sum.peak)) * 1.1, x = (v) => Lm + Math.max(0, v) / mx * (w - Lm - 24), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Peak week above expected by planned impact. Values are in the All launches table.' }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(0, mx, 6)) { el('line', { x1: x(t), x2: x(t), y1: 4, y2: H - 26 }, g); text(ax, x(t), H - 8, (t ? '+' : '') + t + '%', '', 'middle'); }
+    LEVELS.forEach((lv, r) => { const y = 4 + r * rh + rh / 2; text(s, Lm - 14, y + 4, lv, 'lab', 'end'); const used = []; all.filter((o) => o.l.planned === lv).sort((a, b) => a.sum.peak - b.sum.peak).forEach((o) => { const px = x(o.sum.peak); let off = 0; for (const c of [0, -13, 13]) { off = c; if (!used.some((u) => Math.abs(u[0] - px) < 14 && u[1] === c)) break; } used.push([px, off]); const on = o.l.id === S.l; el('circle', { class: 'pt' + (on ? ' day' : ''), cx: px, cy: y + off, r: on ? 7 : 5 }, s); const h = el('circle', { class: 'hit', cx: px, cy: y + off, r: 12, tabindex: s.querySelector('.hit') ? -1 : 0, role: 'button', 'data-k': 'plan|' + o.l.id, 'aria-pressed': on, 'aria-label': `${o.l.name}, planned ${lv}: peak ${sg(o.sum.peak, 1)}% against expected` }, s); tip(h, () => `<b>${esc(o.l.name)}</b><br>${fmt.date(o.l.date)} · planned ${lv.toLowerCase()}<br>Peak: <b>${sg(o.sum.peak, 1)}%</b> in week ${o.sum.peakW}<br>${sg(o.sum.extra4)} contacts in weeks 0–3`, () => { S.l = o.l.id; go(); }); }); if (r) el('line', { class: 'sep', x1: 0, x2: w, y1: 4 + r * rh, y2: 4 + r * rh }, s); });
+    arrows(s);
+  }
+  function renderAll() {
+    const rows = [...LA].reverse().map(win); cur.all = rows;
+    const c = (m, o) => { const q = o.change[m]; if (!q) return '<td>–</td>'; const few = q.n < K[m].minN; return `<td class="${few ? 'low' : ''}">${few ? 'too few' : q.sure ? `<b>${dt(m, q.v, q.e)}</b>` : dt(m, q.v, q.e)}</td>`; };
+    $('tbl-all').innerHTML = `<table><thead><tr><th scope="col">Launch</th><th scope="col">Type</th><th scope="col">Planned</th><th scope="col">Peak</th><th scope="col">Extra, weeks 0–3</th><th scope="col">Back to normal</th><th scope="col">AHT</th><th scope="col">FCR</th><th scope="col">CSAT</th><th scope="col">Complaints</th></tr></thead><tbody>${rows.map((o) => { const q = o.sum, on = o.l.id === S.l; return `<tr class="${on ? 'sel' : ''}"><td><button type="button" class="name" data-k="all|${o.l.id}" data-l="${o.l.id}" aria-pressed="${on}">${esc(o.l.name)}</button><div class="muted">${fmt.date(o.l.date)}</div></td><td>${o.l.type}</td><td>${o.l.planned}</td>${q ? `<td>${sg(q.peak, 1)}%<div class="muted">week ${q.peakW}</div></td><td>${sg(q.extra4)}</td><td>${!q.any ? 'never left it' : q.back != null ? 'week ' + q.back : q.last >= 12 ? 'not in 12 weeks' : 'not yet, ' + (q.last + 1) + ' weeks'}</td>${c('aht', o)}${c('fcr', o)}${c('csat', o)}<td>${fmt.count(o.comp)}</td>` : '<td colspan="7">no full week yet</td>'}</tr>`; }).join('')}</tbody></table>`;
+  }
+  // ---------- Events ----------
+  $('f-l').addEventListener('change', (e) => { S.l = +e.target.value; go(); });
+  $('tbl-all').addEventListener('click', (e) => { const b = e.target.closest('[data-l]'); if (b) { S.l = +b.dataset.l; go(); } });
+  $('f-reset').addEventListener('click', () => { S = { ...DEF }; table = false; go(); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget)); $('tb-ser').addEventListener('click', () => { table = !table; renderSeries(cur.W); });
+  const csv = (n, w, h, r) => Site.downloadCsv(`launch_${n}`, IDX.data_through, `Product launch impact · ${w} · uses data to ${IDX.used_through}`, h, r);
+  $('csv-ser').addEventListener('click', () => csv('by-week', `${cur.W.l.name} · ${K[S.metric].name}`, ['week', 'from', S.metric, 'expected', 'range_low', 'range_high', 'other_reasons', 'n'], cur.ser.map((p) => [p.w, wDate(cur.W.l, p.w), p.v, p.e, p.lo, p.hi, p.other, p.n])));
+  $('csv-rea').addEventListener('click', () => csv('reasons', cur.W.l.name + ' · reasons', ['reason', 'expected_a_week', 'actual_a_week', 'extra_contacts', 'aht', 'aht_baseline', 'fcr', 'fcr_baseline', 'csat', 'csat_baseline'], cur.rea.map((r) => [rName(r.id), r.e, r.v, r.x, ...['aht', 'fcr', 'csat'].flatMap((m) => [L.rate(m, r.p), L.rate(m, r.b)])])));
+  $('csv-who').addEventListener('click', () => csv('who', cur.W.l.name + ' · personas and channels', ['group', 'name', 'contacts', 'share_pct', 'usual_share_pct'], [...cur.who.per.rows.map((r) => ['persona', (IDX.personas.find((x) => x[0] === r.id) || [0, 'Not identified'])[1], r.n, r.p, r.u]), ...cur.who.cha.rows.map((r) => ['channel', IDX.channels.find((x) => x[0] === r.id)[1], r.n, r.p, r.u])]));
+  $('csv-all').addEventListener('click', () => csv('all', 'all launches', ['launch', 'date', 'type', 'planned', 'peak_pct', 'peak_week', 'extra_weeks_0_3', 'back_week', 'aht_change', 'fcr_change', 'csat_change', 'complaints'], cur.all.map((o) => [o.l.name, o.l.date, o.l.type, o.l.planned, ...(o.sum ? [o.sum.peak, o.sum.peakW, o.sum.extra4, o.sum.back] : ['', '', '', '']), ...['aht', 'fcr', 'csat'].map((m) => o.change[m] && o.change[m].d), o.comp])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (cur.W) { renderSeries(cur.W); renderPlan(); } }, 150); });
+})();
+</script>
+</body>
+</html>
