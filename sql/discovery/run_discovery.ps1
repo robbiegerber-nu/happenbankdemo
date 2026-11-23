@@ -146,7 +146,8 @@ if ($AllRuns) {
 # Index of all runs for the dashboard's run picker and trend chart
 Export-Json 'index.json' -dir (Join-Path $out 'runs') -sql @"
 SELECT json_build_object('latest_run_id', (SELECT max(run_id) FROM discovery.dq_scorecard), 'runs',
-  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'business_date', r.business_date, 'notes', r.notes, 'summary', r.summary, 'score', s.score, 'status', s.status,
+  (SELECT json_agg(json_build_object('run_id', r.run_id, 'started_at', r.started_at, 'business_date', r.business_date,
+          'data_to', coalesce(r.period_end, date '2026-10-31'), 'notes', r.notes, 'summary', r.summary, 'score', s.score, 'status', s.status,
           'checks', s.checks, 'passed', s.passed, 'warned', s.warned, 'failed', s.failed) ORDER BY r.run_id)
    FROM discovery.dq_run r JOIN discovery.dq_scorecard s ON s.run_id = r.run_id AND s.table_name = '(all tables)' AND s.dimension = '(all dimensions)'));
 "@

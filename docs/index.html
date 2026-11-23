@@ -120,6 +120,9 @@
   .viewing { font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); margin-top: 2px; }
   svg.trend .hit { cursor: pointer; }
   svg.trend .ring { fill: none; stroke: var(--text-primary); stroke-width: 2; }
+  svg.trend .phase-band { fill: var(--text-primary); opacity: 0.045; }
+  svg.trend .phase-rule { stroke: var(--axis); stroke-width: 1; }
+  svg.trend .phase-cap { fill: var(--text-secondary); font-size: 11px; font-weight: 600; }
 
   /* ---- Run picker ---- */
   .runbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
@@ -558,7 +561,7 @@ function renderPicker() {
   const sel = $('run-select');
   sel.innerHTML = S.runs.slice().reverse().map(r =>
     `<option value="${r.run_id}">Run #${r.run_id}${r.run_id === S.latest ? ' (latest)' : ''} · ${Number(r.score).toFixed(1)} · ${r.status} · ${
-      r.business_date ? 'data for ' + dayShort(r.business_date) : shortDate(r.started_at)}</option>`).join('');
+      r.business_date ? 'data for ' + dayShort(r.business_date) : r.data_to ? 'data to ' + dayShort(r.data_to) : shortDate(r.started_at)}</option>`).join('');
   $('runbar').hidden = S.runs.length < 2;
 }
 function renderHeader() {
@@ -775,7 +778,12 @@ function tableScoreExample() {
 /* ---------- trend: all runs, selected run ringed (single series: title names it, no legend) ---------- */
 function renderTrend() {
   const h = S.runs;
-  const W = Math.max(280, Math.round($('trend').clientWidth || 560)), H = 230, m = { t: 22, r: 28, b: 44, l: 40 };
+  // phases: runs that built the checks on the full history (no business day) vs. daily loads
+  const phaseOf = r => r.business_date ? 'daily' : 'setup';
+  const phases = [];
+  h.forEach((r, i) => { const p = phaseOf(r); if (!phases.length || phases[phases.length - 1].p !== p) phases.push({ p, a: i, b: i }); else phases[phases.length - 1].b = i; });
+  const twoPhases = phases.length > 1;
+  const W = Math.max(280, Math.round($('trend').clientWidth || 560)), H = twoPhases ? 256 : 230, m = { t: 22, r: 28, b: twoPhases ? 70 : 44, l: 40 };
   const lo = Math.max(0, Math.floor((Math.min(...h.map(r => +r.score)) - 2) / 2) * 2), hi = 100;
   const x = i => h.length === 1 ? (m.l + W - m.r) / 2 : m.l + i * (W - m.l - m.r) / (h.length - 1);
   const y = v => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
@@ -788,9 +796,23 @@ function renderTrend() {
     if (i < 0 || shown.has(i)) return;
     if ([...shown].every(j => Math.abs(x(i) - x(j)) >= minGap)) shown.add(i);
   });
-  const sub = r => r.business_date ? dayShort(r.business_date).replace(/^\w+, /, '') : shortDate(r.started_at);
+  // second label line: the date the run's data runs through (same meaning for every run)
+  const sub = r => r.data_to ? dayShort(r.data_to).replace(/^\w+, /, '') : shortDate(r.started_at);
+  const step = h.length > 1 ? x(1) - x(0) : 40;
+  const fmtMD = d => dayShort(d).replace(/^\w+, /, '');
+  const phaseSvg = !twoPhases ? '' : phases.map(ph => {
+    const x0 = Math.max(m.l - 6, x(ph.a) - step / 2), x1 = Math.min(W - m.r + 6, x(ph.b) + step / 2), mid = (x0 + x1) / 2;
+    const first = h[ph.a], last = h[ph.b];
+    const long = ph.p === 'setup' ? `Building the checks · data to ${fmtMD(first.data_to)}`
+                                   : `Daily loads · ${fmtMD(first.business_date)}–${fmtMD(last.business_date).replace(/^\w+ /, '')}`;
+    const label = long.length * 6.2 < x1 - x0 - 8 ? long : ph.p === 'setup' ? 'Building checks' : 'Daily loads';
+    return (ph.p === 'setup' ? `<rect class="phase-band" x="${x0}" y="${m.t - 10}" width="${x1 - x0}" height="${H - m.b - m.t + 10}"></rect>` : '') +
+      `<line class="phase-rule" x1="${x0 + 4}" x2="${x1 - 4}" y1="${H - 26}" y2="${H - 26}"></line>
+       <text class="phase-cap" x="${mid}" y="${H - 9}" text-anchor="middle">${esc(label)}</text>`;
+  }).join('');
   $('trend').innerHTML = `
     <svg class="trend" viewBox="0 0 ${W} ${H}" role="group" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
+      ${phaseSvg}
       <g class="grid">${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>
         <text class="axis-label" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
       <path class="line" d="${path}"></path>
@@ -806,7 +828,8 @@ function renderTrend() {
     </svg>`;
 }
 const trendTip = i => { const r = S.runs[i];
-  return `<div class="t-title">Run #${r.run_id} · ${r.business_date ? 'data for ' + dayShort(r.business_date) : fmtDate(r.started_at)}</div>
+  return `<div class="t-title">Run #${r.run_id} · ${r.business_date ? 'data for ' + dayShort(r.business_date) : r.data_to ? 'data to ' + dayShort(r.data_to) : fmtDate(r.started_at)}</div>
+    <div class="t-row"><span>Phase</span><span>${r.business_date ? 'Daily load' : 'Building the checks'}</span></div>
     <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
     <div class="t-row"><span>Status</span><span>${r.status}</span></div>
     <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>
