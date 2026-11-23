@@ -13,7 +13,7 @@
       { name: 'Service & access', href: 'service.html', id: 'service' }, { name: 'Workforce management', href: 'workforce.html', id: 'workforce' }, { name: 'Agent & team coaching', href: 'coaching.html', id: 'coaching' }] },
     { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
-      { name: 'Customer experience', href: 'cx.html', id: 'cx' }, { name: 'Customer & persona insights', href: null },
+      { name: 'Customer experience', href: 'cx.html', id: 'cx' }, { name: 'Customer & persona insights', href: 'personas.html', id: 'personas' },
       { name: 'Product launch impact', href: 'launch.html', id: 'launch' }, { name: 'Self-service & channel shift', href: null }] },
     { group: 'Data', items: [{ name: 'Data quality', href: 'index.html', id: 'quality' }] }
   ];

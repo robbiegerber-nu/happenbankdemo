@@ -99,7 +99,11 @@
     { "id": "repeat", "name": "Repeat contact rate", "short": "Repeat contacts", "format": "pct", "better": "lower", "target": null,
       "definition": "Share of contacts from identified customers followed by another contact from the same customer, on any channel, within 7 days. No target; read the trend.", "formula": "Contacts followed by another within 7 days ÷ contacts from identified customers", "exclusions": "Excludes contacts with no identified customer.", "minN": 50, "wiki": "resolution-and-experience" },
     { "id": "response", "name": "Survey response rate", "short": "Response rate", "format": "pct", "better": "none", "target": null,
-      "definition": "Surveys answered for every 100 answered contacts. No target; it shows how many customers the scores speak for.", "formula": "Surveys ÷ answered contacts", "minN": 50, "wiki": "resolution-and-experience" }
+      "definition": "Surveys answered for every 100 answered contacts. No target; it shows how many customers the scores speak for.", "formula": "Surveys ÷ answered contacts", "minN": 50, "wiki": "resolution-and-experience" },
+    { "id": "contact_rate", "name": "Contacts per 100 customers a month", "short": "Contact rate", "format": "rate", "better": "none", "target": null,
+      "definition": "Contacts from identified customers for every 100 customers on the books, per month. No target; it shows who needs help most often.", "formula": "Contacts ÷ (customers × months) × 100", "exclusions": "Excludes contacts with no identified customer.", "minN": 50, "wiki": "service-and-access" },
+    { "id": "reach", "name": "Customers who contacted", "short": "Reach", "format": "pct", "better": "none", "target": null,
+      "definition": "Share of customers who contacted at least once in the quarter. No target.", "formula": "Customers with one or more contacts ÷ customers on the books", "minN": 50, "wiki": "service-and-access" }
   ],
   "sections": [
     { "id": "access", "name": "Service and access" },

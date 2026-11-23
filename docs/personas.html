@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer &amp; Persona Insights · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated contact patterns and experience by persona, segment and age, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=2.2"></script>
+<script src="assets/personas.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .ctls { display: contents; }
+  @media (min-width: 768px) { .filter-bar .wrap { gap: 7px; } .ctls .filter { gap: 4px; } .ctls select { padding-left: 8px; padding-right: 20px; } #f-q { width: 112px; } #f-cmp { width: 138px; } #f-p { width: 150px; } #f-s { width: 106px; } #f-a { width: 84px; } #f-d { width: 108px; } }
+  .phone-f { display: none; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile-top { display: flex; justify-content: space-between; gap: 6px; }
+  .tile-top button.t { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); min-height: 24px; }
+  .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
+  .chart { margin-top: 10px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .x { overflow-x: auto; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }
+  .name { border: 0; background: none; padding: 4px 0; min-height: 28px; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  h3 { margin-top: 20px; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .l1 { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; } .l2 { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1.5; } .pt.low { fill: var(--surface); stroke: var(--text-muted); } .pt.day { stroke: var(--text-primary); stroke-width: 2; }
+  .tg { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; } .wb { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus-visible, .hm:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  .l3 { fill: none; stroke: var(--text-muted); stroke-width: 1.5; } .bar { fill: var(--brand-blue); } .bar.low { fill: var(--text-muted); fill-opacity: .35; } .tick0 { stroke: var(--text-primary); stroke-width: 2; }
+  .sm-h { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 10px; }
+  @media (max-width: 767px) {
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .card { padding: 14px; }
+    .tile .v { font-size: 22px; }
+    .name, .chip { min-height: 44px; }
+  }
+  .tiles { grid-template-columns: repeat(4, 1fr); } .tile { padding: 12px; }
+  .about { margin: 14px 0 0; max-width: 820px; } .phone-note { display: none; } td div { font-size: 12.5px; } td.on { background: var(--surface-warm); } .w { color: var(--brand-purple); font-weight: 700; } td div.w { color: var(--text-primary); } .b { color: var(--brand-blue); }
+  #tbl-grp th, #tbl-grp td { padding: 8px 9px; } #tbl-grp th { white-space: normal; vertical-align: bottom; min-width: 66px; } #tbl-grp th:nth-last-child(-n+2) { min-width: 104px; } #tbl-grp td { position: relative; } .tools .filter { color: var(--text-secondary); }
+  .sm { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 4px 18px; margin-top: 8px; } .sm > div { min-width: 0; } .sm svg { display: block; width: 100%; }
+  .c1 { fill: var(--brand-blue); } .c4 { fill: url(#h4); stroke: var(--brand-blue); stroke-width: .5; } .c2 { fill: var(--brand-purple); } .c3 { fill: var(--control); } .c5 { fill: url(#h5); stroke: var(--brand-purple); stroke-width: .5; } .inb { fill: var(--on-ink); font-size: 12px; font-weight: 700; font-family: var(--font); pointer-events: none; }
+  @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .phone-note { display: block; } .wide-only { display: none; } .card .btn, .tools .filter select { min-height: 44px; } .tools .filter { flex: none; } }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+  <div class="ctls" id="ctls">
+    <label class="filter"><span class="flabel">Quarter</span><select id="f-q"></select></label>
+    <label class="filter"><span class="flabel">Compare to</span><select id="f-cmp"><option value="prior">Prior quarter</option><option value="year">Same quarter last year</option></select></label>
+    <label class="filter"><span class="flabel">Persona</span><select id="f-p"></select></label>
+    <label class="filter"><span class="flabel">Segment</span><select id="f-s"></select></label>
+    <label class="filter"><span class="flabel">Age</span><select id="f-a"></select></label>
+    <label class="filter"><span class="flabel">Digital</span><select id="f-d"><option value="">All</option><option value="1">Enrolled</option><option value="0">Not enrolled</option></select></label>
+    <button class="link-btn" id="f-reset" type="button">Reset</button>
+  </div>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<main class="wrap" id="main">
+  <h1>Customer &amp; persona insights</h1>
+  <p class="sub" id="s-page"></p>
+  <p class="note phone-note">Open on a larger screen to see channels, reasons and repeat users.</p>
+  <div class="chips" id="chips"></div>
+  <p class="note" id="loading">Loading customer data…</p>
+  <div id="content" hidden>
+    <p class="about" id="about"></p>
+    <div class="tiles" id="tiles"></div>
+    <p class="note">Identified customers only. Digital enrollment and persona are today's, in every quarter. Closed customer relationships aren't recorded, so the number of customers can only grow.</p>
+    <section class="card" aria-labelledby="t-grp">
+      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"><option value="p">Persona</option><option value="s">Segment</option><option value="a">Age band</option><option value="d">Digital enrollment</option></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-grp"></div><p class="note" id="n-grp"></p>
+    </section>
+    <section class="card" aria-labelledby="t-tr">
+      <div class="head"><div><h2 id="t-tr"></h2><div class="sub" id="s-tr"></div></div><div class="tools"><button class="btn" id="csv-tr" type="button">Download CSV</button><button class="btn" id="tb-tr" type="button">View as table</button></div></div>
+      <div class="sm" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-ch">
+      <div class="head"><div><h2 id="t-ch"></h2><div class="sub" id="s-ch"></div></div><div class="tools"><button class="btn" id="csv-ch" type="button">Download CSV</button><button class="btn" id="tb-ch" type="button">View as table</button></div></div>
+      <div class="chart" id="c-ch"></div><div class="legend" id="lg-ch"></div><div class="tbl" id="tbl-ch" tabindex="0" role="region" aria-label="Channel mix" hidden></div><p class="note" id="n-ch"></p>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-rea">
+      <div class="head"><div><h2 id="t-rea"></h2><div class="sub" id="s-rea"></div></div><div class="tools"><button class="btn" id="csv-rea" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-rea"></div><p class="note" id="n-rea"></p>
+    </section>
+    <section class="card wide-only" aria-labelledby="t-hv">
+      <div class="head"><div><h2 id="t-hv"></h2><div class="sub" id="s-hv"></div></div><div class="tools"><button class="btn" id="csv-hv" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-hv"></div>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), P = Personas, M = P.METRICS;
+  Site.renderChrome('personas');
+  const DEF = { q: '', cmp: 'prior', p: '', s: '', a: '', d: '', metric: 'csat', dim: 'p' }, S = { ...DEF }, files = {}; let IDX, K, CELL, req = 0, cur = {}, NOW, WAS; const tbl = { tr: false, ch: false };
+  const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
+  const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/personas/${m}.json.gz`);
+  const shift = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); }, qOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${y}-${String(Math.floor((mo - 1) / 3) * 3 + 1).padStart(2, '0')}`; }, qName = (q) => `Q${(+q.slice(5) + 2) / 3} ${q.slice(0, 4)}`, qMonths = (q) => [0, 1, 2].map((i) => shift(q, i));
+  const DIM = { p: { name: 'Persona', label: (k) => (IDX.personas.find((x) => x.id === +k) || {}).name }, s: { name: 'Segment', label: (k) => IDX.names.s[k] }, a: { name: 'Age band', label: (k) => IDX.names.a[k] }, d: { name: 'Digital enrollment', label: (k) => (+k ? 'Enrolled' : 'Not enrolled') } };
+  Promise.all([file('data/dashboards/kpis.json'), file('data/dashboards/personas/index.json')]).then(([k, i]) => {
+    const all = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); IDX = i;
+    K = { rate: all.contact_rate, reach: all.reach, digital: { ...all.digital_share, better: 'none' }, csat: all.csat, nps: all.nps, fcr: all.fcr, repeat: all.repeat, complaints: { ...all.complaints, definition: 'Formal complaints opened for every 1,000 contacts from identified customers, including complaints made outside the contact center.', formula: 'Complaints ÷ identified contacts × 1,000' } };
+    CELL = new Map(i.cells.map((c) => [c[0], { p: c[1], s: c[2], a: c[3], d: c[4] }])); IDX.cust = new Map(); for (const [q, c, n] of i.customers) (IDX.cust.get(q) || (IDX.cust.set(q, new Map()), IDX.cust.get(q))).set(c, n);
+    IDX.rch = new Map(); for (const r of i.reach) (IDX.rch.get(r[0]) || (IDX.rch.set(r[0], []), IDX.rch.get(r[0]))).push(r);
+    DEF.q = S.q = i.quarters[i.quarters.length - 1]; $('f-q').innerHTML = [...i.quarters].reverse().map((q) => `<option value="${q}">${qName(q)}</option>`).join('');
+    const opt = (id, rows) => { $(id).innerHTML = '<option value="">All</option>' + rows.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); }; opt('f-p', i.personas.map((x) => [x.id, x.name])); opt('f-s', Object.entries(i.names.s)); opt('f-a', Object.entries(i.names.a));
+    const p = new URLSearchParams(location.search); for (const key of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) { const v = p.get(key); if (v && [...$('f-' + key).options].some((o) => o.value === v)) S[key] = v; } if (M.includes(p.get('metric'))) S.metric = p.get('metric');
+    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer & persona insights v1.0`;
+    return update();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer data could not be loaded. ' + e.message; }
+  const F = (m) => K[m].format, V = (m, v) => fmt.value(v, F(m), true), low = (m, t) => P.n(m, t) < (m === 'rate' ? 1 : K[m].minN), dt = (m, a, b) => { const c = fmt.change(a, b, F(m)); return c ? (c.flat ? '0' : c.text) : '–'; };
+  // ---------- Totals ----------
+  const okCell = (c, skip) => ['p', 's', 'a', 'd'].every((f) => f === skip || S[f] === '' || String(c[f]) === S[f]);
+  // totals of a set of months by group; opts: key(cell, channel, reason), skip = filter to ignore
+  function totals(datas, key, skip) {
+    const out = new Map();
+    for (const x of datas) { const c = x.cols; for (let j = 0; j < c.x.length; j++) { const ce = CELL.get(c.x[j]); if (!okCell(ce, skip)) continue; const k = key(ce, c.c[j], c.r[j], x.m); if (k == null) continue; const t = out.get(k) || (out.set(k, { o: 0, a: 0, f: 0, e: 0, sv: 0, sat: 0, net: 0, nn: 0, cp: 0, dg: 0 }), out.get(k)); for (const f of ['o', 'a', 'f', 'e', 'sv', 'sat', 'net', 'nn', 'cp']) t[f] += c[f][j]; if (c.c[j] === 2 || c.c[j] === 3 || c.c[j] === 5) t.dg += c.o[j]; } }
+    return out;
+  }
+  function withBase(map, key, qs, months, skip) {   // customers and reach for groups; qs: quarters, months: months each customer counts for
+    for (const [q, n] of qs) { for (const [id, c] of IDX.cust.get(q) || []) { const ce = CELL.get(id); if (!okCell(ce, skip)) continue; const k = key(ce, q); if (!map.has(k)) continue; const t = map.get(k); t.cm = (t.cm || 0) + c * n; t.cust = (t.cust || 0) + c; } for (const r of IDX.rch.get(q) || []) { const ce = CELL.get(r[1]); if (!okCell(ce, skip)) continue; const k = key(ce, q); if (!map.has(k)) continue; const t = map.get(k); P.add(t, { c1: r[2], c2: r[3], c4: r[4], who: r[2] + r[3] + r[4], k: r[5], k4: r[6] }); } }
+    return map;
+  }
+  function period(q, datas) { const key = () => 'all', dk = (c) => c[S.dim]; return { q, datas, all: withBase(totals(datas, key), key, [[q, 3]]).get('all') || {}, dim: withBase(totals(datas, dk, S.dim), dk, [[q, 3]], 3, S.dim) }; }
+  async function update() {
+    const r = ++req, last = shift(S.q, 2), tm = []; for (let i = 12; i >= 0; i--) { const m = shift(last, -i); if (IDX.months.includes(m)) tm.push(m); }
+    const cq = shift(S.q, S.cmp === 'year' ? -12 : -3), has = IDX.quarters.includes(cq), [td, cd] = await Promise.all([Promise.all(tm.map(month)), has ? Promise.all(qMonths(cq).map(month)) : []]); if (r !== req) return;
+    cur.tm = tm; cur.td = td; NOW = period(S.q, td.slice(-3)); WAS = has ? period(cq, cd) : null;
+    $('loading').hidden = true; $('content').hidden = false; controls(); writeUrl(); renderTiles(); renderGroups(); renderTrend(); renderChannels(); renderReasons(); renderHeavy();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); };
+  const cmpName = () => (S.cmp === 'year' ? 'same quarter last year' : 'prior quarter'), groupName = () => (cur.chips.length ? cur.chips.map((c) => c[1]).join(', ') : 'all identified customers');
+  function controls() {
+    for (const k of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) $('f-' + k).value = S[k];
+    cur.chips = ['p', 's', 'a', 'd'].filter((k) => S[k] !== '').map((k) => [k, k === 'd' ? `Digital: ${DIM.d.label(S.d).toLowerCase()}` : `${DIM[k].name}: ${DIM[k].label(S[k])}`]);
+    $('chips').innerHTML = cur.chips.map(([k, t]) => `<button type="button" class="chip" data-q="${k}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join('');
+    const n = cur.chips.length + ['q', 'cmp'].filter((k) => S[k] !== DEF[k]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
+    $('s-page').textContent = `${qName(S.q)} (${fmt.monthShort(S.q)}–${fmt.monthShort(shift(S.q, 2))}) · ${NOW.all.cust ? fmt.count(NOW.all.cust) + ' customers' : 'no customers match these filters'} · ${WAS ? `compared with ${qName(WAS.q)}` : `no ${cmpName()} to compare`}`;
+    const pr = S.p && IDX.personas.find((x) => x.id === +S.p); $('about').hidden = !pr; $('about').textContent = pr ? `${pr.name}: ${pr.about} Preferred channel: ${pr.channel.toLowerCase()}.` : '';
+  }
+  function writeUrl() { const p = new URLSearchParams(); for (const k of Object.keys(DEF)) if (S[k] !== DEF[k]) p.set(k, S[k]); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '')); }
+  function chg(m, now, was) { if (!was || low(m, was) || low(m, now)) return null; const a = P.value(m, now), b = P.value(m, was), c = fmt.change(a, b, F(m)), real = P.beyond(m, now, was); return c && { c, real, q: real ? changeQuality(K[m], a, b, c) : 'neutral' }; }
+  const arrow = (x) => (x.c.flat ? '– No change' : `${x.c.delta > 0 ? '▲' : '▼'} ${x.c.text}`);
+  // ---------- Tiles ----------
+  function renderTiles() {
+    const host = $('tiles'); host.innerHTML = '';
+    for (const m of M) { const k = K[m], t = NOW.all, v = P.value(m, t), lo = low(m, t), x = WAS && chg(m, t, WAS.all), d = document.createElement('div'); d.className = 'tile' + (S.metric === m ? ' sel' : '');
+      d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${V(m, v)}</div>${k.target == null ? '' : `<span class="status ${lo ? 'none' : statusOf(k, v)}">${lo ? 'Too few' : STATUS_WORD[statusOf(k, v)]}</span>`}<div class="m">${k.target == null ? 'No target' : 'Target ' + esc(k.targetLabel)}${lo ? ` · n = ${fmt.count(P.n(m, t))}, below ${k.minN}` : ''}</div>${x ? `<span class="chg ${x.q}">${arrow(x)} vs ${cmpName()}${Site.QUALITY_WORD[x.q] ? ' · ' + x.q : ''}</span>${x.c.flat ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
+      d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d); }
+  }
+  // ---------- Groups ----------
+  const groups = () => [...NOW.dim].sort((a, b) => a[0] - b[0]), poolOf = (map) => { const all = {}; for (const t of map.values()) P.add(all, t); return all; };
+  function renderGroups() {
+    const D = DIM[S.dim], all = poolOf(NOW.dim), m = S.metric; cur.pool = all;
+    $('t-grp').textContent = `Each group against the rest, by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${qName(S.q)} · the second line is the difference from all customers shown · ◆ worse and ▲ better than the rest, beyond chance · click a name to filter`;
+    const cell = (k, t) => { const lo = low(k, t), v = P.value(k, t), rest = P.minus(all, t), real = !lo && P.beyond(k, t, rest), ch = fmt.change(v, P.value(k, all), F(k)), q = real ? changeQuality(K[k], v, P.value(k, all), ch) : 'neutral'; return `<td class="${lo ? 'low' : ''}${k === m ? ' on' : ''}">${q === 'worse' ? '<span class="w" aria-hidden="true">◆ </span>' : q === 'better' ? '<span class="b" aria-hidden="true">▲ </span>' : ''}${V(k, v)}<div class="${q === 'worse' ? 'w' : 'muted'}">${lo ? 'too few' : dt(k, v, P.value(k, all))}${q === 'worse' || q === 'better' ? `<span class="sr-only"> ${q} than the rest</span>` : ''}</div></td>`; };
+    const byAll = totals(NOW.datas, (c, ch, r) => `${ch}|${r}`, S.dim), byG = new Map();
+    for (const [k, t] of totals(NOW.datas, (c, ch, r) => `${c[S.dim]}~${ch}|${r}`, S.dim)) { const [g, rest] = k.split('~'); (byG.get(+g) || (byG.set(+g, new Map()), byG.get(+g))).set(rest, t); }
+    const hasMix = P.M[m].mix; cur.grp = groups().map(([id, t]) => ({ id, name: D.label(id), t, mix: hasMix && !low(m, t) ? P.mixGap(m, byG.get(id) || new Map(), byAll, all) : null }));
+    $('tbl-grp').innerHTML = `<table><thead><tr><th scope="col">${D.name}</th><th scope="col">Customers</th>${M.map((k) => `<th scope="col">${esc(K[k].short)}</th>`).join('')}${hasMix ? `<th scope="col">${esc(K[m].short)} gap: from what they ask</th><th scope="col">The rest of the gap</th>` : ''}</tr></thead><tbody>${cur.grp.map(({ id, name, t, mix }) => { const on = S[S.dim] === String(id), gap = fmt.displayed(P.value(m, t), F(m)) - fmt.displayed(P.value(m, all), F(m)), part = mix == null ? null : fmt.displayed(mix, F(m)); return `<tr class="${S[S.dim] !== '' ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="grp|${id}" data-v="${id}" aria-pressed="${on}">${esc(name)}</button></td><td>${fmt.count(t.cust || 0)}</td>${M.map((k) => cell(k, t)).join('')}${hasMix ? (mix == null ? '<td>–</td><td>–</td>' : `<td>${gapTxt(m, part)}</td><td>${gapTxt(m, gap - part)}</td>`) : ''}</tr>`; }).join('')}<tr><td><b>All shown</b></td><td>${fmt.count(all.cust || 0)}</td>${M.map((k) => `<td><b>${V(k, P.value(k, all))}</b></td>`).join('')}${hasMix ? '<td></td><td></td>' : ''}</tr></tbody></table>`;
+    $('n-grp').textContent = hasMix ? `From what they ask is the gap you would expect from the group's channels and contact reasons alone, at everyone's results. The rest is how those same contacts turned out for this group. The two add up to the gap.` : 'Contact rate, reach, digital share and complaints have no mix split. Select a tile such as customer satisfaction to see one.';
+  }
+  const gapTxt = (m, d) => { const x = F(m) === 'nps' ? Math.round(d) : Math.round(d * 10) / 10; return (x > 0 ? '+' : x < 0 ? '−' : '') + (F(m) === 'nps' ? Math.abs(x) : Math.abs(x).toFixed(1)) + (F(m) === 'pct' || F(m) === 'nps' ? ' pts' : ''); };
+  // ---------- Chart helpers ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const tick = (m, v) => (F(m) === 'pct' ? +v.toFixed(1) + '%' : F(m) === 'nps' ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) : String(+v.toFixed(1)));
+  function tip(node, html) { const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); }; node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip); }
+  function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
+  const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
+  function swap(k, ids) { ids.forEach((i) => ($(i).hidden = tbl[k])); $('tbl-' + k).hidden = !tbl[k]; $('tb-' + k).textContent = tbl[k] ? 'View as chart' : 'View as table'; $('tb-' + k).setAttribute('aria-pressed', tbl[k]); }
+  // ---------- Trend, small multiples ----------
+  const trendMetric = () => (S.metric === 'reach' ? 'rate' : S.metric);   // reach is a quarterly count
+  function renderTrend() {
+    const m = trendMetric(), k = K[m], key = (c, ch, r, mm) => `${c[S.dim]}~${mm}`, map = totals(cur.td, key, S.dim), aMap = totals(cur.td, (c, ch, r, mm) => mm, S.dim);
+    for (const mm of cur.tm) { const q = qOf(mm); for (const [id, n] of IDX.cust.get(q) || []) { const c = CELL.get(id); if (!okCell(c, S.dim)) continue; const t = map.get(`${c[S.dim]}~${mm}`); if (t) t.cm = (t.cm || 0) + n; const a = aMap.get(mm); if (a) a.cm = (a.cm || 0) + n; } }
+    const rows = groups().map(([id]) => ({ id, name: DIM[S.dim].label(id), pts: cur.tm.map((mm) => { const t = map.get(`${id}~${mm}`); return { mm, t, v: P.value(m, t), low: !t || low(m, t) }; }) })), all = cur.tm.map((mm) => P.value(m, aMap.get(mm))); cur.trend = { m, rows, all };
+    $('t-tr').textContent = `${k.name} by ${DIM[S.dim].name.toLowerCase()}, 13 months`; $('s-tr').textContent = `${k.short}, monthly, ${fmt.month(cur.tm[0])} – ${fmt.month(cur.tm[cur.tm.length - 1])} · same scale in every chart${S.metric === 'reach' ? ' · contact rate is shown, because reach is counted per quarter' : ''}`; swap('tr', ['c-tr', 'lg-tr']);
+    if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th>${rows.map((r) => `<th scope="col">${esc(r.name)}</th>`).join('')}<th scope="col">All shown</th></tr></thead><tbody>${cur.tm.map((mm, i) => `<tr><td>${fmt.month(mm)}</td>${rows.map((r) => `<td class="${r.pts[i].low ? 'low' : ''}">${V(m, r.pts[i].v)}${r.pts[i].low ? ' (too few)' : ''}</td>`).join('')}<td>${V(m, all[i])}</td></tr>`).reverse().join('')}</tbody></table>`; return; }
+    const host = $('c-tr'); host.innerHTML = ''; $('lg-tr').innerHTML = ''; const vs = [...rows.flatMap((r) => r.pts.filter((p) => !p.low).map((p) => p.v)), ...all].filter((v) => v != null); if (!vs.length) { host.textContent = 'No data for these filters.'; return; }
+    let lo = Math.min(...vs, ...(k.target == null ? [] : [k.target])), hi = Math.max(...vs, ...(k.target == null ? [] : [k.target])); const pad = (hi - lo || 1) * .08; lo -= pad; hi += pad;
+    const boxes = rows.map(() => host.appendChild(document.createElement('div')));
+    rows.forEach((r, i) => { const box = boxes[i], on = S[S.dim] === String(r.id); box.innerHTML = `<div class="sm-h">${esc(r.name)}${on ? ' (selected)' : ''}</div>`; const w = box.clientWidth || 300, H = 130, G = { l: 46, r: 8, t: 6, b: 22 }, x = (j) => G.l + (j + .5) / cur.tm.length * (w - G.l - G.r), y = (v) => G.t + (hi - Math.max(lo, Math.min(hi, v))) / (hi - lo) * (H - G.t - G.b);
+      const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, ${r.name}. Use View as table for values.` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+      for (const t of ticks(lo, hi, 3)) { el('line', { x1: G.l, x2: w - G.r, y1: y(t), y2: y(t) }, g); text(ax, G.l - 6, y(t) + 4, tick(m, t), '', 'end'); } cur.tm.forEach((mm, j) => { if ((cur.tm.length - 1 - j) % 4 === 0) text(ax, x(j), H - 6, fmt.monthShort(mm) + (j === 0 ? ' ’' + mm.slice(2, 4) : ''), '', 'middle'); });
+      if (k.target != null) el('line', { class: 'tg', x1: G.l, x2: w - G.r, y1: y(k.target), y2: y(k.target) }, s);
+      const path = (a) => a.map((v, j) => [v, j]).filter((q) => q[0] != null).map(([v, j], n) => `${n ? 'L' : 'M'}${x(j)},${y(v)}`).join(''); el('path', { class: 'l3', d: path(all) }, s); el('path', { class: 'l1', d: path(r.pts.map((p) => (p.low ? null : p.v))) }, s);
+      r.pts.forEach((p, j) => { if (p.v == null) return; if (p.low) el('circle', { class: 'pt low', cx: x(j), cy: y(p.v), r: 3 }, s); const h = el('rect', { class: 'hit', x: x(j) - (w - G.l - G.r) / cur.tm.length / 2, y: G.t, width: (w - G.l - G.r) / cur.tm.length, height: H - G.t - G.b, tabindex: j === cur.tm.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${r.name}, ${fmt.month(p.mm)}: ${V(m, p.v)}, all ${V(m, all[j])}${p.low ? ', too few' : ''}` }, s); tip(h, () => `<b>${esc(r.name)}</b><br>${fmt.month(p.mm)}: <b>${V(m, p.v)}</b><br>All shown: ${V(m, all[j])}<br><span class="muted">n = ${fmt.count(P.n(m, p.t))}${p.low ? ', too few' : ''}</span>`); }); arrows(s); });
+    $('lg-tr').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Group'], ['<line class="l3" x2="20" y1="7" y2="7"/>', 'All shown'], ...(k.target == null ? [] : [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target ' + tick(m, k.target)]]), ['<circle class="pt low" cx="10" cy="7" r="3"/>', 'Too few']]);
+  }
+  // ---------- Channels ----------
+  const CC = { 1: 'c1', 2: 'c2', 3: 'c3', 4: 'c4', 5: 'c5' }, ORDER = [1, 4, 2, 3, 5];
+  function renderChannels() {
+    const map = totals(NOW.datas, (c, ch) => (ch ? `${c[S.dim]}~${ch}` : null), S.dim), rows = groups().map(([id]) => { const o = ORDER.map((ch) => (map.get(`${id}~${ch}`) || { o: 0 }).o), t = o.reduce((a, b) => a + b, 0); return { id, name: DIM[S.dim].label(id), o, t, p: o.map((v) => (t ? v / t * 100 : 0)) }; }); cur.ch = rows;
+    const cn = (id) => IDX.channels.find((x) => x[0] === id)[1];
+    $('t-ch').textContent = `How each group contacts, by ${DIM[S.dim].name.toLowerCase()}`; $('s-ch').textContent = `Share of contacts by channel, ${qName(S.q)}`; $('n-ch').textContent = S.dim === 'p' ? 'Preferred channel: ' + IDX.personas.map((x) => `${x.name} ${x.channel.toLowerCase()}`).join(' · ') + '.' : ''; swap('ch', ['c-ch', 'lg-ch']);
+    if (tbl.ch) { $('tbl-ch').innerHTML = `<table><thead><tr><th scope="col">${DIM[S.dim].name}</th>${ORDER.map((c) => `<th scope="col">${cn(c)}</th>`).join('')}<th scope="col">Contacts</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td>${r.p.map((v) => `<td>${v.toFixed(1)}%</td>`).join('')}<td>${fmt.count(r.t)}</td></tr>`).join('')}</tbody></table>`; return; }
+    const host = $('c-ch'); host.innerHTML = ''; const w = host.clientWidth; if (!w) return; const L = 190, rh = 32, H = rows.length * rh + 26, x = (v) => L + v / 100 * (w - L - 16), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Channel mix by group. Use View as table for values.' }, host), ax = el('g', { class: 'ax' }, s);
+    const df = el('defs', {}, s); for (const [id, v, a] of [['h4', '--brand-blue', 45], ['h5', '--brand-purple', -45]]) { const pt = el('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: `rotate(${a})` }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: `fill:var(${v})` }, pt); }
+    rows.forEach((r, i) => { const y = i * rh + 4; text(s, L - 10, y + 17, r.name, 'lab', 'end'); let b = 0; r.p.forEach((v, j) => { el('rect', { class: CC[ORDER[j]], x: x(b), y: y + 2, width: Math.max(0, x(b + v) - x(b) - 1), height: rh - 10 }, s); if (v >= 9 && [1, 2].includes(ORDER[j])) text(s, x(b + v / 2), y + 18, Math.round(v) + '%', 'inb', 'middle'); b += v; }); const h = el('rect', { class: 'hit', x: L, y, width: w - L - 16, height: rh - 6, tabindex: i ? -1 : 0, role: 'img', 'aria-label': `${r.name}: ${ORDER.map((c, j) => `${cn(c)} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${esc(r.name)}</b><br>${ORDER.map((c, j) => `${cn(c)}: ${r.p[j].toFixed(1)}%`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} contacts</span>`); });
+    for (const t of [0, 25, 50, 75, 100]) text(ax, x(t), H - 6, t + '%', '', 'middle'); arrows(s); $('lg-ch').innerHTML = leg(ORDER.map((c) => [`<rect class="${CC[c]}" width="20" height="14"/>`, cn(c)]));
+  }
+  // ---------- Reasons ----------
+  function renderReasons() {
+    const filt = cur.chips.length > 0, everyone = totals(NOW.datas, (c, ch, r) => r || null, null);
+    const save = { p: S.p, s: S.s, a: S.a, d: S.d }; let base = everyone; if (filt) { Object.assign(S, { p: '', s: '', a: '', d: '' }); base = totals(NOW.datas, (c, ch, r) => r || null); Object.assign(S, save); }
+    const sum = (mp) => { const t = {}; for (const v of mp.values()) P.add(t, v); return t; }, a = sum(everyone), b = sum(base);
+    const custA = NOW.all.cm || 0, custB = [...IDX.cust.get(S.q).values()].reduce((x, y) => x + y, 0) * 3;
+    const rows = [...everyone].filter(([, t]) => t.o > 0).map(([id, t]) => { const o = base.get(id); return { id, name: (IDX.reasons.find((x) => x[0] === id) || [0, 'Other'])[1], t, share: t.o / a.o * 100, base: o.o / b.o * 100, rate: custA ? t.o / custA * 100 : 0, bRate: custB ? o.o / custB * 100 : 0, o }; }); cur.rea = rows.sort((x, y) => (filt ? Math.abs(y.rate - y.bRate) - Math.abs(x.rate - x.bRate) : y.t.o - x.t.o));
+    $('t-rea').textContent = filt ? `What ${S.p && cur.chips.length === 1 ? DIM.p.label(S.p) + ' customers' : 'the selected customers'} contact about` : 'What customers contact about'; $('s-rea').textContent = `${qName(S.q)} · ${filt ? 'reasons whose contact rate differs most from all customers first' : 'most contacts first; filter to a group to compare it with all customers'}`;
+    const c = (m, t, o) => { const lo = low(m, t); return `<td class="${lo ? 'low' : ''}">${V(m, P.value(m, t))}${filt ? `<div class="muted">${lo ? 'too few' : dt(m, P.value(m, t), P.value(m, o))}</div>` : lo ? '<div class="muted">too few</div>' : ''}</td>`; };
+    $('tbl-rea').innerHTML = `<table><thead><tr><th scope="col">Contact reason</th><th scope="col">Contacts</th><th scope="col">Share</th>${filt ? '<th scope="col">All customers</th>' : ''}<th scope="col">Per 100 customers a month</th>${filt ? '<th scope="col">Times the usual rate</th>' : ''}<th scope="col">CSAT</th><th scope="col">FCR</th></tr></thead><tbody>${cur.rea.slice(0, 15).map((r) => `<tr><td>${esc(r.name)}</td><td>${fmt.count(r.t.o)}</td><td>${r.share.toFixed(1)}%</td>${filt ? `<td>${r.base.toFixed(1)}%</td>` : ''}<td>${r.rate.toFixed(2)}</td>${filt ? `<td><b>${r.t.o < 50 || !r.bRate ? '–' : (r.rate / r.bRate).toFixed(2) + '×'}</b></td>` : ''}${c('csat', r.t, r.o)}${c('fcr', r.t, r.o)}</tr>`).join('')}</tbody></table>`;
+    $('n-rea').textContent = `${rows.length > 15 ? `First 15 of ${rows.length} reasons; the CSV has them all. ` : ''}${filt ? 'The second line is the difference from all customers for the same reason.' : ''}`;
+  }
+  // ---------- Heavy users ----------
+  function renderHeavy() {
+    const rows = [...groups().map(([id, t]) => ({ name: DIM[S.dim].label(id), t })), { name: 'All shown', t: cur.pool, all: true }]; cur.hv = rows;
+    $('t-hv').textContent = `How often customers contact, by ${DIM[S.dim].name.toLowerCase()}`; $('s-hv').textContent = `Customers by number of contacts in ${qName(S.q)}, all channels`;
+    const p = (a, b) => (b ? (a / b * 100).toFixed(1) + '%' : '–');
+    $('tbl-hv').innerHTML = `<table><thead><tr><th scope="col">${DIM[S.dim].name}</th><th scope="col">Customers</th><th scope="col">None</th><th scope="col">1 contact</th><th scope="col">2–3</th><th scope="col">4 or more</th><th scope="col">Share of contacts from the 4 or more</th></tr></thead><tbody>${rows.map(({ name, t, all }) => `<tr><td>${all ? `<b>${name}</b>` : esc(name)}</td><td>${fmt.count(t.cust || 0)}</td><td>${p((t.cust || 0) - (t.who || 0), t.cust)}</td><td>${p(t.c1 || 0, t.cust)}</td><td>${p(t.c2 || 0, t.cust)}</td><td>${p(t.c4 || 0, t.cust)}</td><td>${p(t.k4 || 0, t.k)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  // ---------- Events ----------
+  for (const k of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; go(); });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { S[b.dataset.q] = ''; go(); } });
+  $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { S[S.dim] = S[S.dim] === b.dataset.v ? '' : b.dataset.v; go(); } });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); tbl.tr = tbl.ch = false; go(); }); $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
+  $('tb-tr').addEventListener('click', () => { tbl.tr = !tbl.tr; renderTrend(); }); $('tb-ch').addEventListener('click', () => { tbl.ch = !tbl.ch; renderChannels(); });
+  const csv = (n, w, h, r) => Site.downloadCsv(`personas_${n}`, IDX.data_through, `Customer and persona insights · ${w} · ${qName(S.q)} · filters: ${cur.chips.map((c) => c[1]).join('; ') || 'none'} · data through ${IDX.data_through}`, h, r);
+  $('csv-grp').addEventListener('click', () => csv('groups', 'by ' + DIM[S.dim].name, ['group', 'customers', ...M.flatMap((m) => [m, m + '_n']), S.metric + '_gap_from_mix'], cur.grp.map((r) => [r.name, r.t.cust, ...M.flatMap((m) => [P.value(m, r.t), P.n(m, r.t)]), r.mix])));
+  $('csv-tr').addEventListener('click', () => csv('trend', K[cur.trend.m].name + ' by month', ['month', ...cur.trend.rows.map((r) => r.name), 'all_shown'], cur.tm.map((mm, i) => [mm, ...cur.trend.rows.map((r) => r.pts[i].v), cur.trend.all[i]]).reverse()));
+  $('csv-ch').addEventListener('click', () => csv('channels', 'channel mix', ['group', ...ORDER.map((c) => IDX.channels.find((x) => x[0] === c)[1])], cur.ch.map((r) => [r.name, ...r.o])));
+  $('csv-rea').addEventListener('click', () => csv('reasons', 'contact reasons', ['reason', 'contacts', 'share_pct', 'all_customers_share_pct', 'per_100_customers_a_month', 'all_customers_per_100', 'csat', 'fcr'], cur.rea.map((r) => [r.name, r.t.o, r.share, r.base, r.rate, r.bRate, P.value('csat', r.t), P.value('fcr', r.t)])));
+  $('csv-hv').addEventListener('click', () => csv('how-often', 'customers by number of contacts', ['group', 'customers', 'one', 'two_three', 'four_or_more', 'contacts', 'contacts_from_four_or_more'], cur.hv.map((r) => [r.name, r.t.cust, r.t.c1, r.t.c2, r.t.c4, r.t.k, r.t.k4])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (NOW) { renderTrend(); renderChannels(); } }, 150); });
+})();
+</script>
+</body>
+</html>

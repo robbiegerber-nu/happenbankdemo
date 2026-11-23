@@ -16,6 +16,7 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 | [Agent & team coaching](https://robbiegerber-nu.github.io/happenbankdemo/coaching.html) | Who could use coaching, on what, and is it a real gap? |
 | [Customer experience](https://robbiegerber-nu.github.io/happenbankdemo/cx.html) | How do customers feel, and what drives it? |
 | [Product launch impact](https://robbiegerber-nu.github.io/happenbankdemo/launch.html) | What happens after a launch, and for how long? |
+| [Customer & persona insights](https://robbiegerber-nu.github.io/happenbankdemo/personas.html) | Who contacts us most, how, and who has the worst experience? |
 | [Performance driver explorer](https://robbiegerber-nu.github.io/happenbankdemo/drivers.html) | What changed, and what drove it? |
 | [Process stability monitor](https://robbiegerber-nu.github.io/happenbankdemo/stability.html) | Is this a real change or normal variation? |
 | [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/) | Can we trust the data? |
