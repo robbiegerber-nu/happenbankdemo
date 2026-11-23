@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent &amp; Team Coaching · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated agent and team results with fair peer comparisons, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=1.9"></script>
+<script src="assets/coaching.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .ctls { display: contents; }
+  @media (min-width: 768px) { .filter-bar .wrap { gap: 7px; } .ctls .filter { gap: 4px; } .ctls select { padding-left: 8px; padding-right: 20px; } #f-per { width: 108px; } #f-end { width: 150px; } #f-ch { width: 98px; } #f-site { width: 120px; } #f-team { width: 150px; } #f-ten { width: 130px; } }
+  .phone-f { display: none; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-top: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; cursor: pointer; }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile-top { display: flex; justify-content: space-between; gap: 6px; }
+  .tile-top button.t { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); min-height: 24px; }
+  .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
+  .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
+  .chart { margin-top: 10px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .x { overflow-x: auto; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .tbl { overflow: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; max-height: 520px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; z-index: 1; }
+  td.low { color: var(--text-muted); }
+  tr.sel td { box-shadow: inset 0 2px 0 var(--brand-blue), inset 0 -2px 0 var(--brand-blue); }
+  tr.faded td, tr.faded .name { color: var(--text-muted); font-weight: 400; }
+  .name { border: 0; background: none; padding: 4px 0; min-height: 28px; cursor: pointer; color: var(--text-primary); font-weight: 600; text-align: left; }
+  .name:hover { color: var(--brand-blue); }
+  h3 { margin-top: 20px; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .g line { stroke: var(--grid); }
+  .l1 { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; } .l2 { fill: none; stroke: var(--text-primary); stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1.5; } .pt.low { fill: var(--surface); stroke: var(--text-muted); } .pt.day { stroke: var(--text-primary); stroke-width: 2; }
+  .tg { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; } .wb { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .hit { fill: transparent; cursor: pointer; }
+  .hit:focus-visible, .hm:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  .sm-h { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 10px; }
+  @media (max-width: 767px) {
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .card { padding: 14px; }
+    .tile .v { font-size: 22px; }
+    .name, .chip { min-height: 44px; }
+  }
+  .how { margin-top: 12px; font-size: 14px; } .how summary { cursor: pointer; font-weight: 600; color: var(--brand-blue); min-height: 32px; display: inline-flex; align-items: center; } .how ul { margin: 6px 0 0; padding-left: 20px; max-width: 900px; } .how li { margin: 4px 0; }
+  .sm { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 4px 20px; margin-top: 8px; } .sm > div { min-width: 0; } .sm svg { display: block; width: 100%; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 0 20px; } .two > div { min-width: 0; }
+  .zero { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; } .sep { stroke: var(--grid); }
+  .dot { stroke: var(--surface); stroke-width: 1; } .dot.similar { fill: var(--brand-blue); fill-opacity: .55; } .dot.worse { fill: var(--brand-purple); } .dot.better { fill: var(--brand-blue); } .dot.few { fill: var(--surface); stroke: var(--text-muted); stroke-width: 1.5; } .dot.ramp { fill: var(--surface); stroke: var(--brand-blue); stroke-width: 1.5; stroke-dasharray: 2 2; } .dot.on { stroke: var(--text-primary); stroke-width: 2.5; fill-opacity: 1; }
+  .hit0 { fill: transparent; } td .w { color: var(--text-primary); font-weight: 700; } td div { font-size: 12.5px; }
+  #t-agent:focus { outline: none; } #sec-agent { scroll-margin-top: 80px; }
+  input[type=search] { font: inherit; font-size: 14px; min-height: 40px; border: 1px solid var(--control); border-radius: 8px; padding: 6px 10px; background: var(--surface); color: var(--text-primary); width: 160px; }
+  @media (max-width: 767px) { .how summary, input[type=search], .card .btn { min-height: 44px; } }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters"><div class="wrap">
+  <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+  <div class="ctls" id="ctls">
+    <label class="filter"><span class="flabel">Period</span><select id="f-per"><option value="1">1 month</option><option value="3">3 months</option></select></label>
+    <label class="filter"><span class="flabel">Ending</span><select id="f-end"></select></label>
+    <label class="filter"><span class="flabel">Group</span><select id="f-ch"></select></label>
+    <label class="filter"><span class="flabel">Site</span><select id="f-site"></select></label>
+    <label class="filter"><span class="flabel">Team</span><select id="f-team"></select></label>
+    <label class="filter"><span class="flabel">Tenure</span><select id="f-ten"><option value="">All</option><option value="new">Under 90 days</option><option value="exp">90 days or more</option></select></label>
+    <button class="link-btn" id="f-reset" type="button">Reset</button>
+  </div>
+  <span class="spacer"></span><button class="btn" id="copy-link" type="button">Copy link</button>
+</div></div>
+<main class="wrap" id="main">
+  <h1>Agent &amp; team coaching</h1>
+  <p class="sub" id="s-page"></p>
+  <details class="how"><summary>How to read this page</summary>
+    <ul>
+      <li>Agents are compared only with their own group (phone, chat or email). Handle time, resolution, transfers and satisfaction are compared with what the <b>same queues and contact reasons</b> took the whole group, so a harder mix of work doesn't count against anyone.</li>
+      <li>A gap is marked only when it is well beyond chance (3 standard errors) and there are enough contacts, surveys, days or evaluations. Everything else reads "similar".</li>
+      <li>A coaching focus is <b>consistent</b> when the same gap was also there in the 3 months before. Agents in their first 90 days are shown as ramping up and never listed. Those 3 months must also fall after the agent's first 90 days.</li>
+      <li>Short handle time is never marked as good: it can mean rushed contacts. Occupancy isn't shown because agents don't control it.</li>
+      <li>Agents and teams are listed by name, not ranked. Use this to start a conversation, not to judge performance on its own.</li>
+      <li>Agents appear under their current team in every month. An agent's quality always covers 3 months, because about four contacts a month are evaluated.</li>
+    </ul></details>
+  <div class="chips" id="chips"></div>
+  <p class="note" id="loading">Loading coaching data…</p>
+  <div id="content" hidden>
+    <div class="tiles" id="tiles"></div>
+    <section class="card" id="sec-agent" aria-labelledby="t-agent" hidden>
+      <div class="head"><div><h2 id="t-agent" tabindex="-1"></h2><div class="sub" id="s-agent"></div></div><div class="tools"><button class="btn" id="tb-agent" type="button">View as table</button><button class="btn" id="csv-agent" type="button">Download CSV</button><button class="btn" id="x-agent" type="button">Close</button></div></div>
+      <div class="sm" id="c-agent"></div><div class="legend" id="lg-agent"></div><div class="tbl" id="tbl-agent" tabindex="0" role="region" aria-label="Agent values by month" hidden></div>
+      <div class="two"><div><h3>Time behind adherence</h3><div class="tbl" id="tbl-time"></div></div><div><h3>Handle time by part</h3><div class="tbl" id="tbl-parts"></div></div></div>
+      <h3>Contact reasons furthest from the group</h3><p class="note" id="n-reasons"></p><div class="tbl" id="tbl-reasons"></div>
+    </section>
+    <section class="card" aria-labelledby="t-focus">
+      <div class="head"><div><h2 id="t-focus"></h2><div class="sub" id="s-focus"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-new"> Include new this period</label><button class="btn" id="csv-focus" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-focus"></div><p class="note" id="n-focus"></p>
+    </section>
+    <section class="card" aria-labelledby="t-strip">
+      <div class="head"><div><h2 id="t-strip"></h2><div class="sub" id="s-strip"></div></div><div class="tools"><button class="btn" id="tb-strip" type="button">View as table</button></div></div>
+      <div class="chart" id="c-strip"></div><div class="legend" id="lg-strip"></div><div class="tbl" id="tbl-strip" tabindex="0" role="region" aria-label="Agents by team" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="t-scat">
+      <div class="head"><div><h2 id="t-scat"></h2><div class="sub" id="s-scat"></div></div><div class="tools"><button class="btn" id="tb-scat" type="button">View as table</button></div></div>
+      <div class="chart" id="c-scat"></div><div class="tbl" id="tbl-scat" tabindex="0" role="region" aria-label="Handle time and resolution gaps" hidden></div>
+    </section>
+    <section class="card" aria-labelledby="t-str">
+      <div class="head"><div><h2 id="t-str"></h2><div class="sub">Better than the group, beyond chance, in this period and in the 3 months before. Good people to learn from.</div></div><div class="tools"><button class="btn" id="csv-str" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-str"></div>
+    </section>
+    <section class="card" aria-labelledby="t-team">
+      <div class="head"><div><h2 id="t-team"></h2><div class="sub">By name. The second line is the difference from what the same contacts took the group. Click a name to filter; Ctrl + click adds.</div></div><div class="tools"><button class="btn" id="csv-team" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-team"></div>
+    </section>
+    <section class="card" aria-labelledby="t-all">
+      <div class="head"><div><h2 id="t-all"></h2><div class="sub">By name. Click a name for that agent's trend and detail.</div></div><div class="tools"><label class="filter"><span>Find</span> <input id="f-find" type="search" placeholder="Name" autocomplete="off"></label><button class="btn" id="csv-all" type="button">Download CSV</button></div></div>
+      <div class="tbl" id="tbl-all"></div>
+    </section>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), C = Coaching;
+  Site.renderChrome('coaching');
+  const GROUPS = { 1: 'Phone', 2: 'Chat', 3: 'Email' }, METRICS = C.METRICS;
+  const DEF = { per: '1', end: '', ch: '1', site: '', ten: '', metric: 'adherence', team: [], agent: null }, S = { ...DEF, team: [] };
+  let IDX, KPI, ROWS, AG, BY, W, cur = {}, req = 0, NAMES = null; const tbl = { agent: false, strip: false, scat: false }, files = {};
+  const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
+  const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
+  const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; }));
+  const teams = () => IDX.teams.filter((t) => String(t.ch) === S.ch), team = (id) => IDX.teams.find((t) => t.id === id), tName = (id) => team(id).name, lc = () => GROUPS[S.ch].toLowerCase();
+  const lastDay = (m) => { const [y, mo] = m.split('-').map(Number), d = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); return d > IDX.data_through ? IDX.data_through : d; };
+  const partial = (m) => { const [y, mo] = m.split('-').map(Number); return lastDay(m) < new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); };
+  const span = (end, n) => { const i = IDX.months.indexOf(end); return IDX.months.slice(Math.max(0, i - n + 1), i + 1); };
+  const nameM = (a) => (a.length === 1 ? fmt.month(a[0]) : `${fmt.month(a[0])} – ${fmt.month(a[a.length - 1])}`) + (partial(a[a.length - 1]) ? ` (to ${fmt.dateShort(IDX.data_through)})` : '');
+
+  Promise.all([file('data/dashboards/kpis.json'), file('data/dashboards/coaching/index.json.gz')]).then(([k, i]) => {
+    KPI = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); IDX = i;
+    AG = new Map(i.agents.map(([id, name, no, t, ch, hire, term]) => [id, { id, name, no, t, ch, hire, term }]));
+    ROWS = C.prepare(i.rows.map((r) => Object.fromEntries(i.keys.map((c, j) => [c, r[j]]))), (g) => AG.get(g).ch);
+    BY = new Map(); for (const r of ROWS) (BY.get(r.m) || (BY.set(r.m, []), BY.get(r.m))).push(r);
+    DEF.end = [...i.months].reverse().find((m) => !partial(m)); S.end = DEF.end;
+    $('f-end').innerHTML = [...i.months].reverse().map((m) => `<option value="${m}">${fmt.month(m)}${partial(m) ? ` (to ${fmt.dateShort(i.data_through)})` : ''}</option>`).join('');
+    $('f-ch').innerHTML = Object.entries(GROUPS).map(([id, n]) => `<option value="${id}">${n}</option>`).join('');
+    const p = new URLSearchParams(location.search), one = (id, v) => v != null && [...$(id).options].some((o) => o.value === v);
+    if (one('f-end', p.get('end'))) S.end = p.get('end'); else if (one('f-end', carried())) S.end = carried();
+    for (const [id, key] of [['f-per', 'per'], ['f-ch', 'ch'], ['f-ten', 'ten']]) if (one(id, p.get(key))) S[key] = p.get(key);
+    if (teams().some((t) => t.site === p.get('site'))) S.site = p.get('site');
+    if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x));
+    if (AG.has(+p.get('agent')) && String(AG.get(+p.get('agent')).ch) === S.ch) S.agent = +p.get('agent');
+    Site.setDataThrough(i.data_through);
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Agent & team coaching v1.0`;
+    update();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The coaching data could not be loaded. ' + e.message; }
+
+  // ---------- Data ----------
+  const kpi = (m) => KPI[m], f = (m) => kpi(m).format, V = (m, v) => fmt.value(v, f(m), true);
+  const days = (a) => Math.round((Date.parse(W.last) - Date.parse(a.hire)) / 864e5), ramping = (a) => days(a) < 90, left = (a) => a.term && a.term <= W.last;
+  const ok = (a, skip = []) => String(a.ch) === S.ch && (!S.site || team(a.t).site === S.site) && (skip.includes('team') || !S.team.length || S.team.includes(a.t)) && (!S.ten || (S.ten === 'new') === ramping(a));
+  const tot = (ms, keep) => { const o = {}; for (const m of ms) for (const r of BY.get(m) || []) if (keep(AG.get(r.g))) C.add(o, r); return o; };
+  const byAgent = (ms, keep) => { const o = new Map(); for (const m of ms) for (const r of BY.get(m) || []) if (keep(AG.get(r.g))) C.add(o.get(r.g) || (o.set(r.g, {}), o.get(r.g)), r); return o; };
+  const gap = (m, p) => { const v = C.value(m, p), e = C.expected(m, p); return v == null ? null : v - e; };
+  const GT = (m, p) => { const v = C.value(m, p); return v == null ? '–' : G2(m, fmt.displayed(v, f(m)) - fmt.displayed(C.expected(m, p), f(m))); };
+  const G2 = (m, d) => { if (d == null) return '–'; const x = fmt.displayed(d, f(m)), a = Math.abs(x); return (x > 0 ? '+' : x < 0 ? '−' : '') + (f(m) === 'pct' ? a.toFixed(1) + ' pts' : f(m) === 'duration' ? a + ' s' : a.toFixed(1)); };
+  const WORD = { adherence: ['Below', 'Above'], fcr: ['Below', 'Above'], csat: ['Below', 'Above'], quality: ['Below', 'Above'], aht: ['Longer', 'Shorter'], transfer: ['More', 'Fewer'] };
+  const sig = (m, p) => C.signal(m, p, kpi(m).minN);
+  const MARK = { worse: '◆', better: '▲', similar: '', few: '' };
+  const mark = (m, s) => (s === 'few' ? 'too few' : s === 'similar' ? 'similar' : `${MARK[s]} ${WORD[m][s === 'worse' ? 0 : 1].toLowerCase()}`);
+  function windows() {
+    const n = +S.per, i = IDX.months.indexOf(S.end);
+    W = { ms: span(S.end, n), q: span(S.end, 3), last: lastDay(S.end) };
+    const before = IDX.months.slice(0, IDX.months.indexOf(W.ms[0])), bq = IDX.months.slice(0, IDX.months.indexOf(W.q[0]));
+    W.prev = before.length >= n ? before.slice(-n) : null; W.base = before.slice(-3); W.baseQ = bq.slice(-3); W.trend = span(S.end, 6); W.i = i;
+  }
+  // one record per agent: now and before, with quality over 3 months
+  function people() {
+    const keep = (a) => ok(a), now = byAgent(W.ms, keep), q = byAgent(W.q, keep), base = byAgent(W.base, keep), baseQ = byAgent(W.baseQ, keep), out = [];
+    for (const [g, p] of now) {
+      const a = AG.get(g); if (!(p.n > 0 || p.ans >= 20)) continue;
+      const part = (m) => (m === 'quality' ? q.get(g) || {} : p), before = (m) => (m === 'quality' ? baseQ : base).get(g) || {};
+      const s = {}, b = {}; for (const m of METRICS) { s[m] = sig(m, part(m)); b[m] = sig(m, before(m)); }
+      out.push({ a, p, part, s, b, ramp: ramping(a), left: left(a) });
+    }
+    return out.sort((x, y) => x.a.name.localeCompare(y.a.name));
+  }
+  function update() {
+    req++; windows();
+    S.team = S.team.filter((x) => teams().some((t) => t.id === x && (!S.site || t.site === S.site)));
+    if (S.agent && String(AG.get(S.agent).ch) !== S.ch) S.agent = null;
+    cur.people = people(); cur.group = tot(W.ms, (a) => String(a.ch) === S.ch);
+    $('loading').hidden = true; $('content').hidden = false;
+    controls(); writeUrl(); renderTiles(); renderAgent(); renderFocus(); renderStrip(); renderScatter(); renderStrong(); renderTeams(); renderAll();
+  }
+  const go = () => { hideTip(); const k = Site.focusKey(); update(); Site.restoreFocus(k, '#tiles button'); };
+  function controls() {
+    for (const [id, key] of [['f-per', 'per'], ['f-end', 'end'], ['f-ch', 'ch'], ['f-ten', 'ten']]) $(id).value = S[key];
+    $('f-site').innerHTML = `<option value="">All</option>` + [...new Set(teams().map((t) => t.site))].sort().map((s) => `<option${S.site === s ? ' selected' : ''}>${esc(s)}</option>`).join('');
+    $('f-team').innerHTML = `<option value="">All</option>` + (S.team.length > 1 ? `<option value="*" selected>${S.team.length} selected</option>` : '') + teams().filter((t) => !S.site || t.site === S.site).map((t) => `<option value="${t.id}"${S.team.length === 1 && S.team[0] === t.id ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
+    const c = [...(S.site ? [['site', S.site, 'Site: ' + S.site]] : []), ...S.team.map((x) => ['team', x, 'Team: ' + tName(x)]), ...(S.ten ? [['ten', S.ten, 'Tenure: ' + (S.ten === 'new' ? 'under 90 days' : '90 days or more')]] : []), ...(S.agent ? [['agent', S.agent, 'Agent: ' + AG.get(S.agent).name]] : [])];
+    $('chips').innerHTML = c.map(([k, v, t]) => `<button type="button" class="chip" data-q="${k}" data-v="${esc(v)}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join('');
+    const n = c.length + ['per', 'end', 'ch'].filter((x) => S[x] !== DEF[x]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
+    $('s-page').textContent = `${GROUPS[S.ch]} agents · ${nameM(W.ms)} · ${cur.people.length} agents · ${W.prev ? `compared with ${nameM(W.prev)}` : 'no full earlier period to compare'}`;
+  }
+  function writeUrl() {
+    const p = new URLSearchParams(); for (const k of ['per', 'end', 'ch', 'site', 'ten', 'metric']) if (S[k] !== DEF[k] || (k === 'end' && carried())) p.set(k, S[k]);
+    S.team.forEach((x) => p.append('team', x)); if (S.agent) p.set('agent', S.agent);
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+  const few = (m, p) => C.n(m, p) < kpi(m).minN;
+  // ---------- Tiles ----------
+  function renderTiles() {
+    const keep = (a) => ok(a), now = tot(W.ms, keep), was = W.prev ? tot(W.prev, keep) : null, host = $('tiles'); host.innerHTML = '';
+    for (const m of METRICS) {
+      const k = kpi(m), v = C.value(m, now), lo = few(m, now), pv = was && !few(m, was) ? C.value(m, was) : null, ch = pv == null || v == null ? null : fmt.change(v, pv, k.format), q = ch ? changeQuality(k, v, pv, ch) : 'neutral';
+      const st = k.target == null ? '' : `<span class="status ${lo ? 'none' : statusOf(k, v)}">${lo ? 'Too few' : STATUS_WORD[statusOf(k, v)]}</span>`;
+      const foc = cur.people.filter((x) => consistent(x, m)).length;
+      const t = document.createElement('div'); t.className = 'tile' + (S.metric === m ? ' sel' : '');
+      t.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${V(m, v)}</div>${st}<div class="m">${k.target == null ? 'No target' : 'Target ' + esc(k.targetLabel)}${lo ? ` · n = ${fmt.count(C.n(m, now))}, below ${k.minN}` : ''}</div>${ch ? `<span class="chg ${lo ? 'neutral' : q}">${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} vs prior ${S.per === '1' ? 'month' : '3 months'}${!lo && Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span>` : ''}<div class="m">${foc} ${foc === 1 ? 'agent' : 'agents'} with a consistent gap</div>`;
+      t.querySelector('.tile-top').append(Site.infoButton(k)); t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(t);
+    }
+  }
+  const eligible = (x) => !x.ramp && !x.left, baseOf = (m) => (m === 'quality' ? W.baseQ : W.base),
+    // the 3 months before must be complete, and after the agent's own first 90 days
+    seasoned = (x, m) => baseOf(m).length === 3 && Date.parse(baseOf(m)[0] + '-01') - Date.parse(x.a.hire) >= 90 * 864e5,
+    both = (x, m, w) => x.s[m] === w && x.b[m] === w && seasoned(x, m), consistent = (x, m) => eligible(x) && both(x, m, 'worse'), fresh = (x, m) => eligible(x) && x.s[m] === 'worse' && !consistent(x, m);
+  // ---------- Chart helpers ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const tick = (m, v) => (f(m) === 'duration' ? secs(v) : f(m) === 'pct' ? +v.toFixed(1) + '%' : String(+v.toFixed(1))), secs = (v) => fmt.value(v, 'duration');
+  const gtick = (m, v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + (f(m) === 'duration' ? ' s' : '');
+  function tip(node, html, click) {
+    const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top); };
+    node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
+    if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
+  }
+  function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
+  const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${p ? ic(p) : ''}${esc(t)}</span>`).join('');
+  const shape = (cls, x, y, r) => (cls === 'worse' ? `M${x},${y - r * 1.3}L${x + r * 1.3},${y}L${x},${y + r * 1.3}L${x - r * 1.3},${y}Z` : cls === 'better' ? `M${x},${y - r * 1.2}L${x + r * 1.2},${y + r}L${x - r * 1.2},${y + r}Z` : `M${x - r},${y}a${r},${r} 0 1,0 ${2 * r},0a${r},${r} 0 1,0 ${-2 * r},0`);
+  function pick(id) { S.agent = S.agent === id ? null : id; hideTip(); update(); if (S.agent) { $('t-agent').focus({ preventScroll: true }); $('sec-agent').scrollIntoView({ block: 'start' }); } }
+  const note = (x) => (x.left ? 'no longer employed' : x.ramp ? `ramping up, day ${days(x.a)}` : '');
+  const describe = (m, x) => { const p = x.part(m), k = kpi(m); return `<b>${esc(x.a.name)}</b><br>${esc(tName(x.a.t))}${note(x) ? ' · ' + note(x) : ''}<br>${esc(k.name)}: <b>${V(m, C.value(m, p))}</b><br>Group, ${m === 'adherence' || m === 'quality' ? 'same period' : 'same contacts'}: ${V(m, C.expected(m, p))}<br>Gap: ${GT(m, p)} · ${mark(m, x.s[m])}<br><span class="muted">n = ${fmt.count(C.n(m, p))}${few(m, p) ? ', below ' + k.minN : ''}</span><br><span class="muted">Click for detail</span>`; };
+  function dot(svg, m, x, px, py, s, cls) {
+    el('path', { class: 'dot ' + (x.ramp ? 'ramp' : s) + (S.agent === x.a.id ? ' on' : ''), d: shape(x.ramp ? '' : s, px, py, 4.5) }, svg);
+    return el('circle', { class: 'hit', cx: px, cy: py, r: 8, tabindex: -1, 'data-k': `${cls}|${x.a.id}`, role: 'button', 'aria-pressed': S.agent === x.a.id }, svg);
+  }
+  const LEG = () => leg([['<path class="dot similar" d="M5.5,7a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0"/>', 'Similar to the group'], [`<path class="dot worse" d="${shape('worse', 10, 7, 4.5)}"/>`, 'Gap to look at'], [`<path class="dot better" d="${shape('better', 10, 7, 4.5)}"/>`, 'Better'], ['<path class="dot few" d="M5.5,7a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0"/>', 'Too few'], ['<path class="dot ramp" d="M5.5,7a4.5,4.5 0 1,0 9,0a4.5,4.5 0 1,0 -9,0"/>', 'Ramping up']]);
+
+  // ---------- One agent ----------
+  async function renderAgent() {
+    const a = S.agent && AG.get(S.agent); $('sec-agent').hidden = !a; if (!a) return;
+    $('t-agent').textContent = a.name; $('s-agent').textContent = `${tName(a.t)} · ${team(a.t).site}${team(a.t).sup ? ' · supervisor ' + team(a.t).sup : ''} · hired ${fmt.date(a.hire)}${left(a) ? ', left ' + fmt.date(a.term) : ramping(a) ? ` · ramping up, day ${days(a)}` : ''} · 6 months to ${fmt.month(S.end)}`;
+    $('tb-agent').textContent = tbl.agent ? 'View as chart' : 'View as table'; $('tb-agent').setAttribute('aria-pressed', tbl.agent);
+    const isA = (x) => x.id === a.id, tr = W.trend.map((m) => ({ m, p: tot([m], isA), q: tot(span(m, 3), isA) })); cur.tr = tr;
+    const part = (m, t) => (m === 'quality' ? t.q : t.p), host = $('c-agent'); host.innerHTML = ''; host.hidden = $('lg-agent').hidden = tbl.agent; $('tbl-agent').hidden = !tbl.agent;
+    if (tbl.agent) $('tbl-agent').innerHTML = `<table><thead><tr><th scope="col">Month</th>${METRICS.map((m) => `<th scope="col">${esc(kpi(m).short)}</th><th scope="col">Group</th>`).join('')}</tr></thead><tbody>${tr.slice().reverse().map((t) => `<tr><td>${fmt.month(t.m)}</td>${METRICS.map((m) => { const p = part(m, t); return `<td class="${few(m, p) ? 'low' : ''}">${V(m, C.value(m, p))}${C.value(m, p) != null && few(m, p) ? ' (too few)' : ''}</td><td>${V(m, C.expected(m, p))}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
+    else { const boxes = METRICS.map(() => host.appendChild(document.createElement('div'))); for (const m of METRICS) {
+      const box = boxes[METRICS.indexOf(m)]; box.innerHTML = `<div class="sm-h">${esc(kpi(m).name)}${m === 'quality' ? ' (3 months)' : ''}</div>`;
+      const w = box.clientWidth || 340, H = 130, M = { l: 54, r: 12, t: 8, b: 22 }, pts = tr.map((t, i) => ({ t, i, p: part(m, t), v: C.value(m, part(m, t)), e: C.expected(m, part(m, t)) })).filter((q) => q.v != null);
+      if (!pts.length) { box.insertAdjacentHTML('beforeend', '<p class="note">No data.</p>'); continue; }
+      let lo = Math.min(...pts.flatMap((q) => [q.v, q.e])), hi = Math.max(...pts.flatMap((q) => [q.v, q.e])); const pad = (hi - lo || 2) * .15; lo -= pad; hi += pad;
+      const x = (i) => M.l + (i + .5) / tr.length * (w - M.l - M.r), y = (v) => M.t + (hi - v) / (hi - lo) * (H - M.t - M.b), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'img', 'aria-label': `${kpi(m).name}: ${pts.map((q) => `${fmt.month(q.t.m)} ${V(m, q.v)}, group ${V(m, q.e)}`).join('; ')}` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+      for (const t of ticks(lo, hi, 3)) { el('line', { x1: M.l, x2: w - M.r, y1: y(t), y2: y(t) }, g); text(ax, M.l - 6, y(t) + 4, tick(m, t), '', 'end'); }
+      tr.forEach((t, i) => text(ax, x(i), H - 6, fmt.monthShort(t.m), '', 'middle'));
+      el('path', { class: 'l2', d: pts.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.e)}`).join('') }, s); el('path', { class: 'l1', d: pts.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.v)}`).join('') }, s);
+      pts.forEach((q) => { el('circle', { class: 'pt' + (few(m, q.p) ? ' low' : ''), cx: x(q.i), cy: y(q.v), r: 4 }, s); tip(el('rect', { class: 'hit0', x: x(q.i) - 20, y: 0, width: 40, height: H - M.b }, s), () => `<b>${fmt.month(q.t.m)}</b><br>${esc(kpi(m).name)}: <b>${V(m, q.v)}</b><br>Group: ${V(m, q.e)}<br>${mark(m, sig(m, q.p))}<br><span class="muted">n = ${fmt.count(C.n(m, q.p))}</span>`); });
+    } }
+    $('lg-agent').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Agent'], ['<line class="l2" x2="20" y1="7" y2="7"/>', 'Group, for the same contacts (adherence and quality: whole group)'], ['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']]);
+    const p = tot(W.ms, isA), g = cur.group, row = (n, v, e, fx, u) => { const a1 = fmt.displayed(v, u), b1 = fmt.displayed(e, u); return `<tr><td>${n}</td><td>${fx(v)}</td><td>${fx(e)}</td><td><b>${u === 'duration' ? G2('aht', a1 - b1) : G2('quality', a1 - b1)}</b></td></tr>`; }, head = (a1, b1) => `<thead><tr><th scope="col">${a1}</th><th scope="col">Agent</th><th scope="col">${b1}</th><th scope="col">Difference</th></tr></thead>`;
+    const none = '<p class="note" style="padding:12px">No data for this period.</p>';
+    $('tbl-time').innerHTML = p.n > 0 ? `<table>${head('Minutes a day worked', 'Group')}<tbody>${TIME.map(([k, n]) => row(n, p[k] / p.n, g[k] / g.n, (v) => v.toFixed(1), 'rate')).join('')}${row('Coaching received', p.coa / p.n, g.coa / g.n, (v) => v.toFixed(1), 'rate')}</tbody></table>` : none;
+    $('tbl-parts').innerHTML = p.ans > 0 ? `<table>${head('Per contact', 'Same contacts')}<tbody>${[...PARTS, ['h', 'eh', 'Handle time']].map(([k, e, n]) => row(n, p[k] / p.ans, p[e] / p.ans, (v) => fmt.value(v, 'duration'), 'duration')).join('')}</tbody></table>` : none;
+    const r = req; $('tbl-reasons').innerHTML = ''; $('n-reasons').textContent = 'Loading contact reasons…';
+    try {
+      const [ix, ...mo] = await Promise.all([file('data/dashboards/drivers/index.json'), ...W.ms.map((m) => file(`data/dashboards/drivers/agents/${m}.json.gz`))]); if (r !== req) return;
+      const nm = Object.fromEntries(ix.names.r.map((x) => [x.id, x.name])), peer = new Map(), mine = new Map();
+      for (const x of mo) { const c = x.cols; for (let j = 0; j < c.g.length; j++) { const o = AG.get(c.g[j]); if (!o || o.ch !== a.ch || !c.ans[j]) continue; const k = x.m + '|' + c.q[j] + '|' + c.r[j], q = peer.get(k) || (peer.set(k, { n: 0, h: 0, s: 0 }), peer.get(k)); q.n += c.ans[j]; q.h += c.handle[j]; q.s += c.resolved[j]; if (o.id === a.id) mine.set(k, { r: c.r[j], n: c.ans[j], h: c.handle[j], s: c.resolved[j] }); } }
+      const by = new Map(); for (const [k, v] of mine) { const q = peer.get(k), t = by.get(v.r) || (by.set(v.r, { n: 0, h: 0, s: 0, eh: 0, es: 0 }), by.get(v.r)); t.n += v.n; t.h += v.h; t.s += v.s; t.eh += v.n * q.h / q.n; t.es += v.n * q.s / q.n; }
+      const rs = [...by].map(([id, t]) => ({ name: nm[id], ...t, dh: (t.h - t.eh) / t.n, ds: (t.s - t.es) / t.n * 100 })).filter((t) => t.n >= 20).sort((u, v) => Math.abs(v.h - v.eh) - Math.abs(u.h - u.eh)).slice(0, 8);
+      $('n-reasons').textContent = rs.length ? `${nameM(W.ms)}. The 8 reasons that moved total handle time most; at least 20 contacts each. Resolution is shown from 50 contacts. Single reasons are small samples: read them as topics to discuss.` : 'No contact reason has 20 or more contacts in this period.';
+      $('tbl-reasons').innerHTML = rs.length ? `<table><thead><tr><th scope="col">Contact reason</th><th scope="col">Contacts</th><th scope="col">AHT</th><th scope="col">Same contacts</th><th scope="col">Difference</th><th scope="col">FCR</th><th scope="col">Same contacts</th><th scope="col">Difference</th></tr></thead><tbody>${rs.map((t) => `<tr><td>${esc(t.name)}</td><td>${fmt.count(t.n)}</td><td>${fmt.value(t.h / t.n, 'duration')}</td><td>${fmt.value(t.eh / t.n, 'duration')}</td><td><b>${G2('aht', Math.round(t.h / t.n) - Math.round(t.eh / t.n))}</b></td>${t.n >= 50 ? `<td>${V('fcr', t.s / t.n * 100)}</td><td>${V('fcr', t.es / t.n * 100)}</td><td><b>${G2('fcr', fmt.displayed(t.s / t.n * 100, 'pct') - fmt.displayed(t.es / t.n * 100, 'pct'))}</b></td>` : '<td class="low" colspan="3">too few</td>'}</tr>`).join('')}</tbody></table>` : '';
+    } catch (e) { if (r === req) $('n-reasons').textContent = 'Contact reasons could not be loaded. ' + e.message; }
+  }
+  const TIME = [['late', 'Late start'], ['early', 'Early finish'], ['ext', 'Long breaks'], ['aux', 'Unplanned unavailable']], PARTS = [['tk', 'etk', 'Talk'], ['hd', 'ehd', 'Hold'], ['wr', 'ewr', 'Wrap-up']];
+  function behind(m, x) {
+    const p = x.p, g = cur.group;
+    if (m === 'adherence') { const o = TIME.map(([k, n]) => [n, p[k] / p.n - g[k] / g.n]).sort((a, b) => b[1] - a[1])[0]; return o[1] > 0.05 ? `${o[0]} +${o[1].toFixed(1)} min a day` : 'Breaks and lunches off schedule'; }
+    if (m === 'aht') { const o = PARTS.map(([k, e, n]) => [n, (p[k] - p[e]) / p.ans]).sort((a, b) => b[1] - a[1])[0]; return `${o[0]} +${Math.round(o[1])} s a contact`; }
+    if (m === 'fcr' && x.s.transfer === 'worse') return `Transfers ${GT('transfer', p)}`;
+    if (m === 'csat' && x.s.fcr === 'worse') return `FCR ${GT('fcr', p)}`;
+    return m === 'quality' ? 'Review recent evaluations' : 'Open the agent for contact reasons';
+  }
+  const agentBtn = (x, k) => `<button type="button" class="name" data-k="${k}|${x.a.id}" data-g="${x.a.id}">${esc(x.a.name)}</button>`;
+  const coa = (x) => (x.p.coa || 0) / 60;
+  // ---------- Coaching focus ----------
+  function renderFocus() {
+    const inc = $('t-new').checked, rows = []; for (const x of cur.people) for (const m of METRICS) { const c = consistent(x, m); if (c || (inc && fresh(x, m))) rows.push({ x, m, c }); } cur.focus = rows;
+    const nA = new Set(rows.map((r) => r.x.a.id)).size, all = cur.people.filter(eligible).length;
+    $('t-focus').textContent = `Where coaching could help, ${lc()} agents`; $('s-focus').textContent = `${nameM(W.ms)} · ${nA} of ${all} agents have ${inc ? 'a gap' : 'a consistent gap'} on at least one measure · by name`;
+    $('tbl-focus').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Agent</th><th scope="col">Team</th><th scope="col">Measure</th><th scope="col">Agent</th><th scope="col">Group</th><th scope="col">Gap</th><th scope="col">Seen</th><th scope="col">What's behind it</th><th scope="col">Coaching</th></tr></thead><tbody>${rows.map(({ x, m, c }, i) => { const p = x.part(m); return `<tr><td>${agentBtn(x, 'foc' + i)}</td><td>${esc(tName(x.a.t))}</td><td>${esc(kpi(m).name)}${m === 'quality' ? ' (3 months)' : ''}</td><td>${V(m, C.value(m, p))}</td><td>${V(m, C.expected(m, p))}</td><td><b>${GT(m, p)}</b></td><td>${c ? 'Consistent' : 'New this period'}</td><td>${esc(behind(m, x))}</td><td>${coa(x).toFixed(1)} h</td></tr>`; }).join('')}</tbody></table>` : `<p class="note" style="padding:12px">${W.base.length < 3 ? 'There are not 3 earlier months to confirm a consistent gap. Include new this period to see gaps in this period alone.' : `No ${inc ? '' : 'consistent '}gaps beyond chance for these filters.`}</p>`;
+    const rp = cur.people.filter((x) => x.ramp && !x.left).length;
+    $('n-focus').textContent = `Group is what the same queues and reasons took the group${'; for adherence and quality, the whole group'}. Coaching is the coaching time taken in the period.${rp ? ` ${rp} ${rp === 1 ? 'agent is' : 'agents are'} ramping up and not listed.` : ''}`;
+  }
+  // ---------- Spread by team ----------
+  function renderStrip() {
+    const m = S.metric, k = kpi(m), host = $('c-strip'), pts = cur.people.map((x) => ({ x, d: gap(m, x.part(m)) })).filter((q) => q.d != null), tm = teams().filter((t) => pts.some((q) => q.x.a.t === t.id));
+    $('t-strip').textContent = `${k.name}, each agent's gap to the group, by team`; $('s-strip').textContent = `${k.short}, ${m === 'quality' ? nameM(W.q) : nameM(W.ms)} · 0 is ${m === 'adherence' || m === 'quality' ? 'the group average' : 'what the same contacts took the group'} · ${k.better === 'higher' ? 'right is higher' : m === 'aht' ? 'right is longer' : 'right is more transfers'}`;
+    tblSwap('strip', ['c-strip', 'lg-strip']);
+    if (tbl.strip) { $('tbl-strip').innerHTML = `<table><thead><tr><th scope="col">Agent</th><th scope="col">Team</th><th scope="col">${esc(k.short)}</th><th scope="col">Group</th><th scope="col">Gap</th><th scope="col">Reading</th><th scope="col">n</th></tr></thead><tbody>${pts.map(({ x }) => { const p = x.part(m); return `<tr><td>${agentBtn(x, 'st')}</td><td>${esc(tName(x.a.t))}</td><td>${V(m, C.value(m, p))}</td><td>${V(m, C.expected(m, p))}</td><td>${GT(m, p)}</td><td>${x.ramp ? 'ramping up' : mark(m, x.s[m])}</td><td>${fmt.count(C.n(m, p))}</td></tr>`; }).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; $('lg-strip').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
+    const w = host.clientWidth || 800, narrow = w < 560, rh = narrow ? 64 : 50, L = narrow ? 12 : 220, R = 20, T = 8, H = T + tm.length * rh + 26, src = pts.filter((q) => q.x.s[m] !== 'few'), mx = Math.max(...(src.length ? src : pts).map((q) => Math.abs(q.d))) * 1.08 || 1, x = (v) => L + (Math.max(-mx, Math.min(mx, v)) + mx) / (2 * mx) * (w - L - R);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} gaps by team. Use View as table for values; arrow keys move between agents.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(-mx, mx, narrow ? 4 : 8)) { el('line', { x1: x(t), x2: x(t), y1: T, y2: H - 26 }, g); text(ax, x(t), H - 8, gtick(m, t), '', 'middle'); }
+    el('line', { class: 'zero', x1: x(0), x2: x(0), y1: T, y2: H - 26 }, s);
+    const hits = []; tm.forEach((t, r) => {
+      const y0 = T + r * rh + (narrow ? 40 : rh / 2); if (r) el('line', { class: 'sep', x1: 0, x2: w, y1: T + r * rh, y2: T + r * rh }, s);
+      if (narrow) text(s, 4, T + r * rh + 16, t.name, 'lab'); else text(s, L - 14, y0 + 4, t.name, 'lab', 'end');
+      const used = []; pts.filter((q) => q.x.a.t === t.id).sort((a, b) => a.d - b.d).forEach((q) => { const px = x(q.d); let o = 0; for (const c of [0, -8, 8, -16, 16]) { o = c; if (!used.some((u) => Math.abs(u[0] - px) < 9 && u[1] === c)) break; } used.push([px, o]); hits.push([q, px, y0 + o]); });
+    });
+    hits.forEach(([q, px, py], i) => { const h = dot(s, m, q.x, px, py, q.x.s[m], 'strip'); if (!i) h.setAttribute('tabindex', 0); h.setAttribute('aria-label', `${q.x.a.name}, ${tName(q.x.a.t)}: gap ${GT(m, q.x.part(m))}, ${q.x.ramp ? 'ramping up' : mark(m, q.x.s[m]).replace(/[◆▲] /, '')}`); tip(h, () => describe(m, q.x), () => pick(q.x.a.id)); });
+    arrows(s); $('lg-strip').innerHTML = LEG();
+  }
+  function tblSwap(k, ids) { ids.forEach((i) => ($(i).hidden = tbl[k])); $('tbl-' + k).hidden = !tbl[k]; $('tb-' + k).textContent = tbl[k] ? 'View as chart' : 'View as table'; $('tb-' + k).setAttribute('aria-pressed', tbl[k]); }
+  // ---------- Handle time against resolution ----------
+  function renderScatter() {
+    const host = $('c-scat'), pts = cur.people.filter((x) => !few('aht', x.p) && !few('fcr', x.p)).map((x) => ({ x, dx: gap('aht', x.p), dy: gap('fcr', x.p) }));
+    $('t-scat').textContent = `Handle time and first contact resolution, ${lc()} agents`; $('s-scat').textContent = `Each agent's gap to the group for the same contacts, ${nameM(W.ms)} · diamonds have a gap beyond chance on either measure`;
+    tblSwap('scat', ['c-scat']);
+    if (tbl.scat) { $('tbl-scat').innerHTML = `<table><thead><tr><th scope="col">Agent</th><th scope="col">Team</th><th scope="col">AHT gap</th><th scope="col">FCR gap</th><th scope="col">Contacts</th></tr></thead><tbody>${pts.map((q) => `<tr><td>${agentBtn(q.x, 'sc')}</td><td>${esc(tName(q.x.a.t))}</td><td>${GT('aht', q.x.p)}</td><td>${GT('fcr', q.x.p)}</td><td>${fmt.count(q.x.p.ans)}</td></tr>`).join('')}</tbody></table>`; return; }
+    host.innerHTML = ''; if (!pts.length) { host.textContent = 'No agent has enough contacts for these filters.'; return; }
+    const w = host.clientWidth || 800, H = 340, M = { l: 52, r: 16, t: 14, b: 44 }, mx = Math.max(...pts.map((q) => Math.abs(q.dx))) * 1.08 || 1, my = Math.max(...pts.map((q) => Math.abs(q.dy))) * 1.12 || 1, x = (v) => M.l + (v + mx) / (2 * mx) * (w - M.l - M.r), y = (v) => M.t + (my - v) / (2 * my) * (H - M.t - M.b);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Handle time gap against resolution gap. Use View as table for values; arrow keys move between agents.' }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (const t of ticks(-mx, mx, w < 560 ? 4 : 8)) { el('line', { x1: x(t), x2: x(t), y1: M.t, y2: H - M.b }, g); text(ax, x(t), H - M.b + 16, gtick('aht', t), '', 'middle'); }
+    for (const t of ticks(-my, my, 5)) { el('line', { x1: M.l, x2: w - M.r, y1: y(t), y2: y(t) }, g); text(ax, M.l - 8, y(t) + 4, gtick('fcr', t), '', 'end'); }
+    el('line', { class: 'zero', x1: x(0), x2: x(0), y1: M.t, y2: H - M.b }, s); el('line', { class: 'zero', x1: M.l, x2: w - M.r, y1: y(0), y2: y(0) }, s);
+    text(ax, (M.l + w - M.r) / 2, H - 6, 'Handle time gap (seconds)', '', 'middle'); text(ax, M.l + 6, M.t + 12, 'Resolution gap (points)');
+    if (w >= 560) { text(ax, w - M.r - 4, M.t + 12, 'Longer, resolves more', '', 'end'); text(ax, w - M.r - 4, H - M.b - 8, 'Longer, resolves less', '', 'end'); text(ax, M.l + 6, H - M.b - 8, 'Shorter, resolves less'); }
+    pts.sort((a, b) => a.dx - b.dx).forEach((q, i) => { const bad = q.x.s.aht === 'worse' || q.x.s.fcr === 'worse', h = dot(s, 'fcr', q.x, x(q.dx), y(q.dy), bad ? 'worse' : 'similar', 'scat'); if (!i) h.setAttribute('tabindex', 0); h.setAttribute('aria-label', `${q.x.a.name}: handle time gap ${GT('aht', q.x.p)}, resolution gap ${GT('fcr', q.x.p)}`); tip(h, () => `<b>${esc(q.x.a.name)}</b><br>${esc(tName(q.x.a.t))}${note(q.x) ? ' · ' + note(q.x) : ''}<br>AHT gap: <b>${GT('aht', q.x.p)}</b> · ${mark('aht', q.x.s.aht)}<br>FCR gap: <b>${GT('fcr', q.x.p)}</b> · ${mark('fcr', q.x.s.fcr)}<br><span class="muted">${fmt.count(q.x.p.ans)} contacts · click for detail</span>`, () => pick(q.x.a.id)); });
+    arrows(s);
+  }
+  // ---------- Strengths, teams, everyone ----------
+  function renderStrong() {
+    const rows = []; for (const x of cur.people) if (!x.left) for (const m of METRICS) if (both(x, m, 'better')) rows.push({ x, m }); cur.strong = rows;
+    $('t-str').textContent = `Strong practice to share, ${lc()} agents`;
+    $('tbl-str').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Agent</th><th scope="col">Team</th><th scope="col">Measure</th><th scope="col">Agent</th><th scope="col">Group</th><th scope="col">Gap</th></tr></thead><tbody>${rows.map(({ x, m }, i) => { const p = x.part(m); return `<tr><td>${agentBtn(x, 'str' + i)}</td><td>${esc(tName(x.a.t))}</td><td>${esc(kpi(m).name)}${m === 'quality' ? ' (3 months)' : ''}</td><td>${V(m, C.value(m, p))}</td><td>${V(m, C.expected(m, p))}</td><td><b>${GT(m, p)}</b></td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">None for these filters.</p>';
+  }
+  function renderTeams() {
+    const rows = teams().filter((t) => !S.site || t.site === S.site).map((t) => ({ t, p: tot(W.ms, (a) => a.t === t.id && ok(a, ['team'])) })).filter((r) => r.p.n > 0 || r.p.ans > 0).sort((a, b) => a.t.name.localeCompare(b.t.name)); cur.teams = rows;
+    const foc = (t) => new Set(cur.focusAll(t).map((x) => x.a.id)).size;
+    $('t-team').textContent = `Teams, ${lc()} agents`;
+    $('tbl-team').innerHTML = `<table><thead><tr><th scope="col">Team</th><th scope="col">Site</th>${METRICS.map((m) => `<th scope="col">${esc(kpi(m).short)}</th>`).join('')}<th scope="col">Agents with a consistent gap</th><th scope="col">Coaching, min a day worked</th><th scope="col">Contacts</th></tr></thead><tbody>${rows.map(({ t, p }) => { const on = S.team.includes(t.id); return `<tr class="${S.team.length ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="team|${t.id}" data-id="${t.id}" aria-pressed="${on}">${esc(t.name)}</button>${t.sup ? `<div class="muted">Supervisor: ${esc(t.sup)}</div>` : ''}</td><td>${esc(t.site)}</td>${METRICS.map((m) => `<td class="${few(m, p) ? 'low' : ''}">${V(m, C.value(m, p))}<div class="muted">${few(m, p) ? 'too few' : GT(m, p)}</div></td>`).join('')}<td>${S.team.length && !on ? '–' : foc(t.id)}</td><td>${p.n > 0 ? (p.coa / p.n).toFixed(1) : '–'}</td><td>${fmt.count(p.ans || 0)}</td></tr>`; }).join('')}</tbody></table>`;
+  }
+  cur.focusAll = (t) => cur.people.filter((x) => x.a.t === t && METRICS.some((m) => consistent(x, m)));
+  function renderAll() {
+    const q = $('f-find').value.trim().toLowerCase(), rows = cur.people.filter((x) => !q || x.a.name.toLowerCase().includes(q));
+    $('t-all').textContent = `All ${lc()} agents`;
+    const cell = (m, x) => { const p = x.part(m), s = x.s[m]; return `<td class="${s === 'few' ? 'low' : ''}">${V(m, C.value(m, p))}<div class="${s === 'worse' && !x.ramp ? 'w' : 'muted'}">${C.value(m, p) == null ? '' : x.ramp && s === 'worse' ? 'ramping up' : mark(m, s)}</div></td>`; };
+    $('tbl-all').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Agent</th><th scope="col">Team</th><th scope="col">Tenure</th><th scope="col">Contacts</th>${METRICS.map((m) => `<th scope="col">${esc(kpi(m).short)}${m === 'quality' ? ' (3 mo)' : ''}</th>`).join('')}<th scope="col">Days worked</th></tr></thead><tbody>${rows.map((x) => `<tr class="${S.agent === x.a.id ? 'sel' : ''}"><td>${agentBtn(x, 'all')}${note(x) ? `<div class="muted">${note(x)}</div>` : ''}</td><td>${esc(tName(x.a.t))}</td><td>${days(x.a) < 365 ? Math.floor(days(x.a) / 30.4) + ' mo' : (days(x.a) / 365.25).toFixed(1) + ' yr'}</td><td>${fmt.count(x.p.ans)}</td>${METRICS.map((m) => cell(m, x)).join('')}<td>${x.p.n}</td></tr>`).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No agents match.</p>';
+  }
+  // ---------- Events ----------
+  for (const [id, key] of [['f-per', 'per'], ['f-end', 'end'], ['f-ch', 'ch'], ['f-site', 'site'], ['f-ten', 'ten']]) $(id).addEventListener('change', (e) => { S[key] = e.target.value; if (key === 'end') carried(S.end); if (key === 'ch') { S.site = ''; S.team = []; S.agent = null; } if (key === 'site') S.team = []; go(); });
+  $('f-team').addEventListener('change', (e) => { if (e.target.value !== '*') { S.team = e.target.value ? [+e.target.value] : []; go(); } });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; if (k === 'team') S.team = S.team.filter((x) => x !== +b.dataset.v); else S[k] = k === 'agent' ? null : ''; go(); });
+  $('tbl-team').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (!b) return; const v = +b.dataset.id, a = S.team, plus = e.ctrlKey || e.metaKey; S.team = a.includes(v) ? (plus ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : plus ? [...a, v] : [v]; go(); });
+  for (const id of ['tbl-focus', 'tbl-str', 'tbl-all', 'tbl-strip', 'tbl-scat']) $(id).addEventListener('click', (e) => { const b = e.target.closest('[data-g]'); if (b) { if (S.agent === +b.dataset.g) S.agent = null; pick(+b.dataset.g); } });
+  $('x-agent').addEventListener('click', () => { S.agent = null; update(); document.querySelector('#tiles button').focus({ preventScroll: true }); });
+  $('t-new').addEventListener('change', renderFocus); $('f-find').addEventListener('input', renderAll);
+  $('tb-agent').addEventListener('click', () => { tbl.agent = !tbl.agent; renderAgent(); }); $('tb-strip').addEventListener('click', () => { tbl.strip = !tbl.strip; renderStrip(); }); $('tb-scat').addEventListener('click', () => { tbl.scat = !tbl.scat; renderScatter(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF, { team: [] }); carried(null); $('t-new').checked = false; $('f-find').value = ''; go(); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
+  const about = (w) => `Agent and team coaching · ${GROUPS[S.ch]} agents · ${w} · ${W.ms[0]} to ${S.end} · filters: ${[...(S.site ? ['site=' + S.site] : []), ...S.team.map((x) => 'team=' + tName(x)), ...(S.ten ? ['tenure=' + S.ten] : [])].join('; ') || 'none'} · data through ${IDX.data_through}`;
+  const csv = (n, w, h, r) => Site.downloadCsv(`coaching_${n}_${lc()}`, IDX.data_through, about(w), h, r), who = (x) => [x.a.name, x.a.no, tName(x.a.t)];
+  const trio = (m, p) => [C.value(m, p), C.expected(m, p), C.n(m, p)], H3 = METRICS.flatMap((m) => [m, m + '_group', m + '_n']);
+  $('csv-focus').addEventListener('click', () => csv('focus', 'coaching focus', ['agent', 'employee_number', 'team', 'measure', 'value', 'group', 'n', 'seen', 'behind_it', 'coaching_hours'], cur.focus.map(({ x, m, c }) => [...who(x), m, ...trio(m, x.part(m)), c ? 'consistent' : 'new', behind(m, x), coa(x)])));
+  $('csv-str').addEventListener('click', () => csv('strengths', 'strong practice', ['agent', 'employee_number', 'team', 'measure', 'value', 'group', 'n'], cur.strong.map(({ x, m }) => [...who(x), m, ...trio(m, x.part(m))])));
+  $('csv-team').addEventListener('click', () => csv('teams', 'teams', ['team', 'site', 'supervisor', ...H3], cur.teams.map(({ t, p }) => [t.name, t.site, t.sup, ...METRICS.flatMap((m) => trio(m, p))])));
+  $('csv-all').addEventListener('click', () => csv('agents', 'all agents', ['agent', 'employee_number', 'team', 'tenure_days', 'days_worked', 'contacts', ...H3, ...METRICS.map((m) => m + '_reading')], cur.people.map((x) => [...who(x), days(x.a), x.p.n, x.p.ans, ...METRICS.flatMap((m) => trio(m, x.part(m))), ...METRICS.map((m) => x.s[m])])));
+  $('csv-agent').addEventListener('click', () => csv('agent', AG.get(S.agent).name + ' by month', ['month', ...H3], cur.tr.map((t) => [t.m, ...METRICS.flatMap((m) => trio(m, m === 'quality' ? t.q : t.p))])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (cur.people) { renderAgent(); renderStrip(); renderScatter(); } }, 150); });
+})();
+</script>
+</body>
+</html>

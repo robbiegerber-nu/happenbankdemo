@@ -87,7 +87,13 @@
       "formula": "(Breaks + lunch + training + coaching + meetings + unplanned unavailable + absence) ÷ scheduled minutes",
       "exclusions": "Excludes PTO, which is not in scheduled minutes.", "minN": 5, "wiki": "workforce" },
     { "id": "forecast", "name": "Forecast error", "short": "Forecast error", "format": "signedpct", "better": "range", "target": [-10, 10], "watch": [-15, 15], "targetLabel": "within ±10% a day",
-      "definition": "How far contacts offered were above (+) or below (−) the forecast.", "formula": "(Offered − forecast) ÷ forecast", "minN": 0, "wiki": "workforce" }
+      "definition": "How far contacts offered were above (+) or below (−) the forecast.", "formula": "(Offered − forecast) ÷ forecast", "minN": 0, "wiki": "workforce" },
+    { "id": "quality", "name": "Quality score", "short": "Quality", "format": "rate", "better": "higher", "target": 85, "watch": 82, "targetLabel": "≥ 85.0",
+      "definition": "Average score of evaluated contacts, from 50 to 100. About one agent-day in five is evaluated.", "formula": "Sum of evaluation scores ÷ evaluations", "minN": 5, "wiki": "workforce" },
+    { "id": "transfer", "name": "Transfer rate", "short": "Transfers", "format": "pct", "better": "lower", "target": null,
+      "definition": "Share of answered contacts passed to another agent or queue. No target, because it varies by contact reason.", "formula": "Transferred contacts ÷ answered contacts", "minN": 50, "wiki": "efficiency" },
+    { "id": "aht", "name": "Average handle time", "short": "AHT", "format": "duration", "better": "none", "target": null,
+      "definition": "Average talk + hold + wrap-up time of all contacts the agents answered, on every channel. No target, because it varies by contact reason.", "formula": "Total handle time ÷ answered contacts", "minN": 20, "wiki": "efficiency" }
   ],
   "sections": [
     { "id": "access", "name": "Service and access" },

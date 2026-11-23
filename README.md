@@ -4,7 +4,19 @@ Interactive banking analytics using PostgreSQL, Python, and AI Assisted Developm
 
 > **100% synthetic data.** Generated for dashboard demonstrations. This is **not** real Happen Bank data, and every agent, supervisor and customer is fictional. Product names are generic.
 
-This repository builds a realistic contact center database: 34 months (Jan 2024 – Oct 2026) and 5.9 million contacts across phone, chat, email, callback and secure message. It includes agents, schedules and adherence, IVR, surveys, complaints, customers, personas and product launches. It is the foundation for a data health dashboard and a contact center analytics dashboard published with GitHub Pages.
+This repository builds a realistic contact center database: 34 months (Jan 2024 – Oct 2026), 5.9 million contacts and 15 daily loads for November 2026, across phone, chat, email, callback and secure message. It includes agents, schedules and adherence, IVR, surveys, complaints, customers, personas and product launches. It feeds the dashboards below, published with GitHub Pages.
+
+## Dashboards
+
+| Dashboard | Question it answers |
+|---|---|
+| [Executive scorecard](https://robbiegerber-nu.github.io/happenbankdemo/executive.html) | Are we meeting our targets? |
+| [Service & access operations](https://robbiegerber-nu.github.io/happenbankdemo/service.html) | When and where do customers wait? |
+| [Workforce management](https://robbiegerber-nu.github.io/happenbankdemo/workforce.html) | Do we have the right people at the right time? |
+| [Agent & team coaching](https://robbiegerber-nu.github.io/happenbankdemo/coaching.html) | Who could use coaching, on what, and is it a real gap? |
+| [Performance driver explorer](https://robbiegerber-nu.github.io/happenbankdemo/drivers.html) | What changed, and what drove it? |
+| [Process stability monitor](https://robbiegerber-nu.github.io/happenbankdemo/stability.html) | Is this a real change or normal variation? |
+| [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/) | Can we trust the data? |
 
 ## 📖 Documentation lives in the wiki
 
@@ -32,7 +44,9 @@ This takes about 75 minutes. It drops and recreates the `happen_demo` database, 
 | Path | Contents |
 |---|---|
 | [`sql/`](sql/) | Numbered scripts that build the database (`00`–`12`), the validation suite (`99_validate.sql`) and `run_all.ps1` |
-| [`sql/discovery/`](sql/discovery/) | Data discovery & data quality toolkit: column profiling, 99 rules stored as data, run history, JSON export ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery)) |
+| [`sql/discovery/`](sql/discovery/) | Data discovery & data quality toolkit: column profiling, 101 rules stored as data, run history, JSON export ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery)) |
+| [`sql/pipeline/`](sql/pipeline/) | Daily loads: feed generation, loading, incidents, alerts and reset ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2b-Data-Quality-Pipeline)) |
+| [`sql/dashboards/`](sql/dashboards/) | Exports the JSON the operational dashboards read, refreshed after each daily load with no failed check |
 | [`sql/remediation/`](sql/remediation/) | Documented, re-runnable fixes for data defects found by discovery |
 | [`tools/`](tools/) | `generate_data_dictionary.ps1`: rebuilds the wiki's column pages from the database's own documentation |
-| [`docs/`](docs/) | GitHub Pages site: the [Data Quality Dashboard](https://robbiegerber-nu.github.io/happenbankdemo/) and its JSON data |
+| [`docs/`](docs/) | GitHub Pages site: the dashboards above and their JSON data |
