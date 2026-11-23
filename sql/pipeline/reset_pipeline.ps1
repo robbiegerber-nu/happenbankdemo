@@ -5,7 +5,8 @@
 $ErrorActionPreference = 'Stop'
 $env:PGCLIENTENCODING = 'UTF8'
 $psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
-$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', 'happen_demo')
+$db   = if ($env:HAPPEN_DB) { $env:HAPPEN_DB } else { 'happen_demo' }   # set HAPPEN_DB to work on a copy (rehearsals)
+$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', $db)
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $keep = 5   # last run before daily loads
 
@@ -44,6 +45,9 @@ $tmp = Join-Path $env:TEMP 'happen_reset.sql'
 if ($LASTEXITCODE -ne 0) { throw 'reset failed' }
 
 # exported files for runs after #5, then re-export run 5 as the latest
-Get-ChildItem (Join-Path $root 'docs\data\runs') -Directory | Where-Object { [int]$_.Name -gt $keep } | Remove-Item -Recurse -Force
+$exportDir = if ($env:HAPPEN_EXPORT) { $env:HAPPEN_EXPORT } else { Join-Path $root 'docs\data' }
+if (Test-Path (Join-Path $exportDir 'runs')) {
+    Get-ChildItem (Join-Path $exportDir 'runs') -Directory | Where-Object { [int]$_.Name -gt $keep } | Remove-Item -Recurse -Force
+}
 & powershell -NoProfile -File (Join-Path $root 'sql\discovery\run_discovery.ps1') -ExportOnly -ResumeRunId $keep | Out-Null
 "reset: data back to 31 Oct 2026, latest run #$keep"

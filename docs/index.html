@@ -510,7 +510,7 @@
   </section>
   </div>
 
-  <footer>Data Quality Dashboard · v3.1 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
+  <footer>Data Quality Dashboard · v3.2 · Source: <code>discovery</code> schema in PostgreSQL, exported to JSON by
     <code>sql/discovery/run_discovery.ps1</code> · <a href="https://github.com/robbiegerber-nu/happenbankdemo">Repository</a></footer>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -779,7 +779,8 @@ function tableScoreExample() {
 function renderTrend() {
   const h = S.runs;
   // phases: runs that built the checks on the full history (no business day) vs. daily loads
-  const phaseOf = r => r.business_date ? 'daily' : 'setup';
+  // a run with no business day after daily loads began re-checks existing data (e.g. after refining the rules)
+  const phaseOf = r => r.business_date ? 'daily' : (r.data_to && r.data_to > '2026-10-31') ? 'recheck' : 'setup';
   const phases = [];
   h.forEach((r, i) => { const p = phaseOf(r); if (!phases.length || phases[phases.length - 1].p !== p) phases.push({ p, a: i, b: i }); else phases[phases.length - 1].b = i; });
   const twoPhases = phases.length > 1;
@@ -804,8 +805,9 @@ function renderTrend() {
     const x0 = Math.max(m.l - 6, x(ph.a) - step / 2), x1 = Math.min(W - m.r + 6, x(ph.b) + step / 2), mid = (x0 + x1) / 2;
     const first = h[ph.a], last = h[ph.b];
     const long = ph.p === 'setup' ? `Building the checks · data to ${fmtMD(first.data_to)}`
-                                   : `Daily loads · ${fmtMD(first.business_date)}–${fmtMD(last.business_date).replace(/^\w+ /, '')}`;
-    const label = long.length * 6.2 < x1 - x0 - 8 ? long : ph.p === 'setup' ? 'Building checks' : 'Daily loads';
+               : ph.p === 'recheck' ? 'Checks refined'
+               : `Daily loads · ${fmtMD(first.business_date)}–${fmtMD(last.business_date).replace(/^\w+ /, '')}`;
+    const label = long.length * 6.2 < x1 - x0 - 8 ? long : ph.p === 'setup' ? 'Building checks' : ph.p === 'recheck' ? 'Refined' : 'Daily loads';
     return (ph.p === 'setup' ? `<rect class="phase-band" x="${x0}" y="${m.t - 10}" width="${x1 - x0}" height="${H - m.b - m.t + 10}"></rect>` : '') +
       `<line class="phase-rule" x1="${x0 + 4}" x2="${x1 - 4}" y1="${H - 26}" y2="${H - 26}"></line>
        <text class="phase-cap" x="${mid}" y="${H - 9}" text-anchor="middle">${esc(label)}</text>`;
@@ -829,7 +831,7 @@ function renderTrend() {
 }
 const trendTip = i => { const r = S.runs[i];
   return `<div class="t-title">Run #${r.run_id} · ${r.business_date ? 'data for ' + dayShort(r.business_date) : r.data_to ? 'data to ' + dayShort(r.data_to) : fmtDate(r.started_at)}</div>
-    <div class="t-row"><span>Phase</span><span>${r.business_date ? 'Daily load' : 'Building the checks'}</span></div>
+    <div class="t-row"><span>Phase</span><span>${r.business_date ? 'Daily load' : r.data_to > '2026-10-31' ? 'Re-check with refined rules' : 'Building the checks'}</span></div>
     <div class="t-row"><span>Score</span><span>${Number(r.score).toFixed(1)}</span></div>
     <div class="t-row"><span>Status</span><span>${r.status}</span></div>
     <div class="t-row"><span>Pass / Warn / Fail</span><span>${r.passed} / ${r.warned} / ${r.failed}</span></div>

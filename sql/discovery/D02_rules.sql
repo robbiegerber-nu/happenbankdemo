@@ -122,7 +122,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  $$SELECT count(*) FROM cc.contact WHERE handle_sec <> talk_sec + hold_sec + wrap_sec$$,'rows',0,0,'High',NULL),
 ('VAL-004','contact','offered_ts','Validity','Contacts inside the reporting period',
  'Contacts offered before 1 Jan 2024 or after 31 Oct 2026.',
- $$SELECT count(*) FROM cc.contact WHERE offered_ts < '2024-01-01' OR offered_ts >= discovery.period_end() + 1$$,'rows',0,0,'High',NULL),
+ $$SELECT count(*) FROM cc.contact WHERE offered_ts < '2024-01-01' OR offered_ts >= (SELECT discovery.period_end()) + 1$$,'rows',0,0,'High',NULL),
 ('VAL-005','contact','offered_ts','Validity','Phone and chat offered only in opening hours',
  'Customers can only join the phone or chat queue Mon-Fri 7:00-21:00 and Sat 8:00-17:00, never on a closed day.',
  $$SELECT count(*) FROM cc.contact c JOIN cc.dim_date d ON d.full_date = c.offered_ts::date
@@ -210,8 +210,8 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
  $$SELECT abs((SELECT sum(answered) FROM cc.interval_volume) - (SELECT count(*) FROM cc.contact WHERE answered))$$,'rows',0,0,'Critical',NULL),
 ('CON-003','agent_daily','contacts_handled','Consistency','Agent-day contacts = answered contacts',
  'Contacts per agent per day must reconcile to the contact detail.',
- $$SELECT abs((SELECT sum(contacts_handled) FROM cc.agent_daily WHERE date_key <= to_char(discovery.period_end(), 'YYYYMMDD')::int)
-            - (SELECT count(*) FROM cc.contact WHERE answered AND answered_ts::date <= discovery.period_end()))$$,'rows',0,0,'Critical',
+ $$SELECT abs((SELECT sum(contacts_handled) FROM cc.agent_daily WHERE date_key <= to_char((SELECT discovery.period_end()), 'YYYYMMDD')::int)
+            - (SELECT count(*) FROM cc.contact WHERE answered AND answered_ts::date <= (SELECT discovery.period_end())))$$,'rows',0,0,'Critical',
  'Compares up to the latest day loaded: an email answered the day after it arrived is counted when that day is loaded.'),
 ('CON-004','survey_response','agent_id','Consistency','Survey agent matches contact agent',
  'Surveys credited to a different agent than the one who handled the contact.',
@@ -231,7 +231,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
                          FROM cc.contact WHERE answered AND channel_id <> 2) x WHERE nxt < wrap_end_ts$$,'rows',0,0,'Critical',NULL),
 ('CON-009','contact','answered_ts','Consistency','Contacts handled only while agent is Available',
  'Contacts handled while the agent was on break, in training, unavailable or logged out.',
- $$SELECT count(*) FROM cc.contact c WHERE c.answered AND c.answered_ts::date <= discovery.period_end() AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
+ $$SELECT count(*) FROM cc.contact c WHERE c.answered AND c.answered_ts::date <= (SELECT discovery.period_end()) AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
      WHERE a.agent_id = c.agent_id AND a.date_key = to_char(c.answered_ts, 'YYYYMMDD')::int
        AND a.state = 'Available' AND c.answered_ts >= a.state_start_ts AND c.wrap_end_ts <= a.state_end_ts)$$,'rows',0,0,'Critical',
  'Checks contacts answered up to the latest day loaded; that day''s agent activity arrives with it.'),

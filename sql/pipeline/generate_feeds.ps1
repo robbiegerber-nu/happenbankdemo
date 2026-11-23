@@ -6,7 +6,8 @@ param([switch]$Rebuild)
 $ErrorActionPreference = 'Stop'
 $env:PGCLIENTENCODING = 'UTF8'
 $psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
-$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', 'happen_demo')
+$db   = if ($env:HAPPEN_DB) { $env:HAPPEN_DB } else { 'happen_demo' }   # set HAPPEN_DB to work on a copy (rehearsals)
+$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', $db)
 $root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $base = Join-Path $root 'data\daily_loads'
 

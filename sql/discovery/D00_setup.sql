@@ -203,6 +203,20 @@ CREATE TABLE IF NOT EXISTS discovery.dq_incident_update (
 );
 COMMENT ON TABLE discovery.dq_incident_update IS 'How each incident looked in every run while it was open.';
 
+-- ======================= v3.2: checks flag only what needs recording =======================
+-- Evidence is collected even when a check passes, for checks whose explained findings should stay visible
+ALTER TABLE discovery.dq_rule ADD COLUMN IF NOT EXISTS evidence_always boolean NOT NULL DEFAULT false;
+
+-- Findings a person reviewed and accepted: they stay listed in the evidence but no longer warn
+CREATE TABLE IF NOT EXISTS discovery.dq_reviewed_finding (
+  rule_id      text NOT NULL,
+  item_key     text NOT NULL,          -- a day (yyyy-mm-dd) or a record id, depending on the check
+  reason       text NOT NULL,
+  reviewed_on  date NOT NULL,
+  PRIMARY KEY (rule_id, item_key)
+);
+COMMENT ON TABLE discovery.dq_reviewed_finding IS 'Findings reviewed by a person and accepted, with the reason; they no longer raise warnings.';
+
 -- Rows waiting for a record they refer to (child feeds whose contact has not arrived yet)
 CREATE SCHEMA IF NOT EXISTS pipeline;
 COMMENT ON SCHEMA pipeline IS 'Daily load staging: files are copied here, checked, then merged into cc.';

@@ -158,7 +158,7 @@ UPDATE discovery.dq_rule SET evidence_sql = $$
            'detail', to_char(n, 'FM999,999') || CASE WHEN n = 1 THEN ' contact' ELSE ' contacts' END
                      || ' answered with no matching Available time for the agent, e.g. ' || array_to_string(ids, ', ')) ORDER BY day DESC)
   FROM (SELECT c.answered_ts::date AS day, count(*) AS n, (array_agg(c.contact_id ORDER BY c.contact_id DESC))[1:3] AS ids
-        FROM cc.contact c WHERE c.answered AND c.answered_ts::date <= discovery.period_end() AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
+        FROM cc.contact c WHERE c.answered AND c.answered_ts::date <= (SELECT discovery.period_end()) AND NOT EXISTS (SELECT 1 FROM cc.agent_activity a
           WHERE a.agent_id = c.agent_id AND a.date_key = to_char(c.answered_ts, 'YYYYMMDD')::int
             AND a.state = 'Available' AND c.answered_ts >= a.state_start_ts AND c.wrap_end_ts <= a.state_end_ts)
         GROUP BY 1 ORDER BY 1 DESC LIMIT 25) x$$
@@ -215,9 +215,4 @@ UPDATE discovery.dq_rule r SET problem_plain = v.p FROM (VALUES
  ('VAL-017', 'contacts handled by agents who had left')
 ) v(id, p) WHERE r.rule_id = v.id AND r.problem_plain IS NULL;
 
--- Every active rule must have evidence
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM discovery.dq_rule WHERE is_active AND evidence_sql IS NULL) THEN
-    RAISE EXCEPTION 'rules without evidence: %', (SELECT string_agg(rule_id, ', ') FROM discovery.dq_rule WHERE is_active AND evidence_sql IS NULL);
-  END IF;
-END $$;
+-- (The "every rule has evidence" check runs at the end of D07_refinements.sql, after the refined rules get theirs.)

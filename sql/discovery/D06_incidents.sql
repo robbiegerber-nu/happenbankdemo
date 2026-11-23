@@ -31,7 +31,8 @@ RETURNS TABLE (rule_id text, day date, records numeric, detail text) LANGUAGE sq
            CASE WHEN (SELECT unit FROM discovery.dq_rule q WHERE q.rule_id = c.rule_id) = 'days' THEN 1 ELSE (e->>'records')::numeric END AS records,
            e->>'detail' AS detail,
            CASE WHEN e->>'item' ~ '^[A-Z][a-z]{2} [A-Z][a-z]{2} \d{2}, \d{4}$' THEN to_date(e->>'item', 'Dy Mon DD, YYYY') END AS d
-    FROM c LEFT JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.evidence) = 'array' THEN c.evidence ELSE '[]'::jsonb END) e ON true)
+    FROM c LEFT JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.evidence) = 'array' THEN c.evidence ELSE '[]'::jsonb END) e ON true
+    WHERE e IS NULL OR e->>'explained' IS NULL)   -- explained or reviewed findings never open an incident
   SELECT i.rule_id,
          least(coalesce(i.d, CASE WHEN discovery.status_rank(i.status) > discovery.status_rank(i.ps) THEN r.bd END), r.bd) AS day,
          coalesce(i.records, 0), i.detail
@@ -119,7 +120,9 @@ BEGIN
     -- (totals that no longer reconcile, unusual volume), then the most important, then the most records
     SELECT x.rule_id, x.records, r.unit, r.severity INTO prim
     FROM (SELECT pd.rule_id, sum(pd.records) AS records FROM pd WHERE pd.day = d GROUP BY 1) x JOIN discovery.dq_rule r USING (rule_id)
-    ORDER BY CASE r.dimension WHEN 'Uniqueness' THEN 1 WHEN 'Completeness' THEN 1 WHEN 'Validity' THEN 1 WHEN 'Consistency' THEN 2 ELSE 3 END,
+    -- (CMP-019, fields that stopped being filled in, is a derived signal: it ranks with the symptoms)
+    ORDER BY CASE WHEN r.rule_id = 'CMP-019' THEN 2 WHEN r.dimension IN ('Uniqueness', 'Completeness', 'Validity') THEN 1
+                  WHEN r.dimension = 'Consistency' THEN 2 ELSE 3 END,
              CASE r.severity WHEN 'Critical' THEN 4 WHEN 'High' THEN 3 WHEN 'Medium' THEN 2 ELSE 1 END DESC, x.records DESC LIMIT 1;
     SELECT jsonb_object_agg(x.rule_id, jsonb_build_object('records', x.records, 'unit', r.unit, 'status', c.status)), count(*)
       INTO chk, n

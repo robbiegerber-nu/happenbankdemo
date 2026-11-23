@@ -12,9 +12,10 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PGCLIENTENCODING = 'UTF8'
 $psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
-$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', 'happen_demo')
+$db   = if ($env:HAPPEN_DB) { $env:HAPPEN_DB } else { 'happen_demo' }   # set HAPPEN_DB to work on a copy (rehearsals)
+$conn = @('-w', '-h', 'localhost', '-U', 'postgres', '-d', $db)
 $dir  = $PSScriptRoot
-$out  = Join-Path $PSScriptRoot '..\..\docs\data'
+$out  = if ($env:HAPPEN_EXPORT) { $env:HAPPEN_EXPORT } else { Join-Path $PSScriptRoot '..\..\docs\data' }   # set HAPPEN_EXPORT to keep rehearsal output away from the dashboard
 New-Item -ItemType Directory -Force $out | Out-Null
 
 function Invoke-File([string]$f) {
@@ -35,7 +36,7 @@ if ($ExportOnly) {
     $run = if ($ResumeRunId -gt 0) { $ResumeRunId } else { [int](Invoke-Scalar "SELECT max(run_id) FROM discovery.dq_run;") }
     "export only: run_id = $run"
 } else {
-Step 'setup, engine, rules' { foreach ($f in 'D00_setup.sql', 'D01_functions.sql', 'D02_rules.sql', 'D04_events.sql', 'D05_evidence.sql', 'D06_incidents.sql') { Invoke-File $f } }
+Step 'setup, engine, rules' { foreach ($f in 'D00_setup.sql', 'D01_functions.sql', 'D02_rules.sql', 'D04_events.sql', 'D05_evidence.sql', 'D06_incidents.sql', 'D07_refinements.sql') { Invoke-File $f } }
 if ($ResumeRunId -gt 0) {
     $run = $ResumeRunId
     "resuming run_id = $run"

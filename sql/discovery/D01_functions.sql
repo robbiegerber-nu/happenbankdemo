@@ -137,7 +137,7 @@ BEGIN
       val := NULL; st := 'Error'; err := SQLERRM;
     END;
     -- evidence: the specific items behind a non-zero result (which fields, which days, which products...)
-    IF r.evidence_sql IS NOT NULL AND coalesce(val, 0) > 0 THEN
+    IF r.evidence_sql IS NOT NULL AND (coalesce(val, 0) > 0 OR r.evidence_always) THEN
       BEGIN
         EXECUTE replace(r.evidence_sql, '{run_id}', p_run::text) INTO ev;
       EXCEPTION WHEN OTHERS THEN ev := jsonb_build_array(jsonb_build_object('item', 'Evidence could not be collected', 'detail', SQLERRM));
