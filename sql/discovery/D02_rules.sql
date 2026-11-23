@@ -141,7 +141,7 @@ INSERT INTO discovery.dq_rule (rule_id, table_name, column_name, dimension, rule
 ('VAL-007','contact','queue_wait_sec','Validity','Very long phone and chat waits',
  '% of answered phone and chat contacts that waited more than 20 minutes.',
  $$SELECT 100.0 * avg((queue_wait_sec > 1200)::int) FROM cc.contact WHERE answered AND channel_id IN (1, 2)$$,'%',0.5,2,'Medium',
- 'Long waits are real during the summer 2025 staffing crunch; investigate if this rises.'),
+ 'Long waits are real during the summer 2025 staffing gap; investigate if this rises.'),
 ('VAL-008','contact','sentiment_score','Validity','Sentiment within -1 to +1',
  'Sentiment scores outside the valid range.',
  $$SELECT count(*) FROM cc.contact WHERE sentiment_score NOT BETWEEN -1 AND 1$$,'rows',0,0,'Medium',NULL),

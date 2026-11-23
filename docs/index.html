@@ -150,11 +150,12 @@
   .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 16px; border-top: 1px solid var(--grid);
             font-size: 0.8rem; color: var(--text-secondary); }
 
+  .ctls { display: contents; } .phone-f { display: none; }
   /* ---- Tooltip ---- */
-  .tip { position: fixed; z-index: 10; pointer-events: none; max-width: 300px; padding: 10px 12px; border-radius: 8px;
+  .tip { position: fixed; z-index: 10; pointer-events: none; visibility: hidden; max-width: 300px; padding: 10px 12px; border-radius: 8px;
          background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 24px rgba(0,0,0,0.18);
          font-size: 0.82rem; color: var(--text-primary); opacity: 0; transition: opacity 0.08s; }
-  .tip.show { opacity: 1; }
+  .tip.show { opacity: 1; visibility: visible; pointer-events: auto; }
   .tip .t-title { font-weight: 650; margin-bottom: 4px; }
   .tip .t-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   .tip .t-sep { border-top: 1px solid var(--grid); margin: 6px 0 4px; }
@@ -319,7 +320,11 @@
     .filters label { flex: 1 1 150px; } main .filters select, main .filters input { width: 100%; min-height: 44px; }
     .seg { flex-wrap: wrap; }
     .rule > summary, details.sql > summary { min-height: 44px; }
-    .filter-bar .filter { flex: 1 1 100%; }
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
   }
   @media (max-width: 600px) {
     .tile.hero .value { font-size: 2.2rem; }
@@ -332,9 +337,12 @@
 <body>
 <div class="filter-bar" role="region" aria-label="Filters">
   <div class="wrap">
+    <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+    <div class="ctls" id="ctls">
     <label class="filter" id="runbar" hidden><span class="flabel">Run</span>
       <select id="run-select" aria-label="Run"></select></label>
     <button class="link-btn" id="reset" type="button">Reset to default</button>
+    </div>
     <span class="spacer"></span>
     <button class="btn" id="copy-link" type="button">Copy link</button>
   </div>
@@ -538,14 +546,27 @@ const runById = id => S.runs.find(r => r.run_id === id);
 
 /* ---------- tooltip (shared) ---------- */
 const tip = $('tip');
-function showTip(html, x, y) {
-  tip.innerHTML = html; tip.classList.add('show');
+// WCAG 1.4.13: the tooltip stays while the pointer is over it, and Esc dismisses it.
+// It holds still while the pointer stays on the same item (otherwise it would move away from the pointer).
+let tipTimer = 0, tipHtml = null;
+const tipOpen = () => tip.classList.contains('show');
+function showTip(html, x, y, wide = false) {
+  keepTip();
+  if (tipOpen() && html === tipHtml) return;
+  tipHtml = html; tip.innerHTML = html; tip.classList.toggle('wide', wide); tip.classList.add('show');
   const r = tip.getBoundingClientRect();
-  tip.style.left = Math.max(8, Math.min(x + 14, innerWidth - r.width - 8)) + 'px';
-  tip.style.top = Math.max(8, Math.min(y + 14, innerHeight - r.height - 8)) + 'px';
+  let left = x + 14, top = y + 14;
+  if (left + r.width > innerWidth - 8) left = Math.max(8, x - r.width - 14);
+  if (top + r.height > innerHeight - 8) top = Math.max(8, y - r.height - 14);
+  tip.style.left = left + 'px'; tip.style.top = top + 'px';
 }
-const hideTip = () => tip.classList.remove('show');
-addEventListener('keydown', e => { if (e.key === 'Escape') hideTip(); });
+const keepTip = () => { clearTimeout(tipTimer); tipTimer = 0; };
+const closeTip = () => { keepTip(); tip.classList.remove('show'); tipHtml = null; };
+// the timer is not restarted by repeated calls, so moving over empty space still closes it
+const hideTip = () => { if (!tipOpen()) return; if (tipTimer) return; tipTimer = setTimeout(closeTip, 300); };
+tip.addEventListener('mouseenter', keepTip);
+tip.addEventListener('mouseleave', hideTip);
+addEventListener('keydown', e => { if (e.key === 'Escape') closeTip(); });
 
 /* ---------- header: run picker, meta, "older run" banner ---------- */
 function renderPicker() {
@@ -558,6 +579,7 @@ function renderPicker() {
 function renderHeader() {
   const s = S.data.summary;
   $('run-select').value = String(S.selected);
+  $('phone-f').textContent = S.selected !== S.latest ? 'Filters (1)' : 'Filters';
   $('meta').innerHTML =
     `<span>Run #${s.run.run_id} · ${fmtDate(s.run.finished_at || s.run.started_at)}</span>` +
     `<span>Data period ${Site.fmt.date(s.period.start)} – ${Site.fmt.date(s.period.end)}</span><span>${esc(s.run.notes || '')}</span>`;
@@ -568,7 +590,7 @@ function renderHeader() {
     $('to-latest').textContent = `Back to latest (run #${S.latest})`;
   }
   document.title = older ? `Data Quality Dashboard · Run #${S.selected} · Happen Bank Contact Center (demo)` : 'Data Quality Dashboard · Happen Bank Contact Center (demo)';
-  $('footer-generated').textContent = `Data Quality Dashboard v3.3 · run #${s.run.run_id}, ${fmtDate(s.run.finished_at || s.run.started_at)} · source: discovery schema in PostgreSQL, exported by sql/discovery/run_discovery.ps1`;
+  $('footer-generated').textContent = `Data Quality Dashboard v3.4 · run #${s.run.run_id}, ${fmtDate(s.run.finished_at || s.run.started_at)} · source: discovery schema in PostgreSQL, exported by sql/discovery/run_discovery.ps1`;
 }
 
 function renderTiles() {
@@ -1031,7 +1053,7 @@ function setTab(name, { push = true, focus = false } = {}) {
     if (on && focus) b.focus();
   });
   TABS.forEach(t => { $('tab-' + t).hidden = t !== name; });
-  hideTip();
+  closeTip();
   const url = new URL(location.href);
   if (name === 'overview') url.searchParams.delete('tab'); else url.searchParams.set('tab', name);
   if (push && url.href !== location.href) history.pushState({}, '', url);
@@ -1412,7 +1434,7 @@ async function showRun(id, { push = true } = {}) {
       load(base + 'summary.json'), load(base + 'scorecard.json'), load(base + 'checks.json'), load(base + 'scorecard_history.json').catch(() => [])]);
     if (req !== S.reqId) return;                                  // a newer selection won
     S.selected = id; S.data = { summary, score, checks, hist };
-    renderAll(); hideTip();
+    renderAll(); closeTip();
     const url = new URL(location.href);
     if (id === S.latest) url.searchParams.delete('run'); else url.searchParams.set('run', id);
     if (push && url.href !== location.href) history.pushState({ run: id }, '', url);
@@ -1427,6 +1449,7 @@ async function showRun(id, { push = true } = {}) {
 function wire() {
   $('run-select').addEventListener('change', e => showRun(+e.target.value));
   $('to-latest').addEventListener('click', () => showRun(S.latest));
+  document.getElementById('phone-f').addEventListener('click', (e) => { const o = document.getElementById('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
   addEventListener('popstate', () => {
     restoreFilters();
     const t = tabFromUrl(); if (t !== S.tab) setTab(t, { push: false });
@@ -1446,8 +1469,8 @@ function wire() {
   $('c-text').addEventListener('input', drawColumns);
   const cv = $('c-table-view');
   const colOf = el => S.profile.tables.find(x => x.table === $('c-table').value).columns.find(c => c.column === el.dataset.col);
-  const cShow = (el, x, y) => { tip.classList.add('wide'); showTip(colTip(colOf(el)), x, y); };
-  const cHide = () => { hideTip(); tip.classList.remove('wide'); };
+  const cShow = (el, x, y) => { showTip(colTip(colOf(el)), x, y, true); };
+  const cHide = () => { hideTip(); };
   cv.addEventListener('mousemove', e => { const el = e.target.closest('[data-col]'); el ? cShow(el, e.clientX, e.clientY) : cHide(); });
   cv.addEventListener('mouseleave', cHide);
   cv.addEventListener('focusin', e => { const el = e.target.closest('[data-col]'); if (el) { const b = el.getBoundingClientRect(); cShow(el, b.left, b.bottom); } });
@@ -1458,18 +1481,18 @@ function wire() {
   $('v-range').addEventListener('click', e => { const b = e.target.closest('[data-range]'); if (!b) return;
     setRange(b.dataset.range); V.idx = null; drawVolume(); saveFilters(); });
   const vc = $('v-chart');
-  const vAt = (i, x, y) => { if (i == null) return; volCross(i); tip.classList.add('wide'); showTip(volTip(i), x, y); };
+  const vAt = (i, x, y) => { if (i == null) return; volCross(i); showTip(volTip(i), x, y, true); };
   vc.addEventListener('mousemove', e => { if (!S.volGeo) return; vAt(volNearest(e.clientX), e.clientX, e.clientY); });
-  vc.addEventListener('mouseleave', () => { hideTip(); tip.classList.remove('wide'); const c = $('v-cross'); if (c) c.style.display = 'none'; V.idx = null; });
+  vc.addEventListener('mouseleave', () => { hideTip(); const c = $('v-cross'); if (c) c.style.display = 'none'; V.idx = null; });
   vc.addEventListener('keydown', e => {
     const g = S.volGeo; if (!g || !g.open.length) return;
     const k = V.idx == null ? -1 : g.open.indexOf(V.idx);
     const n = { ArrowRight: k + 1, ArrowLeft: k < 0 ? g.open.length - 1 : k - 1, Home: 0, End: g.open.length - 1 }[e.key];
     if (n == null) return; e.preventDefault();
     const i = g.open[Math.max(0, Math.min(g.open.length - 1, n))], p = volCross(i), r = vc.querySelector('svg').getBoundingClientRect();
-    tip.classList.add('wide'); showTip(volTip(i), r.left + p.cx * r.width / g.W, r.top + p.cy * r.height / g.H);
+    showTip(volTip(i), r.left + p.cx * r.width / g.W, r.top + p.cy * r.height / g.H, true);
   });
-  vc.addEventListener('focusout', () => { hideTip(); tip.classList.remove('wide'); });
+  vc.addEventListener('focusout', () => { hideTip(); });
 
   /* incidents: filter, and links from the Overview's load card */
   $('i-status').addEventListener('change', drawIncidents);
@@ -1495,30 +1518,30 @@ function wire() {
 
 
   const tiles = $('tiles');
-  const tileShow = (el, x, y) => { tip.classList.add('wide'); showTip(tileTip(el.dataset.ktip), x, y); };
-  const tileHide = () => { hideTip(); tip.classList.remove('wide'); };
+  const tileShow = (el, x, y) => { showTip(tileTip(el.dataset.ktip), x, y, true); };
+  const tileHide = () => { hideTip(); };
   tiles.addEventListener('mousemove', e => { const el = e.target.closest('[data-ktip]'); el ? tileShow(el, e.clientX, e.clientY) : tileHide(); });
   tiles.addEventListener('mouseleave', tileHide);
   tiles.addEventListener('focusin', e => { const el = e.target.closest('[data-ktip]'); if (el) { const b = el.getBoundingClientRect(); tileShow(el, b.left, b.bottom); } });
   tiles.addEventListener('focusout', tileHide);
 
   const heat = $('heat');
-  const colShow = (el, x, y) => { tip.classList.add('wide'); showTip(columnTip(el.dataset.htip), x, y); };
-  const heatHide = () => { hideTip(); tip.classList.remove('wide'); };
+  const colShow = (el, x, y) => { showTip(columnTip(el.dataset.htip), x, y, true); };
+  const heatHide = () => { hideTip(); };
   heat.addEventListener('mousemove', e => {
     const h = e.target.closest('[data-htip]'); if (h) return colShow(h, e.clientX, e.clientY);
-    tip.classList.remove('wide');
+   
     const c = e.target.closest('[data-tip]'); c ? showTip(heatTip(JSON.parse(c.dataset.tip)), e.clientX, e.clientY) : hideTip(); });
   heat.addEventListener('mouseleave', heatHide);
   heat.addEventListener('focusin', e => {
     const h = e.target.closest('[data-htip]'); if (h) { const b = h.getBoundingClientRect(); return colShow(h, b.left, b.bottom); }
-    tip.classList.remove('wide');
+   
     const c = e.target.closest('[data-tip]'); if (c) { const b = c.getBoundingClientRect(); showTip(heatTip(JSON.parse(c.dataset.tip)), b.right, b.top); } });
   heat.addEventListener('focusout', heatHide);
   heat.addEventListener('click', e => {
     const c = e.target.closest('button.cell'); if (!c) return;
     heat.querySelectorAll('.selected').forEach(n => n.classList.remove('selected')); c.classList.add('selected');
-    hideTip(); F.s.value = ''; F.x.value = ''; F.t.value = c.dataset.table || ''; F.d.value = c.dataset.dim || ''; drawChecks(); saveFilters();
+    closeTip(); F.s.value = ''; F.x.value = ''; F.t.value = c.dataset.table || ''; F.d.value = c.dataset.dim || ''; drawChecks(); saveFilters();
     $('h-checks').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   });
 
@@ -1528,8 +1551,8 @@ function wire() {
   F.x.addEventListener('input', drawChecks);
 
   const checksTable = $('checks');
-  const chShow = (el, x, y) => { tip.classList.add('wide'); showTip(checksHeaderTip(el.dataset.chtip), x, y); };
-  const chHide = () => { hideTip(); tip.classList.remove('wide'); };
+  const chShow = (el, x, y) => { showTip(checksHeaderTip(el.dataset.chtip), x, y, true); };
+  const chHide = () => { hideTip(); };
   checksTable.addEventListener('mousemove', e => { const el = e.target.closest('[data-chtip]'); el ? chShow(el, e.clientX, e.clientY) : chHide(); });
   checksTable.addEventListener('mouseleave', chHide);
   checksTable.addEventListener('focusin', e => { const el = e.target.closest('[data-chtip]'); if (el) { const b = el.getBoundingClientRect(); chShow(el, b.left, b.bottom); } });

@@ -105,7 +105,13 @@
   td.low { color: var(--text-muted); }
   .hidden { display: none !important; }
   .loading { padding: 80px 0; text-align: center; color: var(--text-muted); }
+  .ctls { display: contents; } .phone-f { display: none; }
   @media (max-width: 767px) {
+    .phone-f { display: inline-flex; align-items: center; }
+    .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
+    .ctls.open { display: flex; }
+    .ctls .filter { flex: none; }
+    .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
     .tiles { grid-template-columns: 1fr; }
     .summary .headline { font-size: 18px; }
     .detail { padding: 16px; }
@@ -115,6 +121,8 @@
 <body>
 <div class="filter-bar" role="region" aria-label="Filters">
   <div class="wrap">
+    <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
+    <div class="ctls" id="ctls">
     <label class="filter"><span class="flabel">Month</span>
       <select id="f-month" aria-label="Month"></select></label>
     <label class="filter"><span class="flabel">Compare to</span>
@@ -123,6 +131,7 @@
         <option value="year">Same month last year</option>
       </select></label>
     <button class="link-btn" id="f-reset" type="button">Reset to default</button>
+    </div>
     <span class="spacer"></span>
     <button class="btn" id="copy-link" type="button">Copy link</button>
   </div>
@@ -223,6 +232,8 @@
   }
   function carriedMonth(set) { try { if (set === null) sessionStorage.removeItem('happen-demo-month'); else if (set) sessionStorage.setItem('happen-demo-month', set); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } }
   function writeUrl() {
+    const nf = (state.month !== defaults.month ? 1 : 0) + (state.cmp !== defaults.cmp ? 1 : 0);
+    document.getElementById('phone-f').textContent = nf ? `Filters (${nf})` : 'Filters';
     const p = new URLSearchParams();
     if (state.month !== defaults.month || carriedMonth()) p.set('m', state.month);
     if (state.cmp !== 'prior') p.set('cmp', state.cmp);
@@ -648,6 +659,7 @@
   document.getElementById('f-month').addEventListener('change', (e) => { state.month = e.target.value; carriedMonth(state.month); render(); });
   document.getElementById('f-cmp').addEventListener('change', (e) => { state.cmp = e.target.value; render(); });
   document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); carriedMonth(null); render(); });
+  document.getElementById('phone-f').addEventListener('click', (e) => { const o = document.getElementById('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
   document.getElementById('t-events').addEventListener('change', (e) => { state.events = e.target.checked; renderDetail(); });
   document.getElementById('t-table').addEventListener('click', () => { state.table = !state.table; renderDetail(); });
   document.getElementById('copy-link').addEventListener('click', (e) => {

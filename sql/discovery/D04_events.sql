@@ -17,5 +17,6 @@ ALTER TABLE discovery.dq_event ADD COLUMN IF NOT EXISTS incident_id int REFERENC
 DELETE FROM discovery.dq_event WHERE kind IN ('Incident', 'Staffing');
 INSERT INTO discovery.dq_event (start_date, end_date, kind, title, description) VALUES
  ('2026-04-07', '2026-04-08', 'Incident', 'Online banking outage', 'Two-day online banking outage: digital access contacts spiked and service level fell to about 32%.'),
- ('2025-06-01', '2025-08-31', 'Staffing', 'Summer staffing crunch', 'Higher attrition and a hiring freeze cut phone headcount from about 117 to 85; waits and abandons rose.'),
+ -- same name and dates as dash.v_events, which finds them from weekly staffing (sql/dashboards/E00_dash_schema.sql)
+ ('2025-06-08', '2025-09-20', 'Staffing', 'Summer 2025 staffing gap', 'Hiring freeze and higher attrition left phone and chat scheduled below required staff every week; waits and abandons rose.'),
  ('2025-09-03', '2025-09-12', 'Staffing', 'Hiring surge', 'Post-freeze hiring classes finished training; agents logged in jumped 35-47% above recent weeks.');
