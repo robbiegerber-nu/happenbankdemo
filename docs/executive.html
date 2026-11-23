@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Executive Scorecard · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Simulated contact center KPIs against target, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.0.1">
+<style>
+  main { padding-top: 28px; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .page-head .sub { margin-top: 6px; color: var(--text-muted); font-size: 14px; }
+  .note { font-size: 13px; color: var(--text-muted); }
+
+  /* Headline summary */
+  .summary { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .summary .headline { font-size: 20px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+  .summary .counts { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .summary .lines { margin-top: 10px; display: grid; gap: 4px; font-size: 14px; }
+  .summary .lines b { color: var(--text-primary); }
+
+  /* Sections and tiles */
+  section.kpi-section { margin-top: 28px; }
+  section.kpi-section > h2 { margin-bottom: 12px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .tile {
+    position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px 12px;
+    box-shadow: var(--shadow); cursor: pointer; display: flex; flex-direction: column; gap: 6px; min-width: 0;
+  }
+  .tile:hover { border-color: var(--text-muted); }
+  .tile.selected { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .tile.good  { background: linear-gradient(to bottom, color-mix(in srgb, var(--good-wash) calc(var(--wash-op) * 50%), var(--surface)), var(--surface) 60%); }
+  .tile.watch { background: linear-gradient(to bottom, color-mix(in srgb, var(--watch-wash) calc(var(--wash-op) * 70%), var(--surface)), var(--surface) 60%); }
+  .tile.off   { background: linear-gradient(to bottom, color-mix(in srgb, var(--off-wash) calc(var(--wash-op) * 50%), var(--surface)), var(--surface) 60%); }
+  .tile-top { display: flex; align-items: flex-start; gap: 6px; }
+  .tile-select {
+    all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); line-height: 1.3; flex: 1; min-width: 0;
+  }
+  .tile-select:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .tile-value { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .tile-value .v { font-size: 30px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-muted); flex-wrap: wrap; }
+  .spark { width: 100%; height: 44px; display: block; }
+  .tile .finding { font-size: 13px; color: var(--text-secondary); }
+  .tile .sowhat { font-size: 13px; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 6px; margin-top: 2px; }
+
+  /* Detail panel */
+  .detail { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; box-shadow: var(--shadow); scroll-margin-top: 80px; }
+  .detail-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+  .detail-head .sub { margin-top: 4px; font-size: 13px; color: var(--text-muted); }
+  .detail-tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); cursor: pointer; min-height: 40px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .chart { position: relative; margin-top: 12px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+  .legend i { display: inline-block; vertical-align: middle; margin-right: 6px; }
+  .legend .l-line { width: 18px; height: 0; border-top: 2px solid var(--brand-blue); }
+  .legend .l-target { width: 18px; height: 0; border-top: 1.5px dashed var(--text-primary); opacity: .7; }
+  .legend .l-watch { width: 14px; height: 10px; background: var(--watch-wash); opacity: .35; border-radius: 2px; }
+  .legend .l-event { width: 14px; height: 10px; background: var(--event); opacity: .18; border-radius: 2px; }
+  .drivers { margin-top: 24px; }
+  .drivers h3 { margin-bottom: 4px; }
+  .drivers .sub { font-size: 13px; color: var(--text-muted); margin-bottom: 10px; }
+
+  /* SVG marks (colors via tokens, so theme changes need no re-render) */
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .ax line, .ax path { stroke: var(--grid); }
+  .grid line { stroke: var(--grid); }
+  .m-line { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .m-pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 2; }
+  .m-pt.sel { r: 6; }
+  .m-pt.low { fill: var(--surface); stroke: var(--text-muted); }
+  .m-target { stroke: var(--text-primary); stroke-opacity: .7; stroke-width: 1.5; stroke-dasharray: 5 4; }
+  .m-target-label { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .m-watch { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .m-evband { fill: var(--event); fill-opacity: .12; }
+  .m-evline { stroke: var(--event); stroke-opacity: .6; stroke-width: 1; }
+  .m-evmark circle { fill: var(--surface); stroke: var(--event); stroke-width: 1; }
+  .m-evmark text { fill: var(--text-muted); font-size: 10px; font-weight: 700; font-family: var(--font); text-anchor: middle; }
+  .m-evlabel { fill: var(--text-muted); font-size: 11.5px; font-family: var(--font); }
+  .m-cross { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 2 3; }
+  .m-selband { fill: var(--brand-blue); fill-opacity: .06; }
+  .m-bar { fill: var(--brand-blue); }
+  .m-bar.low { fill: var(--text-muted); fill-opacity: .35; }
+  .bar-label { fill: var(--text-secondary); font-size: 12.5px; font-family: var(--font); }
+  .bar-value { fill: var(--text-primary); font-size: 12.5px; font-weight: 600; font-family: var(--font); }
+  .bar-value.low { fill: var(--text-muted); font-weight: 400; }
+  .spark .s-line { fill: none; stroke: var(--brand-blue); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .spark .s-target { stroke: var(--text-primary); stroke-opacity: .55; stroke-width: 1; stroke-dasharray: 3 3; }
+  .spark .s-watch { fill: var(--watch-wash); fill-opacity: var(--wash-op); }
+  .spark .s-end { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 2; }
+
+  /* Table view */
+  .tbl-wrap { overflow-x: auto; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; }
+  tr:last-child td { border-bottom: 0; }
+  td.low { color: var(--text-muted); }
+  .hidden { display: none !important; }
+  .loading { padding: 80px 0; text-align: center; color: var(--text-muted); }
+  @media (max-width: 767px) {
+    .tiles { grid-template-columns: 1fr; }
+    .summary .headline { font-size: 18px; }
+    .detail { padding: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters">
+  <div class="wrap">
+    <label class="filter"><span class="flabel">Month</span>
+      <select id="f-month" aria-label="Month"></select></label>
+    <label class="filter"><span class="flabel">Compare to</span>
+      <select id="f-cmp" aria-label="Compare to">
+        <option value="prior">Prior month</option>
+        <option value="year">Same month last year</option>
+      </select></label>
+    <button class="link-btn" id="f-reset" type="button">Reset to default</button>
+    <span class="spacer"></span>
+    <button class="btn" id="copy-link" type="button">Copy link</button>
+  </div>
+</div>
+
+<main class="wrap" id="main">
+  <div class="loading" id="loading">Loading scorecard…</div>
+  <div id="content" class="hidden">
+    <div class="page-head">
+      <div>
+        <h1>Executive scorecard</h1>
+        <div class="sub" id="page-sub"></div>
+      </div>
+      <div class="note" id="partial-note"></div>
+    </div>
+
+    <div class="summary" id="summary" aria-live="polite"></div>
+
+    <div id="sections"></div>
+
+    <section class="detail" id="detail" aria-labelledby="detail-title">
+      <div class="detail-head">
+        <div>
+          <h2 id="detail-title"></h2>
+          <div class="sub" id="detail-sub"></div>
+        </div>
+        <div class="detail-tools">
+          <label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label>
+          <button class="btn" id="t-table" type="button" aria-pressed="false">View as table</button>
+        </div>
+      </div>
+      <div class="chart" id="trend"></div>
+      <div class="legend" id="trend-legend"></div>
+      <div id="trend-table" class="hidden"></div>
+      <div class="drivers" id="drivers"></div>
+    </section>
+  </div>
+</main>
+
+<script src="assets/site.js?v=1.0"></script>
+<script>
+(function () {
+  'use strict';
+  const { fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, DISCLAIMER } = Site;
+  Site.renderChrome('executive');
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const TREND_MONTHS = 24, SPARK_MONTHS = 13;
+
+  let KPIS, SECTIONS, DATA, months, fullMonths, partialMonth, total = {}, drivers = {}, events = [];
+  const state = { month: null, cmp: 'prior', kpi: null, events: true, table: false };
+  let defaults;
+
+  Promise.all([
+    fetch('data/dashboards/kpis.json').then((r) => r.json()),
+    fetch('data/dashboards/executive.json').then((r) => r.json())
+  ]).then(([k, d]) => { KPIS = k.kpis; SECTIONS = k.sections; DATA = d; prepare(); readUrl(); render(); })
+    .catch((e) => { document.getElementById('loading').textContent = 'The scorecard data could not be loaded. ' + e.message; });
+
+  // ---------- Data ----------
+  function prepare() {
+    for (const r of DATA.rows) {
+      if (r.g == null) { (total[r.k] ||= {})[r.m] = { v: r.v, n: r.n }; }
+      else {
+        const d = (drivers[r.k] ||= { dim: r.g, members: {} });
+        (d.members[r.name] ||= {})[r.m] = { v: r.v, n: r.n };
+      }
+    }
+    months = [...new Set(DATA.rows.map((r) => r.m))].sort();
+    // A month is complete only if data runs through its last day
+    const t = DATA.data_through, last = months[months.length - 1];
+    const [y, mo] = last.split('-').map(Number), lastDay = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+    partialMonth = +t.slice(8, 10) < lastDay && t.slice(0, 7) === last ? last : null;
+    fullMonths = months.filter((m) => m !== partialMonth);
+    events = DATA.events || [];
+    defaults = { month: fullMonths[fullMonths.length - 1], cmp: 'prior', kpi: null };
+    const sel = document.getElementById('f-month');
+    sel.innerHTML = fullMonths.slice().reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    document.getElementById('footer-generated').textContent =
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${DATA.generated_at.slice(11, 16)} CT · Executive scorecard v1.0`;
+  }
+  const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
+  const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
+  const kpiById = (id) => KPIS.find((k) => k.id === id);
+  function shiftMonth(m, by) { const [y, mo] = m.split('-').map(Number); const d = new Date(Date.UTC(y, mo - 1 + by, 1)); return d.toISOString().slice(0, 7); }
+  const cmpMonth = (m) => shiftMonth(m, state.cmp === 'year' ? -12 : -1);
+  const cmpLabel = (m) => (state.cmp === 'year' ? fmt.month(cmpMonth(m)) : fmt.monthShort(cmpMonth(m)));
+  function windowEnding(m, n) { const i = months.indexOf(m); return months.slice(Math.max(0, i - n + 1), i + 1); }
+
+  // ---------- URL state (filters are shareable) ----------
+  function readUrl() {
+    const p = new URLSearchParams(location.search);
+    state.month = fullMonths.includes(p.get('m')) ? p.get('m') : defaults.month;
+    state.cmp = p.get('cmp') === 'year' ? 'year' : 'prior';
+    state.kpi = kpiById(p.get('kpi')) ? p.get('kpi') : null;
+    state.kpiPicked = !!state.kpi;
+  }
+  function writeUrl() {
+    const p = new URLSearchParams();
+    if (state.month !== defaults.month) p.set('m', state.month);
+    if (state.cmp !== 'prior') p.set('cmp', state.cmp);
+    if (state.kpi && state.kpiPicked) p.set('kpi', state.kpi);
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+
+  // ---------- Findings (Style Guide: titles state the finding; neutral, factual) ----------
+  function streak(k, m) {
+    const kpi = kpiById(k), s = statusOf(kpi, val(k, m));
+    let n = 0, i = months.indexOf(m);
+    while (i >= 0 && val(k, months[i]) != null && statusOf(kpi, val(k, months[i])) === s) { n++; i--; }
+    return { s, n, prev: i >= 0 ? statusOf(kpi, val(k, months[i])) : null };
+  }
+  function missWord(kpi, v) {
+    if (kpi.better === 'lower') return 'above target';
+    if (kpi.better === 'range') return fmt.displayed(v, kpi.format) > kpi.target[1] ? 'above the target range' : 'below the target range';
+    return 'below target';
+  }
+  function finding(kpi, m) {
+    const v = val(kpi.id, m);
+    if (v == null) return 'No data for this month';
+    if (kpi.target == null) {
+      const w = windowEnding(m, SPARK_MONTHS).map((x) => val(kpi.id, x)).filter((x) => x != null);
+      const yo = fmt.change(v, val(kpi.id, shiftMonth(m, -12)), kpi.format);
+      if (w.length >= 6 && fmt.displayed(v, kpi.format) >= Math.max(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Highest in ${w.length} months`;
+      if (w.length >= 6 && fmt.displayed(v, kpi.format) <= Math.min(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Lowest in ${w.length} months`;
+      return yo ? (yo.flat ? `Unchanged vs ${fmt.month(shiftMonth(m, -12))}` : `${yo.text} vs ${fmt.month(shiftMonth(m, -12))}`) : 'No target; read the trend';
+    }
+    const st = streak(kpi.id, m), run = st.n === 1 ? '' : ` ${st.n} months running`;
+    if (st.s === 'good') return st.n === 1 && st.prev ? `Back on target after ${st.prev === 'off' ? 'missing' : 'a watch month'}` : `On target${run}`;
+    if (st.s === 'watch') return `In the watch range${run}, ${missWord(kpi, v)}`;
+    return `${missWord(kpi, v)[0].toUpperCase() + missWord(kpi, v).slice(1)}${run}`;
+  }
+  function eventsIn(m) {
+    const start = m + '-01', end = m + '-31';
+    return events.filter((e) => e.start <= end && e.end >= start);
+  }
+  // "So what": the weakest driver for the month, plus any event in the month. Only when watch or off target.
+  function soWhat(kpi, m) {
+    const v = val(kpi.id, m), s = statusOf(kpi, v);
+    if (s !== 'watch' && s !== 'off') return null;
+    const parts = [];
+    const d = drivers[kpi.id];
+    if (d) {
+      const highIsBad = kpi.better === 'lower' || (kpi.better === 'range' && fmt.displayed(v, kpi.format) > kpi.target[1]);
+      const cands = Object.entries(d.members).map(([name, ms]) => ({ name, ...(ms[m] || {}) }))
+        .filter((x) => x.v != null && x.n >= kpi.minN);
+      if (cands.length > 1) {
+        cands.sort((a, b) => (highIsBad ? b.v - a.v : a.v - b.v));
+        const w = cands[0];
+        parts.push(`${highIsBad ? 'Highest' : 'Lowest'} ${d.dim.toLowerCase()}: ${esc(w.name)} at ${fmt.value(w.v, kpi.format)}`);
+      }
+    }
+    const ev = eventsIn(m).filter((e) => e.span === 'Period' || e.kind !== 'Feature');
+    if (ev.length) parts.push(`coincides with ${ev.map((e) => esc(e.span === 'Period' ? e.name.charAt(0).toLowerCase() + e.name.slice(1) : e.name + ' (' + fmt.dateShort(e.start) + ')')).join(' and ')}`);
+    if (!parts.length) return null;
+    const sentence = parts.join('; ');
+    return sentence.charAt(0).toUpperCase() + sentence.slice(1) + '.';
+  }
+
+  // ---------- Render ----------
+  function render() {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('content').classList.remove('hidden');
+    document.getElementById('f-month').value = state.month;
+    document.getElementById('f-cmp').value = state.cmp;
+    document.getElementById('page-sub').textContent = `${fmt.month(state.month)} · all channels · compared with ${state.cmp === 'year' ? 'the same month last year' : 'the prior month'}`;
+    document.getElementById('partial-note').textContent = partialMonth
+      ? `${fmt.month(partialMonth)} is left out until the month is complete (data through ${fmt.dateShort(DATA.data_through)}).` : '';
+    renderSummary();
+    renderTiles();
+    if (!state.kpi) state.kpi = pickDefaultKpi();
+    renderDetail();
+    writeUrl();
+  }
+
+  function pickDefaultKpi() {   // open the detail on the first off-target KPI, then the first watch KPI
+    for (const s of ['off', 'watch']) { const k = KPIS.find((k) => statusOf(k, val(k.id, state.month)) === s); if (k) return k.id; }
+    return KPIS[0].id;
+  }
+
+  function renderSummary() {
+    const m = state.month, pm = cmpMonth(m);
+    const withT = KPIS.filter((k) => k.target != null && val(k.id, m) != null);
+    const by = (mm) => { const c = { good: [], watch: [], off: [] }; withT.forEach((k) => { const s = statusOf(k, val(k.id, mm)); if (c[s]) c[s].push(k); }); return c; };
+    const c = by(m), cp = withT.every((k) => val(k.id, pm) != null) ? by(pm) : null;
+    let head = `${c.good.length} of ${withT.length} KPIs with targets were on target in ${fmt.month(m)}`;
+    if (cp) { const d = c.good.length - cp.good.length; head += d === 0 ? `, the same as ${cmpLabel(m)}` : `, ${d > 0 ? 'up' : 'down'} from ${cp.good.length} in ${cmpLabel(m)}`; }
+    const list = (arr) => arr.map((k) => `${esc(k.name)} (${fmt.value(val(k.id, m), k.format)})`).join(', ');
+    const lines = [];
+    if (c.off.length) lines.push(`<div><b>Off target:</b> ${list(c.off)}</div>`);
+    if (c.watch.length) lines.push(`<div><b>Watch:</b> ${list(c.watch)}</div>`);
+    if (cp) {
+      const slipped = withT.filter((k) => statusOf(k, val(k.id, pm)) === 'good' && statusOf(k, val(k.id, m)) !== 'good');
+      const recovered = withT.filter((k) => statusOf(k, val(k.id, pm)) !== 'good' && statusOf(k, val(k.id, m)) === 'good');
+      if (recovered.length) lines.push(`<div><b>Back on target since ${cmpLabel(m)}:</b> ${recovered.map((k) => esc(k.name)).join(', ')}</div>`);
+      if (slipped.length) lines.push(`<div><b>Slipped since ${cmpLabel(m)}:</b> ${slipped.map((k) => esc(k.name)).join(', ')}</div>`);
+    }
+    document.getElementById('summary').innerHTML = `<div class="headline">${head}.</div>
+      <div class="counts"><span class="status good">${c.good.length} on target</span><span class="status watch">${c.watch.length} watch</span><span class="status off">${c.off.length} off target</span><span class="status none">${KPIS.length - withT.length} without a target</span></div>
+      <div class="lines">${lines.join('')}</div>`;
+  }
+
+  function renderTiles() {
+    const host = document.getElementById('sections');
+    host.innerHTML = '';
+    const m = state.month, pm = cmpMonth(m);
+    for (const sec of SECTIONS) {
+      const s = document.createElement('section');
+      s.className = 'kpi-section';
+      s.setAttribute('aria-labelledby', 'sec-' + sec.id);
+      s.innerHTML = `<h2 id="sec-${sec.id}">${esc(sec.name)}</h2><div class="tiles"></div>`;
+      const grid = s.querySelector('.tiles');
+      for (const kpi of KPIS.filter((k) => k.section === sec.id)) grid.append(tile(kpi, m, pm));
+      host.append(s);
+    }
+  }
+
+  function tile(kpi, m, pm) {
+    const v = val(kpi.id, m), p = val(kpi.id, pm), st = statusOf(kpi, v);
+    const chg = fmt.change(v, p, kpi.format), q = changeQuality(kpi, v, p, chg);
+    const t = document.createElement('div');
+    t.className = 'tile ' + st + (state.kpi === kpi.id ? ' selected' : '');
+    const arrow = !chg ? '' : chg.flat ? '–' : chg.delta > 0 ? '▲' : '▼';
+    const chgText = !chg ? 'No comparison' : chg.flat ? `No change vs ${cmpLabel(m)}` : `${arrow} ${chg.text} vs ${cmpLabel(m)}`;
+    const qWord = { better: 'better', worse: 'worse', flat: 'no change', neutral: 'neutral' }[q];
+    const sw = soWhat(kpi, m);
+    t.innerHTML = `
+      <div class="tile-top"><button class="tile-select" type="button" aria-pressed="${state.kpi === kpi.id}">${esc(kpi.name)}</button></div>
+      <div class="tile-value"><span class="v">${fmt.value(v, kpi.format)}</span><span class="status ${st}">${STATUS_WORD[st]}</span></div>
+      <div class="tile-meta"><span>${kpi.target == null ? '' : 'Target ' + esc(kpi.targetLabel)}</span>
+        <span class="chg ${chg ? q : 'neutral'}" title="${chg ? 'Change: ' + qWord : ''}">${chgText}<span class="sr-only"> (${qWord})</span></span></div>
+      <svg class="spark" aria-hidden="true"></svg>
+      <div class="finding">${esc(finding(kpi, m))}</div>
+      ${sw ? `<div class="sowhat">${sw}</div>` : ''}`;
+    t.querySelector('.tile-top').append(infoButton(kpi));
+    const select = () => { state.kpi = kpi.id; state.kpiPicked = true; render(); document.getElementById('detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
+    t.querySelector('.tile-select').addEventListener('click', (e) => { e.stopPropagation(); select(); });
+    t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn')) select(); });
+    requestAnimationFrame(() => sparkline(t.querySelector('.spark'), kpi, windowEnding(m, SPARK_MONTHS)));
+    return t;
+  }
+
+  // ---------- Charts ----------
+  function svgEl(tag, attrs, parent) {
+    const e = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.append(e);
+    return e;
+  }
+  function domain(kpi, vals) {
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (kpi.target != null) {
+      const t = [].concat(kpi.target, kpi.watch);
+      lo = Math.min(lo, ...t); hi = Math.max(hi, ...t);
+    }
+    const pad = (hi - lo || Math.abs(hi) || 1) * 0.12;
+    return [lo - pad, hi + pad];
+  }
+  function niceTicks(lo, hi, count) {
+    const span = hi - lo, step0 = span / count, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const step = [1, 2, 2.5, 5, 10].map((s) => s * mag).find((s) => span / s <= count) || mag * 10;
+    const out = [];
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
+    return out;
+  }
+  function watchRanges(kpi) {   // [from, to] value ranges to shade as the watch band
+    if (kpi.target == null) return [];
+    if (kpi.better === 'higher') return [[kpi.watch, kpi.target]];
+    if (kpi.better === 'lower') return [[kpi.target, kpi.watch]];
+    return [[kpi.watch[0], kpi.target[0]], [kpi.target[1], kpi.watch[1]]];
+  }
+  const targetLines = (kpi) => (kpi.target == null ? [] : [].concat(kpi.target));
+
+  function sparkline(svg, kpi, ms) {
+    const W = svg.clientWidth || 220, H = 44, pad = 4;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const pts = ms.map((m) => ({ m, v: val(kpi.id, m) })).filter((p) => p.v != null);
+    if (pts.length < 2) return;
+    const [lo, hi] = domain(kpi, pts.map((p) => p.v));
+    const x = (i) => pad + (i / (ms.length - 1)) * (W - pad * 2 - 4);
+    const y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - pad * 2);
+    for (const [a, b] of watchRanges(kpi)) svgEl('rect', { class: 's-watch', x: 0, width: W, y: y(Math.max(a, b)), height: Math.abs(y(a) - y(b)) }, svg);
+    for (const t of targetLines(kpi)) svgEl('line', { class: 's-target', x1: 0, x2: W, y1: y(t), y2: y(t) }, svg);
+    svgEl('path', { class: 's-line', d: pts.map((p, i) => (i ? 'L' : 'M') + x(ms.indexOf(p.m)).toFixed(1) + ',' + y(p.v).toFixed(1)).join('') }, svg);
+    const last = pts[pts.length - 1];
+    svgEl('circle', { class: 's-end', cx: x(ms.indexOf(last.m)), cy: y(last.v), r: 3.5 }, svg);
+  }
+
+  function renderDetail() {
+    const kpi = kpiById(state.kpi), m = state.month, v = val(kpi.id, m);
+    const ms = windowEnding(m, TREND_MONTHS);
+    const f = finding(kpi, m);
+    document.getElementById('detail-title').textContent = `${kpi.name}: ${f.charAt(0).toLowerCase() + f.slice(1)}, at ${fmt.value(v, kpi.format)} in ${fmt.month(m)}`;
+    document.getElementById('detail-sub').textContent = `${kpi.short}, monthly, ${fmt.month(ms[0])} – ${fmt.month(ms[ms.length - 1])}` +
+      (kpi.target == null ? ' · no target' : ` · target ${kpi.targetLabel}`);
+    document.getElementById('t-events').checked = state.events;
+    const tb = document.getElementById('t-table');
+    tb.setAttribute('aria-pressed', state.table); tb.textContent = state.table ? 'View as chart' : 'View as table';
+    document.getElementById('trend').classList.toggle('hidden', state.table);
+    document.getElementById('trend-legend').classList.toggle('hidden', state.table);
+    document.getElementById('trend-table').classList.toggle('hidden', !state.table);
+    if (state.table) renderTable(kpi, ms); else trendChart(kpi, ms);
+    renderDrivers(kpi, m);
+  }
+
+  function trendChart(kpi, ms) {
+    const host = document.getElementById('trend');
+    host.innerHTML = '';
+    const W = host.clientWidth || 800, phone = W < 560, H = phone ? 260 : 320;
+    const M = { t: 46, r: phone ? 12 : 92, b: 28, l: 52 };
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img' }, host);
+    const pts = ms.map((m) => ({ m, v: val(kpi.id, m), n: nOf(kpi.id, m) }));
+    const vals = pts.filter((p) => p.v != null).map((p) => p.v);
+    const [lo, hi] = domain(kpi, vals);
+    const iw = W - M.l - M.r, ih = H - M.t - M.b, step = iw / ms.length;
+    const x = (i) => M.l + step * (i + 0.5);
+    const y = (v) => M.t + ih - ((v - lo) / (hi - lo)) * ih;
+    const xDate = (iso) => {   // fractional position of a date inside its month column
+      const mm = iso.slice(0, 7), i = ms.indexOf(mm);
+      if (i < 0) return iso < ms[0] ? M.l : iso > ms[ms.length - 1] + '-31' ? M.l + iw : null;
+      const [yy, mo, dd] = iso.split('-').map(Number), days = new Date(Date.UTC(yy, mo, 0)).getUTCDate();
+      return M.l + step * (i + (dd - 1) / days);
+    };
+    svg.setAttribute('aria-label', `${kpi.name}, monthly from ${fmt.month(ms[0])} to ${fmt.month(ms[ms.length - 1])}. Latest ${fmt.value(val(kpi.id, ms[ms.length - 1]), kpi.format)}. Use View as table for exact values.`);
+
+    // grid + y axis
+    const ticks = niceTicks(lo, hi, phone ? 4 : 5);
+    const g = svgEl('g', { class: 'grid' }, svg), ax = svgEl('g', { class: 'ax' }, svg);
+    for (const t of ticks) {
+      svgEl('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g);
+      const tx = svgEl('text', { x: M.l - 8, y: y(t) + 4, 'text-anchor': 'end' }, ax);
+      tx.textContent = tickLabel(kpi, t);
+    }
+    // x axis: every month on desktop when it fits, otherwise every 3rd; January shows the year
+    // Labels are placed from the latest month backwards, skipping any closer than the minimum gap, so they never collide
+    const label = (m, i) => (m.endsWith('-01') || i === 0 ? fmt.month(m).replace(' 20', " '") : fmt.monthShort(m));
+    const gap = phone ? 48 : 40;
+    let lastX = Infinity;
+    for (let i = ms.length - 1; i >= 0; i--) {
+      const lx = x(i), wide = label(ms[i], i).length > 3 ? 14 : 0;
+      if (lastX - lx < gap + wide) continue;
+      const tx = svgEl('text', { x: lx, y: H - 8, 'text-anchor': 'middle' }, ax);
+      tx.textContent = label(ms[i], i);
+      lastX = lx;
+    }
+
+    // events behind everything (Style Guide: lines for one-day events, bands for periods)
+    const evs = [];
+    if (state.events) {
+      const gE = svgEl('g', {}, svg);
+      let num = 0;
+      for (const e of events) {
+        const x1 = xDate(e.start), x2 = xDate(e.end);
+        if (x1 == null && x2 == null) continue;
+        if (e.end < ms[0] || e.start > ms[ms.length - 1] + '-31') continue;
+        num++;
+        const a = x1 ?? M.l, b = (x2 ?? M.l + iw) + (e.span === 'Period' ? step / 30 : 0);
+        if (e.span === 'Period') {
+          svgEl('rect', { class: 'm-evband', x: a, y: M.t, width: Math.max(2, b - a), height: ih }, gE);
+          if (b - a > 90 && !phone) { const l = svgEl('text', { class: 'm-evlabel', x: a + 6, y: M.t + 14 }, gE); l.textContent = e.name; }
+        } else {
+          svgEl('line', { class: 'm-evline', x1: a, x2: a, y1: M.t, y2: M.t + ih }, gE);
+        }
+        // markers closer than 18px to the previous one step up a row so numbers never overlap
+        const prev = evs[evs.length - 1];
+        const row = prev && a - prev.x < 18 ? (prev.row + 1) % 2 : 0;
+        const my = M.t - 12 - row * 17;
+        const mk = svgEl('g', { class: 'm-evmark', transform: `translate(${a},${my})` }, gE);
+        svgEl('circle', { r: 8 }, mk);
+        const tx = svgEl('text', { y: 3.5 }, mk); tx.textContent = num;
+        evs.push({ e, x: a, num, row, my });
+      }
+    }
+    // watch band, then target line
+    for (const [a, b] of watchRanges(kpi)) {
+      const ya = y(Math.max(a, b)), yb = y(Math.min(a, b));
+      svgEl('rect', { class: 'm-watch', x: M.l, width: iw, y: Math.max(M.t, ya), height: Math.max(0, Math.min(M.t + ih, yb) - Math.max(M.t, ya)) }, svg);
+    }
+    for (const t of targetLines(kpi)) {
+      svgEl('line', { class: 'm-target', x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, svg);
+      if (!phone) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(t) + 4 }, svg); l.textContent = 'Target ' + tickLabel(kpi, t, true); }
+    }
+    // selected month column
+    svgEl('rect', { class: 'm-selband', x: M.l + step * (ms.length - 1), y: M.t, width: step, height: ih }, svg);
+    // line + points (points below the minimum sample are hollow grey and not used for status)
+    const seg = pts.map((p, i) => (p.v == null ? null : [x(i), y(p.v)]));
+    let d = '', pen = false;
+    seg.forEach((s) => { if (!s) { pen = false; return; } d += (pen ? 'L' : 'M') + s[0].toFixed(1) + ',' + s[1].toFixed(1); pen = true; });
+    svgEl('path', { class: 'm-line', d }, svg);
+    pts.forEach((p, i) => {
+      if (p.v == null) return;
+      const low = p.n != null && p.n < kpi.minN;
+      svgEl('circle', { class: 'm-pt' + (i === pts.length - 1 ? ' sel' : '') + (low ? ' low' : ''), cx: x(i), cy: y(p.v), r: i === pts.length - 1 ? 6 : 4 }, svg);
+    });
+    if (!phone) {
+      const lp = pts[pts.length - 1];
+      if (lp.v != null && !targetLines(kpi).length) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(lp.v) + 4 }, svg); l.textContent = fmt.value(lp.v, kpi.format); }
+    }
+
+    // hover layer: crosshair + tooltip per month, and event markers
+    const cross = svgEl('line', { class: 'm-cross', y1: M.t, y2: M.t + ih, visibility: 'hidden' }, svg);
+    const hit = svgEl('rect', { x: M.l, y: M.t, width: iw, height: ih, fill: 'transparent' }, svg);
+    const onMove = (cx, cy, clientX, clientY) => {
+      const i = Math.max(0, Math.min(ms.length - 1, Math.floor((cx - M.l) / step)));
+      const p = pts[i];
+      cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
+      if (p.v == null) { showTip(`<b>${fmt.month(p.m)}</b><br>No data`, clientX, clientY); return; }
+      const st = statusOf(kpi, p.v), low = p.n != null && p.n < kpi.minN;
+      const evNames = eventsIn(p.m).map((e) => esc(e.name));
+      showTip(`<b>${fmt.month(p.m)}</b><br>${esc(kpi.short)}: <b>${fmt.value(p.v, kpi.format, true)}</b>` +
+        (kpi.target != null ? `<br><span class="status ${low ? 'none' : st}">${low ? 'Too few to rate' : STATUS_WORD[st]}</span> target ${esc(kpi.targetLabel)}` : '') +
+        (p.n != null && kpi.minN ? `<br>n = ${fmt.count(p.n)}${low ? ', below ' + kpi.minN : ''}` : '') +
+        (evNames.length ? `<br><span class="muted">Events: ${evNames.join(', ')}</span>` : ''), clientX, clientY);
+    };
+    const pos = (ev) => { const r = svg.getBoundingClientRect(); return [(ev.clientX - r.left) * (W / r.width), (ev.clientY - r.top) * (H / r.height)]; };
+    hit.addEventListener('mousemove', (ev) => { const [cx, cy] = pos(ev); onMove(cx, cy, ev.clientX, ev.clientY); });
+    hit.addEventListener('mouseleave', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
+    hit.addEventListener('touchstart', (ev) => { const t = ev.touches[0]; const [cx, cy] = pos(t); onMove(cx, cy, t.clientX, t.clientY); }, { passive: true });
+    for (const it of evs) {
+      const hz = svgEl('circle', { cx: it.x, cy: it.my, r: 10, fill: 'transparent', tabindex: 0, role: 'img', 'aria-label': `${it.e.name}, ${eventDates(it.e)}` }, svg);
+      hz.style.cursor = 'help';
+      const show = (ev) => { const r = hz.getBoundingClientRect(); showTip(`<b>${it.num}. ${esc(it.e.name)}</b><br>${eventDates(it.e)}<br><span class="muted">${esc(it.e.description)}</span>`, ev.clientX ?? r.left + 12, ev.clientY ?? r.top); };
+      hz.addEventListener('mouseenter', show); hz.addEventListener('focus', show);
+      hz.addEventListener('mouseleave', hideTip); hz.addEventListener('blur', hideTip);
+    }
+
+    // legend
+    const legend = [`<span><i class="l-line"></i>${esc(kpi.short)}</span>`];
+    if (kpi.target != null) legend.push(`<span><i class="l-target"></i>Target</span>`, `<span><i class="l-watch"></i>Watch range</span>`);
+    if (state.events && evs.length) legend.push(`<span><i class="l-event"></i>Events: numbered markers, hover for details</span>`);
+    document.getElementById('trend-legend').innerHTML = legend.join('');
+  }
+  function tickLabel(kpi, v, exact) {
+    switch (kpi.format) {
+      case 'pct': return (exact ? v.toFixed(1) : +v.toFixed(1)) + '%';
+      case 'signedpct': return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + '%';
+      case 'nps': return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(Math.round(v));
+      case 'wait': return Math.round(v) + ' s';
+      case 'duration': return (v / 60).toFixed(1).replace('.0', '') + 'm';
+      case 'count': return fmt.shortNum(v);
+      default: return String(+v.toFixed(1));
+    }
+  }
+  function eventDates(e) { return e.start === e.end ? fmt.date(e.start) : `${fmt.dateShort(e.start)} – ${fmt.date(e.end)}`; }
+
+  // Drivers for the selected month: sorted horizontal bars
+  function renderDrivers(kpi, m) {
+    const host = document.getElementById('drivers');
+    const d = drivers[kpi.id];
+    if (!d) { host.innerHTML = ''; return; }
+    const rows = Object.entries(d.members).map(([name, ms]) => ({ name, ...(ms[m] || {}) })).filter((r) => r.v != null);
+    const highIsBad = kpi.better === 'lower';
+    rows.sort((a, b) => (highIsBad ? b.v - a.v : a.v - b.v));
+    host.innerHTML = `<h3>${esc(kpi.short)} by ${esc(d.dim.toLowerCase())}, ${fmt.month(m)}</h3>
+      <div class="sub">${highIsBad ? 'Highest' : 'Lowest'} first. Greyed rows have fewer than ${kpi.minN} ${kpi.id === 'csat' || kpi.id === 'nps' ? 'surveys' : kpi.section === 'workforce' ? 'agent-days' : 'contacts'} and are not rated.</div>
+      <div class="chart" id="driver-chart"></div>`;
+    const ch = host.querySelector('#driver-chart');
+    const W = ch.clientWidth || 800, phone = W < 560, rowH = 30, labelW = phone ? 130 : 260, valW = phone ? 92 : 140;
+    const H = rows.length * rowH + 8;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${kpi.short} by ${d.dim}, ${fmt.month(m)}` }, ch);
+    // Bars start at zero (Style Guide). NPS can be negative, so its axis includes the lowest value.
+    const allV = rows.map((r) => r.v).concat(targetLines(kpi));
+    const min = Math.min(0, ...allV), max = Math.max(0, ...allV) * 1.04 || 1;
+    const x0 = labelW, iw = W - labelW - valW - 8;
+    const x = (v) => x0 + ((v - min) / (max - min)) * iw;
+    rows.forEach((r, i) => {
+      const yy = 4 + i * rowH, low = r.n < kpi.minN, st = low ? 'none' : statusOf(kpi, r.v);
+      const lab = svgEl('text', { class: 'bar-label', x: labelW - 10, y: yy + 18, 'text-anchor': 'end' }, svg);
+      lab.textContent = shorten(r.name, phone ? 18 : 36);
+      svgEl('rect', { class: 'm-bar' + (low ? ' low' : ''), x: Math.min(x(0), x(r.v)), y: yy + 7, width: Math.max(1, Math.abs(x(r.v) - x(0))), height: rowH - 14, rx: 3 }, svg);
+      // values sit in a fixed column at the right, with the status shown as an icon and word for rated rows
+      const vt = svgEl('text', { class: 'bar-value' + (low ? ' low' : ''), x: W - valW, y: yy + 19 }, svg);
+      vt.textContent = fmt.value(r.v, kpi.format) + (low ? '  n<' + kpi.minN : kpi.target != null ? '  ' + { good: '✓', watch: '! watch', off: '✕ off' }[st] : '');
+      const hz = svgEl('rect', { x: 0, y: yy, width: W, height: rowH, fill: 'transparent' }, svg);
+      hz.addEventListener('mousemove', (ev) => showTip(`<b>${esc(r.name)}</b><br>${esc(kpi.short)}: <b>${fmt.value(r.v, kpi.format, true)}</b>` +
+        (kpi.target != null ? `<br><span class="status ${st}">${low ? 'Too few to rate' : STATUS_WORD[st]}</span>` : '') + `<br>n = ${fmt.count(r.n)}`, ev.clientX, ev.clientY));
+      hz.addEventListener('mouseleave', hideTip);
+    });
+    for (const t of targetLines(kpi)) svgEl('line', { class: 'm-target', x1: x(t), x2: x(t), y1: 0, y2: H }, svg);
+    if (kpi.target != null) host.querySelector('.sub').textContent += ` Dashed line${targetLines(kpi).length > 1 ? 's mark the target range' : ' marks the target'}.`;
+  }
+  const shorten = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+  // Table view with CSV export (Style Guide: Export and sharing)
+  function renderTable(kpi, ms) {
+    const host = document.getElementById('trend-table');
+    const rows = ms.slice().reverse().map((m) => {
+      const v = val(kpi.id, m), n = nOf(kpi.id, m), low = n != null && n < kpi.minN;
+      return { m, v, n, st: low ? 'none' : statusOf(kpi, v), low };
+    });
+    host.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="csv-btn" type="button">Download CSV</button></div>
+      <div class="tbl-wrap"><table><thead><tr><th scope="col">Month</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${fmt.month(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
+      </tbody></table></div>`;
+    host.querySelector('#csv-btn').addEventListener('click', () => {
+      const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+      const lines = ['# ' + DISCLAIMER, `# Executive scorecard · ${kpi.name} · ${fmt.month(ms[0])} to ${fmt.month(ms[ms.length - 1])} · data through ${DATA.data_through}`,
+        ['month', kpi.id, 'status', 'n'].join(',')];
+      rows.slice().reverse().forEach((r) => lines.push([r.m, r.v ?? '', r.low ? 'too few' : STATUS_WORD[r.st], r.n ?? ''].map(q).join(',')));
+      const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `happen-demo_executive-scorecard_${kpi.id}_${DATA.data_through}.csv`;
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  }
+
+  // ---------- Controls ----------
+  document.getElementById('f-month').addEventListener('change', (e) => { state.month = e.target.value; render(); });
+  document.getElementById('f-cmp').addEventListener('change', (e) => { state.cmp = e.target.value; render(); });
+  document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); render(); });
+  document.getElementById('t-events').addEventListener('change', (e) => { state.events = e.target.checked; renderDetail(); });
+  document.getElementById('t-table').addEventListener('click', () => { state.table = !state.table; renderDetail(); });
+  document.getElementById('copy-link').addEventListener('click', (e) => {
+    const b = e.currentTarget, done = (t) => { b.textContent = t; setTimeout(() => (b.textContent = 'Copy link'), 1800); };
+    if (navigator.clipboard) navigator.clipboard.writeText(location.href).then(() => done('Link copied'), () => done('Copy failed'));
+    else done('Copy failed');
+  });
+  let rz;
+  window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (DATA) { renderTiles(); renderDetail(); } }, 150); });
+})();
+</script>
+</body>
+</html>
