@@ -11,7 +11,7 @@
     { group: 'Overview', items: [{ name: 'Executive scorecard', href: 'executive.html', id: 'executive' }] },
     { group: 'Operations', items: [
       { name: 'Service & access', href: null }, { name: 'Workforce management', href: null }, { name: 'Agent & team coaching', href: null }] },
-    { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: null }, { name: 'Process stability monitor', href: null }] },
+    { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: null }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },
     { group: 'Customers', items: [
       { name: 'Customer experience', href: null }, { name: 'Customer & persona insights', href: null },
       { name: 'Product launch impact', href: null }, { name: 'Self-service & channel shift', href: null }] },
@@ -68,6 +68,7 @@
     monthShort(m) { return MONTHS[+m.split('-')[1] - 1]; },
     date(iso) { const [y, mo, d] = iso.slice(0, 10).split('-'); return MONTHS[+mo - 1] + ' ' + (+d) + ', ' + y; },
     dateShort(iso) { const [, mo, d] = iso.slice(0, 10).split('-'); return MONTHS[+mo - 1] + ' ' + (+d); },
+    time(isoTs) { const [h, m] = isoTs.slice(11, 16).split(':').map(Number); return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'am' : 'pm'}`; },
     count: withCommas, shortNum,
     // Display value for each KPI format. `full` = tables and tooltips.
     value(v, f, full) {

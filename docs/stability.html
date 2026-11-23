@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Process Stability Monitor · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Control charts of simulated contact center KPIs, for demonstration only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.1">
+<script src="assets/site.js?v=1.2"></script>
+<script src="assets/spc.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .card { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; min-height: 44px; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--brand-blue); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-height: 40px; }
+  .seg button { font-size: 14px; padding: 6px 12px; border: 0; background: var(--surface); color: var(--text-secondary); cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--surface-warm); color: var(--brand-blue); font-weight: 700; box-shadow: inset 0 -2px 0 var(--brand-blue); }
+  .seg button:disabled { opacity: .5; cursor: not-allowed; }
+  .seg button:focus-visible { outline-offset: -2px; }
+  h2 { scroll-margin-top: 100px; }
+  .filter-bar .wrap { gap: 10px; }
+  .filter-bar .ctl select { max-width: 140px; }
+  .filter-bar #f-metric { max-width: 215px; }
+  .sm .c-run { stroke-width: 1.5; }
+  .filter input[type=range] { width: 90px; accent-color: var(--brand-blue); }
+  .filter output { color: var(--text-primary); font-weight: 700; min-width: 34px; font-variant-numeric: tabular-nums; }
+  .more { position: relative; }
+  .more summary { list-style: none; }
+  .more summary::-webkit-details-marker { display: none; }
+  .more .panel { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 290px; display: grid; gap: 10px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.14); }
+  .more .panel .filter { justify-content: space-between; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .chips:empty { display: none; }
+  .chip { border: 1px solid var(--border); border-radius: 999px; background: var(--surface); padding: 6px 12px; font-size: 13px; min-height: 36px; cursor: pointer; }
+  .chip:hover { border-color: var(--text-muted); }
+  .line { margin-top: 10px; font-size: 14px; }
+  .line b { color: var(--text-primary); }
+  .note { font-size: 13px; color: var(--text-muted); margin-top: 8px; }
+  .chart { position: relative; margin-top: 8px; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .legend { display: flex; gap: 8px 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); margin-top: 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; margin-top: 12px; }
+  .panel-c { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 8px; min-width: 0; cursor: pointer; transition: opacity .15s; }
+  .panel-c:hover { border-color: var(--text-muted); }
+  .grid.has-sel .panel-c:not(.sel) { opacity: .3; }
+  .grid.has-sel .panel-c:not(.sel):hover, .grid.has-sel .panel-c:not(.sel):focus-within { opacity: 1; }
+  .panel-c.sel { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+  .panel-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  .panel-h button { all: unset; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text-primary); }
+  .panel-h button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+  .panel-s { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; min-height: 22px; font-size: 12.5px; color: var(--text-muted); }
+  .how { margin-top: 20px; }
+  .how summary { cursor: pointer; font-weight: 600; color: var(--text-primary); min-height: 44px; display: flex; align-items: center; }
+  .how li { margin: 6px 0; }
+  .tbl { overflow: auto; max-height: 520px; margin-top: 12px; border: 1px solid var(--border); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child, th.l, td.l { text-align: left; }
+  th { color: var(--text-muted); font-weight: 600; background: var(--surface-warm); position: sticky; top: 0; }
+  td.low { color: var(--text-muted); }
+  .phone-note { display: none; }
+  .ax text { fill: var(--text-muted); font-size: 12px; font-family: var(--font); }
+  .sm .ax text { font-size: 11px; }
+  .g line { stroke: var(--grid); }
+  .c-line { fill: none; stroke: var(--brand-blue); stroke-width: 1.5; stroke-linejoin: round; }
+  .c-pt { fill: var(--brand-blue); stroke: var(--surface); stroke-width: 1; }
+  .c-run { fill: var(--brand-blue); stroke: var(--watch-ink); stroke-width: 2.5; }
+  .c-out { fill: var(--off-ink); stroke: var(--surface); stroke-width: 1.5; }
+  .c-low { fill: var(--surface); stroke: var(--text-muted); stroke-width: 1.2; }
+  .c-cl { stroke: var(--text-primary); stroke-width: 1.5; fill: none; }
+  .c-lim { stroke: var(--text-muted); stroke-width: 1.5; stroke-dasharray: 5 4; fill: none; }
+  .c-base { fill: var(--text-muted); fill-opacity: .07; }
+  .c-lab { fill: var(--text-secondary); font-size: 12px; font-family: var(--font); }
+  .c-evband { fill: var(--event); fill-opacity: .12; }
+  .c-evline { stroke: var(--event); stroke-opacity: .6; }
+  .c-ev circle { fill: var(--surface); stroke: var(--event); }
+  .c-ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
+  .c-cross { stroke: var(--text-muted); stroke-dasharray: 2 3; }
+  @media (max-width: 767px) {
+    .filter-bar .ctl, .more, #f-reset, #split, .card .tools, .chips { display: none !important; }
+    .phone-note { display: block; }
+    .card { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="filter-bar" role="region" aria-label="Filters">
+  <div class="wrap">
+    <label class="filter ctl"><span class="flabel">Metric</span><select id="f-metric"></select></label>
+    <label class="filter ctl"><span class="flabel">Split by</span><select id="f-dim"></select></label>
+    <span class="seg ctl" role="group" aria-label="View" id="f-view">
+      <button type="button" data-v="time">Over time</button><button type="button" data-v="cat">By category</button></span>
+    <label class="filter ctl"><span class="flabel">Limits</span><input type="range" id="f-sigma" min="1" max="3" step="0.5" aria-label="Control limits in standard deviations"><output id="o-sigma" for="f-sigma"></output></label>
+    <details class="more"><summary class="btn">More filters</summary><div class="panel">
+      <label class="filter">Grain <select id="f-grain"><option value="week">Weekly</option><option value="day">Daily</option></select></label>
+      <label class="filter">Period ending <select id="f-end"></select></label>
+      <label class="filter">Period <select id="f-period"><option value="3">3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></label>
+      <label class="filter">Baseline <select id="f-base"><option value="3">3 months before</option><option value="6">6 months before</option><option value="12">12 months before</option><option value="self">The period itself</option></select></label>
+    </div></details>
+    <button class="link-btn" id="f-reset" type="button">Reset to default</button>
+    <span class="spacer"></span>
+    <button class="btn" id="copy-link" type="button">Copy link</button>
+  </div>
+</div>
+<main class="wrap" id="main">
+  <h1>Process stability monitor</h1>
+  <p class="sub">Is a metric varying as it normally does, or did something change? Points outside the limits, and patterns inside them, are signals worth investigating.</p>
+  <p class="note phone-note">Open on a larger screen to change the metric, drill down and compare.</p>
+  <div class="chips" id="chips"></div>
+  <p class="note" id="loading">Loading control charts…</p>
+  <div id="content" hidden>
+    <section class="card" aria-labelledby="t-main">
+      <div class="head"><div><h2 id="t-main"></h2><div class="sub" id="s-main"></div></div>
+        <div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label>
+          <button class="btn" type="button" id="csv-main" hidden>Download CSV</button><button class="btn" type="button" id="tb-main">View as table</button></div></div>
+      <div class="line" id="l-main" aria-live="polite"></div>
+      <div class="chart" id="c-main"></div><div class="legend" id="lg-main"></div><div class="tbl" id="tbl-main" hidden></div>
+      <div class="note" id="n-main"></div>
+    </section>
+    <section class="card" id="split" aria-labelledby="t-split">
+      <div class="head"><div><h2 id="t-split"></h2><div class="sub" id="s-split"></div></div>
+        <div class="tools"><button class="btn" type="button" id="csv-split" hidden>Download CSV</button><button class="btn" type="button" id="tb-split">View as table</button></div></div>
+      <div class="line" id="l-split" aria-live="polite"></div>
+      <div id="c-split"></div><div class="tbl" id="tbl-split" hidden></div>
+    </section>
+    <details class="how card"><summary>How the limits and signals work</summary><ul>
+      <li><b>Center line:</b> the metric's level in the baseline period (shaded). <b>Limits:</b> the center plus or minus the number of standard deviations (σ) you choose. Lower settings catch smaller changes but raise more false alarms.</li>
+      <li><b>Percentages</b> such as service level use a Laney p′ chart. Its limits move with each day's volume and with the day-to-day variation seen in the baseline.</li>
+      <li><b>Times, counts, NPS, adherence, occupancy and staffing</b> use an individuals (XmR) chart, with limits from the average change between neighboring points.</li>
+      <li><b>Outside the limits</b> (red-orange): a sharp break. <b>Run rules</b> (amber ring): 8 points in a row on one side of the center, 6 in a row rising or falling, or 2 of 3 beyond 2σ on the same side. The ring marks the point that completes a pattern and any that continue it.</li>
+      <li><b>By category</b> asks whether each category's result for the whole period is further from the whole-center result than its own day-to-day variation explains. A real, lasting difference will show as a signal.</li>
+      <li><b>Limits are not targets.</b> They show what the process normally does, so targets are left off these charts. A metric can be stable and still miss its target.</li>
+      <li><b>Days of the week differ,</b> which can create daily patterns, so charts open on weekly data. Weeks start on Sunday and only complete weeks are shown. Closed days are skipped.</li>
+      <li><b>Small samples</b> are hollow grey and left out of limits and signals. At least 20 usable points are needed; a shorter baseline is extended back to reach 20.</li>
+    </ul></details>
+  </div>
+</main>
+<script>
+(function () {
+  'use strict';
+  const { fmt, esc, showTip, hideTip } = Site, $ = (id) => document.getElementById(id);
+  Site.renderChrome('stability');
+  const DAY = 864e5, iso = (t) => new Date(t).toISOString().slice(0, 10), ts = (s) => Date.parse(s + 'T00:00:00Z');
+  const RULE = { outside: 'Outside the limits', run8: '8 in a row on one side', trend6: '6 in a row rising or falling', two3: '2 of 3 beyond 2σ' };
+  const DIMS = ['All', 'Channel', 'Queue', 'Contact reason', 'Site', 'Team', 'Persona', 'Customer segment', 'Category'];
+  const PLURAL = { Channel: 'channels', Queue: 'queues', 'Contact reason': 'contact reasons', Site: 'sites', Team: 'teams', Persona: 'personas', 'Customer segment': 'customer segments', Category: 'categories' };
+  const DEF = { metric: 'sl_phone', dim: 'Queue', view: 'time', sigma: 3, grain: 'week', period: '6', base: '6', end: 'latest', member: null };
+  const S = { ...DEF }, cache = {}, phone = () => matchMedia('(max-width: 767px)').matches;
+  let KPIS, SECTIONS, EV, THROUGH, M, req = 0, events = true, tblMain = false, tblSplit = false, mainData = null, splitData = [];
+
+  // a month chosen on another dashboard carries over for this visit (Style Guide: only the date does)
+  const carried = () => { try { return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
+  const carry = (m) => { try { m ? sessionStorage.setItem('happen-demo-month', m) : sessionStorage.removeItem('happen-demo-month'); } catch (e) { /* not remembered */ } };
+
+  Promise.all(['kpis', 'events'].map((f) => fetch(`data/dashboards/${f}.json`, { cache: 'no-cache' }).then((r) => r.json()))).then(([k, e]) => {
+    KPIS = k.kpis; SECTIONS = k.sections; EV = e.events; THROUGH = e.data_through;
+    $('f-metric').innerHTML = SECTIONS.map((s) => `<optgroup label="${esc(s.name)}">${KPIS.filter((q) => q.section === s.id).map((q) => `<option value="${q.id}">${esc(q.name)}</option>`).join('')}</optgroup>`).join('');
+    const months = []; let [y, mo] = THROUGH.split('-').map(Number);
+    for (mo -= 1; months.length < 28; mo--) { if (mo < 1) { mo = 12; y--; } months.push(`${y}-${String(mo).padStart(2, '0')}`); }
+    $('f-end').innerHTML = `<option value="latest">Latest (${fmt.date(THROUGH)})</option>` + months.map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    const p = new URLSearchParams(location.search), one = (id, v) => [...$(id).options].some((o) => o.value === v);
+    if (one('f-metric', p.get('metric'))) S.metric = p.get('metric');
+    if (DIMS.includes(p.get('dim'))) S.dim = p.get('dim');
+    if (p.get('view') === 'cat') S.view = 'cat';
+    if ([1, 1.5, 2, 2.5, 3].includes(+p.get('sigma'))) S.sigma = +p.get('sigma');
+    for (const q of ['grain', 'period', 'base', 'end']) if (one('f-' + q, p.get(q))) S[q] = p.get(q);
+    if (!p.has('end') && one('f-end', carried())) S.end = carried();
+    S.member = p.get('member');
+    $('footer-generated').textContent = `Data through ${fmt.date(THROUGH)} · exported ${fmt.date(e.generated_at)}, ${fmt.time(e.generated_at)} CT · Process stability monitor v1.0`;
+    return load();
+  }).catch(fail);
+  function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The control chart data could not be loaded. ' + e.message; }
+
+  async function load() {
+    const r = ++req, id = S.metric;
+    const d = await (cache[id] ??= fetch(`data/dashboards/stability/${id}.json`, { cache: 'no-cache' }).then((x) => { if (!x.ok) throw new Error(x.status); return x.json(); }).catch((e) => { delete cache[id]; throw e; }));
+    if (r !== req) return;
+    M = { k: KPIS.find((q) => q.id === id), d };
+    $('loading').hidden = true; $('content').hidden = false;
+    render();
+  }
+
+  // ---------- Points and dates ----------
+  function daily(a) {
+    const t0 = ts(M.d.start);
+    return a.x.map((x, i) => ({ t: t0 + i * DAY, x, n: a.n[i], k: a.k ? a.k[i] : a.n[i] }));
+  }
+  function grainPoints(a) {
+    const d = daily(a);
+    if (S.grain === 'day') return d;
+    const out = [];
+    for (let i = (7 - new Date(d[0].t).getUTCDay()) % 7; i + 7 <= d.length; i += 7) {
+      const w = d.slice(i, i + 7).filter((p) => p.x != null);
+      out.push({ t: d[i].t, x: w.length ? w.reduce((s, p) => s + p.x, 0) : null, n: w.reduce((s, p) => s + p.n, 0), k: w.reduce((s, p) => s + p.k, 0) });
+    }
+    return out;
+  }
+  function addMonths(t, m) { const d = new Date(t), day = d.getUTCDate(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() + m); d.setUTCDate(Math.min(day, new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate())); return +d; }
+  function windowOf() {
+    let e = ts(THROUGH), s;
+    if (S.end === 'latest') s = addMonths(e, -S.period) + DAY;
+    else { const [y, m] = S.end.split('-').map(Number); e = Date.UTC(y, m, 0); s = Date.UTC(y, m - +S.period, 1); }
+    const first = ts(M.d.start);
+    s = Math.max(s, first);
+    return { s, e, b: S.base === 'self' ? s : Math.max(first, addMonths(s, -S.base)), first };
+  }
+  const isWeek = () => S.grain === 'week';
+  const inside = (p, a, b) => p.t >= a && p.t + (isWeek() ? 6 * DAY : 0) <= b;
+  const dateName = (t) => (isWeek() ? 'Week of ' : '') + fmt.date(iso(t));
+  const range = (a, b) => { const A = iso(a), B = iso(b); return (A.slice(0, 4) === B.slice(0, 4) ? fmt.dateShort(A) : fmt.date(A)) + ' – ' + fmt.date(B); };
+  const bounds = () => (M.k.format === 'pct' ? [0, 100] : ['wait', 'duration', 'count', 'rate'].includes(M.k.format) ? [0, Infinity] : null);
+
+  // Everything one control chart needs
+  function analyse(a) {
+    const { k } = M, sc = k.spc.scale, w = windowOf(), all = grainPoints(a);
+    let bs = w.b, be = S.base === 'self' ? w.e : w.s - DAY, base = all.filter((p) => inside(p, bs, be)), extended = false;
+    const enough = () => base.filter((p) => SPC.usable(p, sc, k.minN)).length >= SPC.MIN_BASELINE;
+    if (S.base !== 'self' && !enough()) {   // widen back to 20 usable points, at most 12 months
+      const stop = Math.max(w.first, addMonths(w.s, -12));
+      for (const p of all.filter((q) => q.t < bs && q.t >= stop).reverse()) { base.unshift(p); bs = p.t; extended = true; if (enough()) break; }
+    }
+    const pts = all.filter((p) => inside(p, Math.min(bs, w.s), w.e) && p.x != null);
+    const lim = SPC.limits(k.spc.chart, base, sc, k.minN, S.sigma, bounds());
+    const sig = SPC.signals(pts, sc, k.minN, lim);
+    pts.forEach((p, i) => { p.v = SPC.valueOf(p, sc); p.low = !SPC.usable(p, sc, k.minN); p.sig = sig[i]; p.l = lim ? lim.at(p) : null; p.inPeriod = p.t >= w.s; });
+    const per = pts.filter((p) => p.inPeriod);
+    return { pts, lim, w, bs, be, extended, out: per.filter((p) => p.sig.includes('outside')), run: per.filter((p) => p.sig.length && !p.sig.includes('outside')), n: per.reduce((s, p) => s + p.n, 0), usable: per.filter((p) => !p.low).length, per };
+  }
+  const count = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
+  const unit = () => (isWeek() ? 'week' : 'day');
+  const V = (v, full) => fmt.value(v, M.k.format, full);
+  const members = () => Object.keys(M.d.dims[S.dim] || {});
+
+  // ---------- Render ----------
+  function render() {
+    const dims = DIMS.filter((x) => M.d.dims[x]);
+    if (!dims.includes(S.dim)) S.dim = dims.includes('Queue') ? 'Queue' : dims[1] || 'All';
+    if (S.member && !members().includes(S.member)) S.member = null;
+    // comparing sizes, or parts of one total, against the center has no meaning
+    const noCat = S.dim === 'All' ? 'Choose a split first' : M.k.spc.scale == null ? 'Volumes differ by design, so categories are not compared with each other' : S.dim === 'Category' ? 'Categories are parts of one total, so they are not compared with it' : '';
+    if (noCat) S.view = 'time';
+    $('f-metric').value = S.metric;
+    $('f-dim').innerHTML = dims.map((x) => `<option value="${x}">${x === 'All' ? 'None (whole center)' : x}</option>`).join('');
+    for (const q of ['dim', 'sigma', 'grain', 'period', 'base', 'end']) $('f-' + q).value = S[q];
+    $('o-sigma').textContent = S.sigma.toFixed(1) + 'σ';
+    $('f-view').querySelectorAll('button').forEach((b) => { b.setAttribute('aria-pressed', b.dataset.v === S.view); if (b.dataset.v === 'cat') { b.disabled = !!noCat; b.title = noCat; } });
+    chips(); renderMain(); renderSplit(); writeUrl();
+  }
+  function chips() {
+    const c = [];
+    if (S.member) c.push(['member', `${S.dim}: ${S.member}`]);
+    for (const [q, name] of [['grain', 'Grain'], ['end', 'Period ending'], ['period', 'Period'], ['base', 'Baseline']]) if (S[q] !== DEF[q]) c.push([q, `${name}: ${$('f-' + q).selectedOptions[0].textContent}`]);
+    $('chips').innerHTML = c.map(([q, t]) => `<button type="button" class="chip" data-q="${q}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join('');
+  }
+  function writeUrl() {
+    const p = new URLSearchParams();
+    for (const q of Object.keys(DEF)) if (S[q] != null && String(S[q]) !== String(DEF[q])) p.set(q, S[q]);
+    if (S.end === 'latest' && carried()) p.set('end', 'latest');
+    history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  }
+  const grainWord = () => (isWeek() ? 'weekly' : 'daily');
+
+  function renderMain() {
+    const mem = phone() ? null : S.member;
+    const r = mainData = analyse(mem ? M.d.dims[S.dim][mem] : M.d.dims.All.All);
+    r.name = mem || 'Whole center';
+    $('t-main').textContent = `${M.k.name}, ${grainWord()}, ${+S.sigma}σ limits`;
+    $('t-main').append(Site.infoButton(M.k));
+    $('s-main').textContent = `${r.name} · ${range(r.w.s, r.w.e)} · baseline ${S.base === 'self' ? 'is the period itself' : range(r.bs, r.be)} · ${M.k.spc.chart === 'p' ? 'Laney p′ chart' : 'individuals (XmR) chart'}`;
+    const last = [...r.out, ...r.run].sort((a, b) => b.t - a.t)[0];
+    $('l-main').innerHTML = !r.lim ? `<b>No limits.</b> Fewer than ${SPC.MIN_BASELINE} ${unit()}s in the baseline have enough data. Try ${isWeek() ? 'a longer baseline' : 'the weekly grain or a longer baseline'}.`
+      : last ? `<b>${count(r.out.length, unit())} outside the limits</b> and <b>${count(r.run.length, 'run-rule signal')}</b> in ${count(r.usable, unit())}. Latest: ${dateName(last.t)}, ${V(last.v)} (${last.sig.map((s) => RULE[s].toLowerCase()).join(', ')}).`
+      : `<b>No signals</b> in ${count(r.usable, unit())}: the variation is within these limits.`;
+    const sunday = !isWeek() && ['volume', 'digital_share', 'sl_email', 'fcr', 'complaints'].includes(S.metric), weekday = !isWeek() && ['staffing', 'occupancy', 'sl_phone', 'sl_chat', 'asa_phone', 'abandon'].includes(S.metric);
+    $('n-main').textContent = [r.extended && r.lim ? `The baseline was extended back to ${fmt.date(iso(r.bs))}; control limits need at least ${SPC.MIN_BASELINE} points.` : '', sunday ? 'Sundays have few contacts, all by email or secure message, which widens the daily limits. Use the weekly grain for this metric.' : weekday ? 'This metric changes by day of the week. The weekly grain removes that pattern.' : ''].filter(Boolean).join(' ');
+    $('c-main').hidden = $('lg-main').hidden = tblMain; $('tbl-main').hidden = $('csv-main').hidden = !tblMain;
+    $('tb-main').textContent = tblMain ? 'View as chart' : 'View as table'; $('tb-main').setAttribute('aria-pressed', tblMain);
+    if (tblMain) $('tbl-main').innerHTML = `<table><thead><tr><th>${isWeek() ? 'Week' : 'Day'}</th><th>${esc(M.k.short)}</th><th>Center</th><th>LCL</th><th>UCL</th><th class="l">Signal</th></tr></thead><tbody>` +
+      r.pts.slice().reverse().map((p) => `<tr><td>${dateName(p.t)}${p.inPeriod ? '' : ' (baseline)'}</td><td class="${p.low ? 'low' : ''}">${V(p.v, true)}${p.low ? ' (too few)' : ''}</td>${r.lim ? [r.lim.center, p.l.lcl, p.l.ucl].map((v) => `<td>${V(v, true)}</td>`).join('') : '<td>–</td><td>–</td><td>–</td>'}<td class="l">${sigHtml(p)}</td></tr>`).join('') + '</tbody></table>';
+    else { chart($('c-main'), r, false); legend(r); }
+  }
+  const sigHtml = (p) => p.sig.length ? `<span class="status ${p.sig.includes('outside') ? 'off' : 'watch'}">${p.sig.map((s) => RULE[s]).join(', ')}</span>` : '';
+  function legend(r) {
+    const i = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`;
+    $('lg-main').innerHTML = [[`<line class="c-line" x1="0" x2="20" y1="7" y2="7"/>`, M.k.short], ['<line class="c-cl" x1="0" x2="20" y1="7" y2="7"/>', 'Center line'], ['<line class="c-lim" x1="0" x2="20" y1="7" y2="7"/>', `Limits (${+S.sigma}σ)`],
+      ['<circle class="c-out" cx="10" cy="7" r="5.5"/>', 'Outside the limits'], ['<circle class="c-run" cx="10" cy="7" r="4.5"/>', 'Run-rule signal'], ['<circle class="c-low" cx="10" cy="7" r="3.5"/>', 'Too few to rate'],
+      ...(S.base === 'self' ? [] : [['<rect class="c-base" style="fill-opacity:.18" width="20" height="14"/>', 'Baseline']])].map(([a, b]) => `<span>${i(a)}${esc(b)}</span>`).join('');
+  }
+
+  function renderSplit() {
+    const show = S.dim !== 'All' && !phone();
+    $('split').hidden = !show; splitData = [];
+    if (!show) return;
+    const dimWord = S.dim.toLowerCase(), cat = S.view === 'cat';
+    $('t-split').textContent = cat ? `${M.k.name} by ${dimWord}, whole period, ${+S.sigma}σ limits` : `${M.k.name} by ${dimWord}, ${grainWord()}, ${+S.sigma}σ limits`;
+    $('c-split').hidden = tblSplit; $('tbl-split').hidden = $('csv-split').hidden = !tblSplit;
+    $('tb-split').textContent = tblSplit ? 'View as chart' : 'View as table'; $('tb-split').setAttribute('aria-pressed', tblSplit);
+    cat ? renderCategories() : renderPanels();
+  }
+  function renderPanels() {
+    const list = splitData = members().map((name) => ({ name, ...analyse(M.d.dims[S.dim][name]) })).filter((r) => r.per.length).sort((a, b) => b.n - a.n);
+    $('s-split').textContent = `${range(windowOf().s, windowOf().e)} · each panel has its own scale and limits · largest first · click a panel to show it above`;
+    const hit = list.filter((r) => r.out.length + r.run.length), top = hit.slice().sort((a, b) => b.out.length - a.out.length || b.run.length - a.run.length)[0];
+    $('l-split').innerHTML = hit.length ? `<b>${hit.length} of ${list.length} ${PLURAL[S.dim]}</b> show signals. ${top.out.length ? `Most points outside the limits: ${esc(top.name)}, with ${top.out.length}.` : `No points are outside the limits. Most run-rule signals: ${esc(top.name)}, with ${top.run.length}.`}` : `<b>No signals</b> in ${list.length} ${PLURAL[S.dim]}.`;
+    if (tblSplit) {
+      $('tbl-split').innerHTML = `<table><thead><tr><th>${esc(S.dim)}</th><th>Period value</th><th>Center</th><th>Outside limits</th><th>Run rules</th><th>Usable ${unit()}s</th></tr></thead><tbody>` +
+        list.map((r) => `<tr><td>${esc(r.name)}</td><td>${V(total(r), true)}</td><td>${r.lim ? V(r.lim.center, true) : 'No limits'}</td><td>${r.lim ? r.out.length : '–'}</td><td>${r.lim ? r.run.length : '–'}</td><td>${r.usable}</td></tr>`).join('') + '</tbody></table>';
+      return;
+    }
+    const host = $('c-split'); host.innerHTML = `<div class="grid${S.member ? ' has-sel' : ''}"></div>`;
+    for (const r of list) {
+      const el = document.createElement('div'); el.className = 'panel-c' + (S.member === r.name ? ' sel' : '');
+      el.innerHTML = `<div class="panel-h"><button type="button" aria-pressed="${S.member === r.name}">${esc(r.name)}</button></div>
+        <div class="panel-s">${!r.lim ? 'No limits: too few points with enough data' : !r.out.length && !r.run.length ? '<span class="status none">No signals</span>' : (r.out.length ? `<span class="status off">${r.out.length} outside</span>` : '') + (r.run.length ? `<span class="status watch">${count(r.run.length, 'run rule')}</span>` : '')}</div><div class="chart sm"></div>`;
+      el.addEventListener('click', () => { S.member = S.member === r.name ? null : r.name; hideTip(); render(); if (S.member) $('t-main').scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); });
+      host.firstChild.append(el);
+      chart(el.querySelector('.chart'), r, true);
+    }
+  }
+  const total = (r) => { const x = r.per.reduce((s, p) => s + p.x, 0); return M.k.spc.scale == null ? x : (x / r.n) * M.k.spc.scale; };
+
+  // ---------- By category ----------
+  function renderCategories() {
+    const sc = M.k.spc.scale, w = windowOf(), cut = (a) => daily(a).filter((p) => p.t >= w.s && p.t <= w.e);
+    const center = SPC.category(cut(M.d.dims.All.All), sc), [lo, hi] = bounds() || [-Infinity, Infinity];
+    const list = splitData = members().map((name) => ({ name, ...(SPC.category(cut(M.d.dims[S.dim][name]), sc) || {}) })).filter((r) => r.value != null)
+      .map((r) => ({ ...r, low: r.k < M.k.minN || r.days < SPC.MIN_BASELINE, center: center.value, lcl: Math.max(lo, center.value - S.sigma * r.se), ucl: Math.min(hi, center.value + S.sigma * r.se) }))
+      .map((r) => ({ ...r, out: !r.low && (r.value > r.ucl || r.value < r.lcl) })).sort((a, b) => b.n - a.n);
+    const out = list.filter((r) => r.out);
+    $('s-split').textContent = `${range(w.s, w.e)} · center line is the whole center (${V(center.value)}) · limits from each ${S.dim.toLowerCase()}'s daily variation · largest first`;
+    const far = out.slice().sort((a, b) => Math.abs(b.value - b.center) - Math.abs(a.value - a.center))[0];
+    $('l-split').innerHTML = out.length ? `<b>${out.length} of ${list.length} ${PLURAL[S.dim]}</b> differ from the center by more than their daily variation explains. Furthest: ${esc(far.name)} at ${V(far.value)}.` : `<b>No ${esc(S.dim.toLowerCase())}</b> differs from the center by more than its daily variation explains.`;
+    if (tblSplit) {
+      $('tbl-split').innerHTML = `<table><thead><tr><th>${esc(S.dim)}</th><th>${esc(M.k.short)}</th><th>Center</th><th>LCL</th><th>UCL</th><th class="l">Signal</th><th>Days</th></tr></thead><tbody>` +
+        list.map((r) => `<tr><td>${esc(r.name)}</td><td class="${r.low ? 'low' : ''}">${V(r.value, true)}</td><td>${V(r.center, true)}</td><td>${V(r.lcl, true)}</td><td>${V(r.ucl, true)}</td><td class="l">${r.low ? 'Too few to rate' : r.out ? `<span class="status off">${r.value > r.ucl ? 'Above' : 'Below'} the limits</span>` : 'Within limits'}</td><td>${r.days}</td></tr>`).join('') + '</tbody></table>';
+      return;
+    }
+    const host = $('c-split'); host.innerHTML = '<div class="chart"></div>'; const box = host.firstChild;
+    const W = box.clientWidth, H = 360, m = { t: 16, r: 96, b: 74, l: 60 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / list.length;
+    const vals = list.flatMap((r) => [r.value, r.lcl, r.ucl]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - v) / (b - a) * ih, x = (i) => m.l + step * (i + .5);
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${M.k.name} by ${S.dim}. ${out.length} of ${list.length} outside the limits. Use View as table for values.` }, box);
+    axis(s, a, b, y, m.l, m.l + iw);
+    el('line', { class: 'c-cl', x1: m.l, x2: m.l + iw, y1: y(center.value), y2: y(center.value) }, s);
+    text(s, m.l + iw + 8, y(center.value) + 4, 'Center ' + V(center.value), 'c-lab');
+    list.forEach((r, i) => {
+      const l = m.l + step * i + 3, q = l + step - 6;
+      for (const v of [r.lcl, r.ucl]) el('line', { class: 'c-lim', x1: l, x2: q, y1: y(v), y2: y(v) }, s);
+      el('circle', { class: r.low ? 'c-low' : r.out ? 'c-out' : 'c-pt', cx: x(i), cy: y(r.value), r: r.out ? 7 : 5 }, s);
+      wrap(r.name, Math.max(8, Math.floor(step / 6.4))).slice(0, 4).forEach((line, j) => { const g = el('g', { class: 'ax' }, s); text(g, x(i), H - m.b + 20 + j * 14, line, '', 'middle'); });
+      const hit = el('rect', { x: m.l + step * i, y: m.t, width: step, height: ih, fill: 'transparent', tabindex: 0, role: 'img', 'aria-label': `${r.name}: ${V(r.value, true)}, limits ${V(r.lcl)} to ${V(r.ucl)}${r.out ? ', outside the limits' : ''}` }, s);
+      const tip = (ev) => { const bx = hit.getBoundingClientRect(); showTip(`<b>${esc(r.name)}</b><br>${esc(M.k.short)}: <b>${V(r.value, true)}</b><br>Center ${V(r.center)} · limits ${V(r.lcl)} to ${V(r.ucl)}<br>${r.low ? 'Too few to rate' : r.out ? `<span class="status off">${r.value > r.ucl ? 'Above' : 'Below'} the limits</span>` : 'Within limits'}<br>${r.days} days · ${nText(r)}`, ev.clientX ?? bx.left, ev.clientY ?? bx.top); };
+      hit.addEventListener('mousemove', tip); hit.addEventListener('focus', tip); hit.addEventListener('mouseleave', hideTip); hit.addEventListener('blur', hideTip);
+    });
+    const lg = document.createElement('div'); lg.className = 'legend'; lg.innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><line class="c-lim" x2="20" y1="7" y2="7"/></svg>Limits (${+S.sigma}σ)</span><span><svg width="20" height="14" aria-hidden="true"><circle class="c-out" cx="10" cy="7" r="6"/></svg>Outside the limits</span><span><svg width="20" height="14" aria-hidden="true"><circle class="c-pt" cx="10" cy="7" r="5"/></svg>Within limits</span>`; host.append(lg);
+  }
+  const wrap = (s, n) => s.split(' ').reduce((o, w) => { const l = o[o.length - 1]; if (l && (l + ' ' + w).length <= n) o[o.length - 1] = l + ' ' + w; else o.push(w); return o; }, []);
+
+  // ---------- Time chart ----------
+  function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
+  function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
+  function pad(a, b) { const d = (b - a || Math.abs(b) || 1) * .08, [lo, hi] = bounds() || [-Infinity, Infinity]; return [Math.max(lo, a - d), Math.min(hi, b + d)]; }
+  function tick(v) {
+    switch (M.k.format) {
+      case 'pct': return +v.toFixed(1) + '%';
+      case 'signedpct': return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + '%';
+      case 'nps': return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1));
+      case 'wait': case 'duration': return fmt.value(v, M.k.format);
+      case 'count': return fmt.shortNum(v);
+      default: return String(+v.toFixed(1));
+    }
+  }
+  function axis(s, a, b, y, x1, x2, n = 5) {
+    const raw = (b - a) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw);
+    const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) { el('line', { x1, x2, y1: y(v), y2: y(v) }, g); text(ax, x1 - 8, y(v) + 4, tick(v), '', 'end'); }
+  }
+  const nText = (p) => M.k.spc.scale == null || S.metric === 'staffing' ? '' : ['adherence', 'occupancy'].includes(S.metric) ? `${fmt.count(p.k)} agent-days` : `n = ${fmt.count(p.n)}`;
+  function chart(host, r, small) {
+    host.innerHTML = '';
+    const W = host.clientWidth || 600, H = small ? 170 : 340, narrow = W < 560;
+    const m = small ? { t: 8, r: 6, b: 24, l: 46 } : { t: 44, r: narrow ? 8 : 112, b: 28, l: 58 };
+    const pts = r.pts; if (!pts.length) { host.textContent = 'No data in this period.'; return; }
+    const t0 = Math.min(r.bs, r.w.s), t1 = Math.max(r.w.e, t0 + DAY), iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const x = (t) => m.l + (t - t0) / (t1 - t0) * iw;
+    const shown = pts.filter((p) => !p.low), src = shown.length ? shown : pts;
+    const vals = src.flatMap((p) => p.l ? [p.v, p.l.lcl, p.l.ucl] : [p.v]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih;
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${M.k.name}, ${r.name}, ${grainWord()}, ${range(r.w.s, r.w.e)}. ${r.lim ? `${r.out.length} outside the limits, ${r.run.length} run-rule signals.` : 'No limits.'} Use View as table for values.` }, host);
+    if (S.base !== 'self' && r.be > t0) el('rect', { class: 'c-base', x: m.l, y: m.t, width: Math.max(0, x(r.w.s) - m.l), height: ih }, s);
+    axis(s, a, b, y, m.l, m.l + iw, small ? 3 : 5);
+    // month labels, thinned so they never collide
+    const ax = el('g', { class: 'ax' }, s); let lastX = -99;
+    const d = new Date(t0); for (let c = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + (d.getUTCDate() > 1 ? 1 : 0), 1), first = true; c <= t1; c = addMonths(c, 1)) {
+      const lx = x(c); if (lx - lastX < (small || narrow ? 52 : 46) || lx > m.l + iw - 8) continue;
+      const mm = iso(c).slice(0, 7); text(ax, lx, H - 8, first || mm.endsWith('-01') ? fmt.month(mm).replace(' 20', " '") : fmt.monthShort(mm), '', 'middle'); lastX = lx; first = false;
+    }
+    const marks = [];
+    if (events && !small) {
+      let num = 0, lastM = -99, row = 0;
+      for (const e of EV) {
+        const s1 = ts(e.start), s2 = ts(e.end); if (s2 < t0 || s1 > t1) continue;
+        const ea = Math.max(m.l, x(s1)), eb = Math.min(m.l + iw, x(s2 + DAY)); num++;
+        if (e.span === 'Period') el('rect', { class: 'c-evband', x: ea, y: m.t, width: Math.max(3, eb - ea), height: ih }, s);
+        else el('line', { class: 'c-evline', x1: ea, x2: ea, y1: m.t, y2: m.t + ih }, s);
+        row = ea - lastM < 18 ? 1 - row : 0; lastM = ea; marks.push({ e, num, x: ea, y: m.t - 12 - row * 17 });
+      }
+    }
+    if (r.lim) {
+      const withLim = src.filter((p) => p.l), path = (key) => withLim.map((p, i) => { const px = x(p.t), nx = i + 1 < withLim.length ? x(withLim[i + 1].t) : px; return `${i ? 'L' : 'M'}${px.toFixed(1)},${y(p.l[key]).toFixed(1)}L${nx.toFixed(1)},${y(p.l[key]).toFixed(1)}`; }).join('');
+      el('path', { class: 'c-lim', d: path('ucl') }, s); el('path', { class: 'c-lim', d: path('lcl') }, s);
+      el('line', { class: 'c-cl', x1: m.l, x2: m.l + iw, y1: y(r.lim.center), y2: y(r.lim.center) }, s);
+      if (!small && !narrow) {
+        const q = withLim[withLim.length - 1].l, at = [['UCL', q.ucl], ['Center', r.lim.center], ['LCL', q.lcl]].map(([n, v]) => ({ t: `${n}${n === 'Center' ? '' : ` · ${+S.sigma}σ`} ${V(v)}`, y: y(v) + 4 }));
+        for (let i = 1; i < 3; i++) at[i].y = Math.max(at[i].y, at[i - 1].y + 15);
+        at.forEach((q2) => text(s, m.l + iw + 8, q2.y, q2.t, 'c-lab'));
+      }
+    }
+    el('path', { class: 'c-line', d: shown.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('') }, s);
+    const gap = iw / Math.max(1, pts.length), f = small ? .72 : 1;
+    pts.forEach((p) => {
+      const c = p.low ? 'c-low' : p.sig.includes('outside') ? 'c-out' : p.sig.length ? 'c-run' : 'c-pt';
+      el('circle', { class: c, cx: x(p.t), cy: y(p.v), r: f * (c === 'c-out' ? 5.5 : c === 'c-run' ? 4 : c === 'c-low' ? 2.6 : gap > 10 ? 4 : 2) }, s);
+    });
+    // hover and keyboard: nearest point
+    const cross = el('line', { class: 'c-cross', y1: m.t, y2: m.t + ih, visibility: 'hidden' }, s);
+    const tip = (p, cx, cy) => { cross.setAttribute('x1', x(p.t)); cross.setAttribute('x2', x(p.t)); cross.setAttribute('visibility', 'visible');
+      const ev = EV.filter((e) => ts(e.start) <= p.t + (isWeek() ? 6 * DAY : 0) && ts(e.end) >= p.t);
+      showTip(`<b>${dateName(p.t)}</b>${p.inPeriod ? '' : ' · baseline'}<br>${esc(M.k.short)}: <b>${V(p.v, true)}</b>${p.l ? `<br>Center ${V(r.lim.center, true)} · limits ${V(p.l.lcl, true)} to ${V(p.l.ucl, true)}` : ''}${p.low ? `<br>Too few to rate (n = ${fmt.count(p.k)}, below ${M.k.minN})` : nText(p) ? '<br>' + nText(p) : ''}${p.sig.length ? '<br>' + sigHtml(p) : ''}${ev.length ? `<br><span class="muted">Events: ${ev.map((e) => esc(e.name)).join(', ')}</span>` : ''}`, cx, cy); };
+    const hit = el('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', ...(small ? {} : { tabindex: 0, role: 'application', 'aria-label': 'Use left and right arrow keys to move between points' }) }, s);
+    let at = pts.length - 1;
+    const move = (ev) => { const bx = s.getBoundingClientRect(), tx = t0 + ((ev.clientX - bx.left) * W / bx.width - m.l) / iw * (t1 - t0); at = pts.reduce((best, p, i) => (Math.abs(p.t - tx) < Math.abs(pts[best].t - tx) ? i : best), 0); tip(pts[at], ev.clientX, ev.clientY); };
+    const off = () => { cross.setAttribute('visibility', 'hidden'); hideTip(); };
+    hit.addEventListener('mousemove', move); hit.addEventListener('mouseleave', off); hit.addEventListener('blur', off);
+    hit.addEventListener('keydown', (ev) => { const n = { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: pts.length - 1 }[ev.key]; if (n == null) return; ev.preventDefault(); at = Math.max(0, Math.min(pts.length - 1, n)); const bx = s.getBoundingClientRect(); tip(pts[at], bx.left + x(pts[at].t) * bx.width / W, bx.top + y(pts[at].v)); });
+    for (const k of marks) {
+      const g = el('g', { class: 'c-ev', transform: `translate(${k.x},${k.y})`, tabindex: 0, role: 'img', 'aria-label': `${k.e.name}, ${range(ts(k.e.start), ts(k.e.end))}` }, s); el('circle', { r: 8 }, g); text(g, 0, 3.5, k.num);
+      const show = (ev) => { const bx = g.getBoundingClientRect(); showTip(`<b>${k.num}. ${esc(k.e.name)}</b><br>${k.e.start === k.e.end ? fmt.date(k.e.start) : range(ts(k.e.start), ts(k.e.end))}<br><span class="muted">${esc(k.e.description)}</span>`, ev.clientX ?? bx.left, ev.clientY ?? bx.top); };
+      g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('mouseleave', hideTip); g.addEventListener('blur', hideTip);
+    }
+  }
+
+  // ---------- Controls ----------
+  const set = (q, v) => { S[q] = v; if (q === 'metric' || q === 'dim') S.member = null; if (q === 'end') carry(v === 'latest' ? null : v); hideTip(); if (q === 'metric') load().catch(fail); else render(); };
+  for (const q of ['metric', 'dim', 'grain', 'period', 'base', 'end']) $('f-' + q).addEventListener('change', (e) => set(q, e.target.value));
+  $('f-sigma').addEventListener('input', (e) => set('sigma', +e.target.value));
+  $('f-view').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b && !b.disabled) set('view', b.dataset.v); });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) set(b.dataset.q, DEF[b.dataset.q]); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carry(null); events = $('t-events').checked = true; load().catch(fail); });
+  $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderMain(); });
+  $('tb-main').addEventListener('click', () => { tblMain = !tblMain; renderMain(); });
+  $('tb-split').addEventListener('click', () => { tblSplit = !tblSplit; renderSplit(); });
+  const more = document.querySelector('.more');
+  document.addEventListener('click', (e) => { if (!more.contains(e.target)) more.open = false; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } });
+  const about = (what) => `Process stability monitor · ${M.k.name} · ${what} · ${range(windowOf().s, windowOf().e)} · ${S.sigma} sigma · ${grainWord()} · baseline ${$('f-base').selectedOptions[0].textContent} · data through ${THROUGH}`;
+  $('csv-main').addEventListener('click', () => Site.downloadCsv('process-stability_' + S.metric, THROUGH, about(mainData.name), [isWeek() ? 'week_start' : 'day', 'part', S.metric, 'center', 'lcl', 'ucl', 'n', 'samples', 'signal'],
+    mainData.pts.slice().reverse().map((p) => [iso(p.t), p.inPeriod ? 'period' : 'baseline', p.v, mainData.lim && mainData.lim.center, p.l && p.l.lcl, p.l && p.l.ucl, p.n, p.k, p.low ? 'too few' : p.sig.map((s) => RULE[s]).join('; ')])));
+  $('csv-split').addEventListener('click', () => S.view === 'cat'
+    ? Site.downloadCsv('process-stability_' + S.metric + '_by-category', THROUGH, about('by ' + S.dim), [S.dim, S.metric, 'center', 'lcl', 'ucl', 'signal', 'days', 'n'], splitData.map((r) => [r.name, r.value, r.center, r.lcl, r.ucl, r.low ? 'too few' : r.out ? 'outside' : '', r.days, r.n]))
+    : Site.downloadCsv('process-stability_' + S.metric + '_panels', THROUGH, about('by ' + S.dim), [S.dim, 'period_value', 'center', 'outside_limits', 'run_rules', 'usable_points'], splitData.map((r) => [r.name, total(r), r.lim && r.lim.center, r.lim && r.out.length, r.lim && r.run.length, r.usable])));
+  let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (M) render(); }, 150); });
+})();
+</script>
+</body>
+</html>

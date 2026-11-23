@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.1">
-<script src="assets/site.js?v=1.1"></script>
+<script src="assets/site.js?v=1.2"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -200,7 +200,7 @@
     const sel = document.getElementById('f-month');
     sel.innerHTML = fullMonths.slice().reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
     document.getElementById('footer-generated').textContent =
-      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${DATA.generated_at.slice(11, 16)} CT · Executive scorecard v1.0`;
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.0`;
   }
   const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
   const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
@@ -213,14 +213,17 @@
   // ---------- URL state (filters are shareable) ----------
   function readUrl() {
     const p = new URLSearchParams(location.search);
-    state.month = fullMonths.includes(p.get('m')) ? p.get('m') : defaults.month;
+    // a month chosen on another dashboard carries over for this visit
+    let carried = null; try { carried = sessionStorage.getItem('happen-demo-month'); } catch (e) { /* not remembered */ }
+    state.month = [p.get('m'), carried, defaults.month].find((x) => fullMonths.includes(x));
     state.cmp = p.get('cmp') === 'year' ? 'year' : 'prior';
     state.kpi = kpiById(p.get('kpi')) ? p.get('kpi') : null;
     state.kpiPicked = !!state.kpi;
   }
+  function carriedMonth(set) { try { if (set === null) sessionStorage.removeItem('happen-demo-month'); else if (set) sessionStorage.setItem('happen-demo-month', set); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } }
   function writeUrl() {
     const p = new URLSearchParams();
-    if (state.month !== defaults.month) p.set('m', state.month);
+    if (state.month !== defaults.month || carriedMonth()) p.set('m', state.month);
     if (state.cmp !== 'prior') p.set('cmp', state.cmp);
     if (state.kpi && state.kpiPicked) p.set('kpi', state.kpi);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
@@ -630,9 +633,9 @@
   }
 
   // ---------- Controls ----------
-  document.getElementById('f-month').addEventListener('change', (e) => { state.month = e.target.value; render(); });
+  document.getElementById('f-month').addEventListener('change', (e) => { state.month = e.target.value; carriedMonth(state.month); render(); });
   document.getElementById('f-cmp').addEventListener('change', (e) => { state.cmp = e.target.value; render(); });
-  document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); render(); });
+  document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); carriedMonth(null); render(); });
   document.getElementById('t-events').addEventListener('change', (e) => { state.events = e.target.checked; renderDetail(); });
   document.getElementById('t-table').addEventListener('click', () => { state.table = !state.table; renderDetail(); });
   document.getElementById('copy-link').addEventListener('click', (e) => {
