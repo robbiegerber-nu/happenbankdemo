@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=1.6"></script>
+<script src="assets/site.js?v=1.7"></script>
 <script src="assets/spc.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -175,6 +175,7 @@
     for (const q of ['grain', 'period', 'base', 'end']) if (one('f-' + q, p.get(q))) S[q] = p.get(q);
     if (!p.has('end') && one('f-end', carried())) S.end = carried();
     S.member = p.get('member');
+    Site.setDataThrough(THROUGH);
     $('footer-generated').textContent = `Data through ${fmt.date(THROUGH)} · exported ${fmt.date(e.generated_at)}, ${fmt.time(e.generated_at)} CT · Process stability monitor v1.0`;
     return load();
   }).catch(fail);

@@ -50,4 +50,7 @@ if (Test-Path (Join-Path $exportDir 'runs')) {
     Get-ChildItem (Join-Path $exportDir 'runs') -Directory | Where-Object { [int]$_.Name -gt $keep } | Remove-Item -Recurse -Force
 }
 & powershell -NoProfile -File (Join-Path $root 'sql\discovery\run_discovery.ps1') -ExportOnly -ResumeRunId $keep | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'discovery export failed' }
+& powershell -NoProfile -File (Join-Path $root 'sql\dashboards\export_dashboards.ps1') | Select-Object -Last 1
+if ($LASTEXITCODE -ne 0) { throw 'dashboard export failed' }
 "reset: data back to 31 Oct 2026, latest run #$keep"

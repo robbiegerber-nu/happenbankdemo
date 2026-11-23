@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=1.6"></script>
+<script src="assets/site.js?v=1.7"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -175,8 +175,8 @@
   let defaults;
 
   Promise.all([
-    fetch('data/dashboards/kpis.json').then((r) => r.json()),
-    fetch('data/dashboards/executive.json').then((r) => r.json())
+    fetch('data/dashboards/kpis.json', { cache: 'no-cache' }).then((r) => r.json()),
+    fetch('data/dashboards/executive.json', { cache: 'no-cache' }).then((r) => r.json())
   ]).then(([k, d]) => { KPIS = k.kpis; SECTIONS = k.sections; DATA = d; prepare(); readUrl(); render(); })
     .catch((e) => { document.getElementById('loading').textContent = 'The scorecard data could not be loaded. ' + e.message; });
 
@@ -199,6 +199,7 @@
     defaults = { month: fullMonths[fullMonths.length - 1], cmp: 'prior', kpi: null };
     const sel = document.getElementById('f-month');
     sel.innerHTML = fullMonths.slice().reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    Site.setDataThrough(DATA.data_through);
     document.getElementById('footer-generated').textContent =
       `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.0`;
   }

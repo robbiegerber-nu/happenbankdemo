@@ -194,18 +194,28 @@
     loadFreshness();
   }
 
-  // Data-freshness badge, from the Data Quality Dashboard's latest run
+  // Data-freshness badge: this page's own data date, with the Data Quality Dashboard's latest result.
+  // When the latest load failed its checks, the dashboards keep their last good data, so the two dates can differ.
+  let quality = null, pageDate = null;
   function loadFreshness() {
+    fetch('data/summary.json', { cache: 'no-cache' }).then((r) => r.json()).then((s) => { quality = s; drawBadge(); }).catch(() => { quality = false; drawBadge(); });
+  }
+  function setDataThrough(iso) { pageDate = iso; drawBadge(); }
+  function drawBadge() {
     const b = document.getElementById('fresh-badge');
-    fetch('data/summary.json').then((r) => r.json()).then((s) => {
-      const o = s.overall || {}, through = s.period && s.period.end;
-      let word, cls;
-      if (o.failed > 0) { word = o.failed + (o.failed === 1 ? ' check failing' : ' checks failing'); cls = 'off'; }
-      else if (o.warned > 0) { word = o.warned + (o.warned === 1 ? ' check to watch' : ' checks to watch'); cls = 'watch'; }
-      else { word = 'all checks passing'; cls = 'good'; }
-      b.innerHTML = `<span class="status ${cls}" aria-hidden="true" style="padding:0 4px"></span><span>Data through ${esc(fmt.date(through))}</span><span class="long"> · ${esc(word)}</span>`;
-      b.title = `Data quality: ${o.passed} of ${o.checks} checks passed. Open the Data Quality Dashboard.`;
-    }).catch(() => { b.textContent = 'Data quality'; });
+    if (!b) return;
+    const o = quality && quality.overall, latest = quality && quality.period && quality.period.end, date = pageDate || latest;
+    if (!date) { if (quality === false) b.textContent = 'Data quality'; return; }
+    let word = '', cls = 'none', title = 'Open the Data Quality Dashboard.';
+    if (o) {
+      const n = (x, t) => x + (x === 1 ? ' check ' : ' checks ') + t;
+      if (pageDate && latest > pageDate) { cls = 'watch'; word = `newer data to ${fmt.date(latest)} not shown yet`; title = `The latest load runs through ${fmt.date(latest)}: ${o.failed > 0 ? n(o.failed, 'failing') : 'the dashboards have not been refreshed'}. This page shows the last refreshed data. ` + title; }
+      else if (pageDate && latest < pageDate) { cls = 'watch'; word = `checked through ${fmt.date(latest)}`; }
+      else { word = o.failed > 0 ? n(o.failed, 'failing') : o.warned > 0 ? n(o.warned, 'to watch') : 'all checks passing'; cls = o.failed > 0 ? 'off' : o.warned > 0 ? 'watch' : 'good'; title = `Data quality: ${o.passed} of ${o.checks} checks passed. ` + title; }
+    }
+    b.innerHTML = `<span class="status ${cls}" aria-hidden="true" style="padding:0 4px"></span><span>Data through ${esc(fmt.date(date))}</span>${word ? `<span class="long"> · ${esc(word)}</span>` : ''}`;
+    b.title = title;
+    b.setAttribute('aria-label', `Data through ${fmt.date(date)}${word ? ', ' + word : ''}. ${title}`);
   }
 
   // ---------- KPI definition popover (Style Guide: KPI definitions) ----------
@@ -290,5 +300,5 @@
     else done('Copy failed');
   }
 
-  window.Site = { focusKey, restoreFocus, QUALITY_WORD, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  window.Site = { setDataThrough, focusKey, restoreFocus, QUALITY_WORD, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

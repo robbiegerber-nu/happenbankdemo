@@ -1,7 +1,8 @@
 # Loads one business day of feeds, runs the data quality checks, tracks incidents and raises GitHub Issue alerts.
 #   powershell -File sql\pipeline\load_day.ps1 -Date 2026-11-02 [-NoAlerts] [-LoadOnly]
 #     -NoAlerts   record incidents but don't create, comment on or close GitHub Issues (for testing)
-#     -LoadOnly   load the files and stop (no checks)
+#     -LoadOnly   load the files and stop (no checks, no exports)
+# The operational dashboards are exported only when no check failed, so they keep their last good data until it is fixed.
 # Order within a day: late files, then corrections (both fix earlier days), then the day's own files.
 # Nothing is published: review the exported dashboard data locally, then commit and push by hand.
 param([Parameter(Mandatory)][string]$Date, [switch]$NoAlerts, [switch]$LoadOnly)
@@ -109,7 +110,14 @@ foreach ($a in $acts) {
     }
 }
 
-# ---------- Export for the dashboard (review locally; publishing is a separate, manual step) ----------
+# ---------- Export for the dashboards (review locally; publishing is a separate, manual step) ----------
 & powershell -NoProfile -File (Join-Path $root 'sql\discovery\run_discovery.ps1') -ExportOnly -ResumeRunId $run | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'export failed' }
+$status = Invoke-Sql "SELECT status FROM discovery.dq_scorecard WHERE run_id = $run AND table_name = '(all tables)' AND dimension = '(all dimensions)';"
+if ($status -notin 'Pass', 'Warn') {
+    "operational dashboards: not updated (run #$run status is $status). They keep their last good data."
+} else {
+    & powershell -NoProfile -File (Join-Path $root 'sql\dashboards\export_dashboards.ps1') | Select-Object -Last 1
+    if ($LASTEXITCODE -ne 0) { throw 'The load and its checks are done, but the dashboard export failed. Fix the cause and run sql\dashboards\export_dashboards.ps1' }
+}
 "done: $Date checked in run #$run, total {0:N1} min" -f ((Get-Date) - $t0).TotalMinutes
