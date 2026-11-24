@@ -1,0 +1,159 @@
+-- Validation queries: Customer & persona insights
+-- The page defaults to the latest full quarter, July - September 2026. Identified customers only. Use whole quarters.
+-- Run one query at a time (select it, then run). Every query only reads data.
+-- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
+-- Names must match exactly, including capitals. See README.md in this folder.
+
+-- ====================================================================================================
+-- 7.1  All KPIs, in total or by group
+-- On the page: the tiles and the group table (set break_down_by to All, Persona, ...)
+-- Expected with the values below (checked Nov 24, 2026): with All: 400,000 customers, contact rate 40.7, reach 66.5, digital 56.1, CSAT 83.7, NPS +36, FCR 77.0, repeat 16.7, complaints 49.9. Credit Builder: 52.4, 76.6, 54.9, 76.3, +21, 77.1, 18.2, 77.5
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-07-01'              AS start_date,              -- first day of the quarter
+    DATE '2026-09-30'              AS end_date,                -- last day of the quarter (included)
+    'Persona'::text                AS break_down_by,           -- All, Persona, Segment, Age band, Digital enrollment
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS age_band,                -- as on the page
+    'All'::text                    AS digital_enrolled         -- true or false
+),
+people AS (   -- customers on the books at the end of the period
+  SELECT cu.customer_id, p.persona_name, cu.segment, cu.age_band, cu.digital_enrolled
+  FROM cc.customer cu JOIN cc.dim_persona p ON p.persona_id = cu.persona_id CROSS JOIN settings s
+  WHERE cu.customer_since <= s.end_date
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.age_band = 'All' OR cu.age_band = ANY (string_to_array(s.age_band, ' | ')))
+    AND (s.digital_enrolled = 'All' OR cu.digital_enrolled::text = ANY (string_to_array(s.digital_enrolled, ' | ')))
+),
+grouped AS (SELECT pe.customer_id, CASE s.break_down_by WHEN 'Persona' THEN pe.persona_name WHEN 'Segment' THEN pe.segment WHEN 'Age band' THEN pe.age_band WHEN 'Digital enrollment' THEN CASE WHEN pe.digital_enrolled THEN 'Enrolled' ELSE 'Not enrolled' END ELSE 'All shown' END AS grp FROM people pe CROSS JOIN settings s),
+cust AS (SELECT grp, count(*) AS customers FROM grouped GROUP BY 1),
+ct AS (
+  SELECT g.grp, count(*) AS contacts, count(DISTINCT c.customer_id) AS who, count(*) FILTER (WHERE c.channel_id IN (2, 3, 5)) AS digital,
+         count(*) FILTER (WHERE c.answered) AS answered, count(*) FILTER (WHERE c.answered AND c.first_contact_resolved) AS resolved,
+         count(*) FILTER (WHERE c.repeat_within_7d) AS repeated
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key JOIN grouped g USING (customer_id) CROSS JOIN settings s WHERE d.full_date BETWEEN s.start_date AND s.end_date GROUP BY 1
+),
+sv AS (
+  SELECT g.grp, count(*) AS surveys, count(*) FILTER (WHERE v.csat >= 4) AS satisfied, count(*) FILTER (WHERE v.nps >= 9) - count(*) FILTER (WHERE v.nps <= 6) AS net
+  FROM cc.survey_response v JOIN cc.dim_date d ON d.date_key = v.date_key JOIN grouped g ON g.customer_id = v.customer_id CROSS JOIN settings s WHERE d.full_date BETWEEN s.start_date AND s.end_date GROUP BY 1
+),
+cp AS (
+  SELECT g.grp, count(*) AS complaints
+  FROM cc.complaint k JOIN cc.dim_date d ON d.date_key = k.date_key JOIN grouped g ON g.customer_id = k.customer_id CROSS JOIN settings s WHERE d.full_date BETWEEN s.start_date AND s.end_date GROUP BY 1
+),
+m AS (SELECT (extract(year FROM age(end_date + 1, start_date)) * 12 + extract(month FROM age(end_date + 1, start_date)))::int AS months FROM settings)
+SELECT grp, customers, round(100.0 * contacts / (customers * m.months), 1) AS contacts_per_100_customers_a_month, round(100.0 * who / customers, 1) AS reach_pct,
+       round(100.0 * digital / nullif(contacts, 0), 1) AS digital_share_pct, round(100.0 * satisfied / nullif(surveys, 0), 1) AS csat_pct,
+       round(100.0 * net / nullif(surveys, 0), 0) AS nps, round(100.0 * resolved / nullif(answered, 0), 1) AS fcr_pct,
+       round(100.0 * repeated / nullif(contacts, 0), 1) AS repeat_pct, round(1000.0 * complaints / nullif(contacts, 0), 1) AS complaints_per_1000
+FROM cust LEFT JOIN ct USING (grp) LEFT JOIN sv USING (grp) LEFT JOIN cp USING (grp) CROSS JOIN m
+ORDER BY customers DESC, grp;
+
+
+-- ====================================================================================================
+-- 7.2  How often customers contacted
+-- On the page: the contact frequency section
+-- Expected with the values below (checked Nov 24, 2026): none 33.5, one 32.6, 2-3 28.7, 4 or more 5.1; the 4 or more group makes 18.7 of contacts
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-07-01'              AS start_date,              -- first day of the quarter
+    DATE '2026-09-30'              AS end_date,                -- last day of the quarter (included)
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS age_band,                -- as on the page
+    'All'::text                    AS digital_enrolled         -- true or false
+),
+people AS (   -- customers on the books at the end of the period
+  SELECT cu.customer_id, p.persona_name, cu.segment, cu.age_band, cu.digital_enrolled
+  FROM cc.customer cu JOIN cc.dim_persona p ON p.persona_id = cu.persona_id CROSS JOIN settings s
+  WHERE cu.customer_since <= s.end_date
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.age_band = 'All' OR cu.age_band = ANY (string_to_array(s.age_band, ' | ')))
+    AND (s.digital_enrolled = 'All' OR cu.digital_enrolled::text = ANY (string_to_array(s.digital_enrolled, ' | ')))
+),
+n AS (
+  SELECT pe.customer_id, count(x.contact_id) AS contacts
+  FROM people pe LEFT JOIN (SELECT c.contact_id, c.customer_id FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key CROSS JOIN settings s WHERE d.full_date BETWEEN s.start_date AND s.end_date) x USING (customer_id)
+  GROUP BY 1
+)
+SELECT CASE WHEN contacts = 0 THEN '0 contacts' WHEN contacts = 1 THEN '1 contact' WHEN contacts <= 3 THEN '2-3 contacts' ELSE '4 or more' END AS frequency,
+       count(*) AS customers, round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS share_of_customers_pct,
+       sum(contacts) AS contacts, round(100.0 * sum(contacts) / nullif(sum(sum(contacts)) OVER (), 0), 1) AS share_of_contacts_pct
+FROM n
+GROUP BY 1
+ORDER BY 1;
+
+
+-- ====================================================================================================
+-- 7.3  Channel mix by persona
+-- On the page: the "How each group contacts" chart
+-- Expected with the values below (checked Nov 24, 2026): Digital Native Starter: Phone 17%, Chat 77%
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-07-01'              AS start_date,              -- first day of the quarter
+    DATE '2026-09-30'              AS end_date,                -- last day of the quarter (included)
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS age_band,                -- as on the page
+    'All'::text                    AS digital_enrolled         -- true or false
+),
+people AS (   -- customers on the books at the end of the period
+  SELECT cu.customer_id, p.persona_name, cu.segment, cu.age_band, cu.digital_enrolled
+  FROM cc.customer cu JOIN cc.dim_persona p ON p.persona_id = cu.persona_id CROSS JOIN settings s
+  WHERE cu.customer_since <= s.end_date
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.age_band = 'All' OR cu.age_band = ANY (string_to_array(s.age_band, ' | ')))
+    AND (s.digital_enrolled = 'All' OR cu.digital_enrolled::text = ANY (string_to_array(s.digital_enrolled, ' | ')))
+),
+x AS (
+  SELECT pe.persona_name, ch.channel_name, count(*) AS contacts
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key JOIN people pe USING (customer_id) JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id CROSS JOIN settings s
+  WHERE d.full_date BETWEEN s.start_date AND s.end_date GROUP BY 1, 2
+)
+SELECT persona_name, channel_name, contacts, round(100.0 * contacts / sum(contacts) OVER (PARTITION BY persona_name), 1) AS share_pct
+FROM x
+ORDER BY 1, 3 DESC;
+
+
+-- ====================================================================================================
+-- 7.4  What customers contact about
+-- On the page: the contact reasons section
+-- Expected with the values below (checked Nov 24, 2026): Balance & Transaction Inquiry 44,595 (9.1%)
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-07-01'              AS start_date,              -- first day of the quarter
+    DATE '2026-09-30'              AS end_date,                -- last day of the quarter (included)
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS age_band,                -- as on the page
+    'All'::text                    AS digital_enrolled,        -- true or false
+    'All'::text                    AS channel                  -- Phone, Chat, Email, Callback, Secure Message
+),
+people AS (   -- customers on the books at the end of the period
+  SELECT cu.customer_id, p.persona_name, cu.segment, cu.age_band, cu.digital_enrolled
+  FROM cc.customer cu JOIN cc.dim_persona p ON p.persona_id = cu.persona_id CROSS JOIN settings s
+  WHERE cu.customer_since <= s.end_date
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.age_band = 'All' OR cu.age_band = ANY (string_to_array(s.age_band, ' | ')))
+    AND (s.digital_enrolled = 'All' OR cu.digital_enrolled::text = ANY (string_to_array(s.digital_enrolled, ' | ')))
+),
+x AS (
+  SELECT r.reason_group, r.reason, count(*) AS contacts, round(100.0 * count(*) FILTER (WHERE c.repeat_within_7d) / count(*), 1) AS repeat_pct
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key JOIN people pe USING (customer_id) JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id CROSS JOIN settings s
+  WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+  GROUP BY 1, 2
+)
+SELECT reason_group, reason, contacts, round(100.0 * contacts / sum(contacts) OVER (), 1) AS share_pct, repeat_pct
+FROM x
+ORDER BY contacts DESC;

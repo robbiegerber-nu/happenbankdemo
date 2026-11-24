@@ -1,0 +1,207 @@
+-- Validation queries: Process stability monitor
+-- The page defaults to phone service level by week, 3 sigma, the 6 months to Nov 15, 2026 and a baseline of the 6 months before.
+-- Weeks run Sunday to Saturday and only whole weeks count. If the baseline has fewer than 20 usable points the page extends it back;
+-- if baseline_points is below 20 here, move baseline_start earlier until it reaches 20.
+-- Run one query at a time (select it, then run). Every query only reads data.
+-- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
+-- Names must match exactly, including capitals. See README.md in this folder.
+
+-- ====================================================================================================
+-- 10.1  The points on the chart
+-- On the page: the main chart and its table (View as table)
+-- Expected with the values below (checked Nov 24, 2026): week of Nov 8, 2026: 85.0
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-05-16'              AS start_date,              -- first day of the period shown
+    DATE '2026-11-15'              AS end_date,                -- last day
+    DATE '2025-11-16'              AS baseline_start,          -- first day of the baseline
+    DATE '2026-05-15'              AS baseline_end,            -- last day of it
+    'week'::text                   AS grain,                   -- week or day
+    'Phone'::text                  AS channel,                 -- Phone; Chat; Email | Secure Message; Callback
+    'All'::text                    AS queue,                   -- e.g. Phone - Lending & Mortgage
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment                  -- Mass, Mass Affluent, Private, Small Business
+),
+pts AS (   -- one point per week (Sunday to Saturday) or day; only whole weeks inside the baseline or the period
+  SELECT point, part, sum(x)::numeric AS x, sum(n)::numeric AS n
+  FROM (
+    SELECT CASE WHEN s.grain = 'week' THEN d.full_date - extract(dow FROM d.full_date)::int ELSE d.full_date END AS point, (c.met_service_level)::int AS x, (c.answered OR (c.abandoned AND NOT c.short_abandon))::int AS n
+    FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+  JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+  JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+  JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+  LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+  CROSS JOIN settings s
+    WHERE d.full_date BETWEEN s.baseline_start AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+  ) z CROSS JOIN settings s
+  CROSS JOIN LATERAL (SELECT z.point + CASE WHEN s.grain = 'week' THEN 6 ELSE 0 END AS last) w
+  CROSS JOIN LATERAL (SELECT CASE WHEN z.point >= s.start_date AND w.last <= s.end_date THEN 'period'
+                                  WHEN z.point >= s.baseline_start AND w.last <= s.baseline_end THEN 'baseline' END AS part) k
+  WHERE part IS NOT NULL
+  GROUP BY 1, 2
+)
+SELECT point, part, n AS eligible_contacts, round(100 * x / nullif(n, 0), 1) AS service_level_pct
+FROM pts
+ORDER BY point DESC;
+
+
+-- ====================================================================================================
+-- 10.2  Center line and limits for a percentage (Laney p-prime chart)
+-- On the page: the Center, UCL and LCL labels and the out-of-limits count
+-- Expected with the values below (checked Nov 24, 2026): center 73.9; latest point (week of Nov 8): 85.0, LCL 56.0, UCL 91.8; 0 weeks outside
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-05-16'              AS start_date,              -- first day of the period shown
+    DATE '2026-11-15'              AS end_date,                -- last day
+    DATE '2025-11-16'              AS baseline_start,          -- first day of the baseline
+    DATE '2026-05-15'              AS baseline_end,            -- last day of it
+    'week'::text                   AS grain,                   -- week or day
+    3.0                            AS sigma,                   -- control limit width, 1 to 3
+    50                             AS min_contacts,            -- points with fewer are left out of the limits
+    'Phone'::text                  AS channel,                 -- Phone; Chat; Email | Secure Message; Callback
+    'All'::text                    AS queue,                   -- e.g. Phone - Lending & Mortgage
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment                  -- Mass, Mass Affluent, Private, Small Business
+),
+pts AS (   -- one point per week (Sunday to Saturday) or day; only whole weeks inside the baseline or the period
+  SELECT point, part, sum(x)::numeric AS x, sum(n)::numeric AS n
+  FROM (
+    SELECT CASE WHEN s.grain = 'week' THEN d.full_date - extract(dow FROM d.full_date)::int ELSE d.full_date END AS point, (c.met_service_level)::int AS x, (c.answered OR (c.abandoned AND NOT c.short_abandon))::int AS n
+    FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+  JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+  JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+  JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+  LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+  CROSS JOIN settings s
+    WHERE d.full_date BETWEEN s.baseline_start AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+  ) z CROSS JOIN settings s
+  CROSS JOIN LATERAL (SELECT z.point + CASE WHEN s.grain = 'week' THEN 6 ELSE 0 END AS last) w
+  CROSS JOIN LATERAL (SELECT CASE WHEN z.point >= s.start_date AND w.last <= s.end_date THEN 'period'
+                                  WHEN z.point >= s.baseline_start AND w.last <= s.baseline_end THEN 'baseline' END AS part) k
+  WHERE part IS NOT NULL
+  GROUP BY 1, 2
+),
+base AS (
+  SELECT p.*, sum(x) OVER () / sum(n) OVER () AS pbar FROM pts p CROSS JOIN settings s WHERE part = 'baseline' AND n >= s.min_contacts
+),
+z AS (SELECT pbar, (x / n - pbar) / sqrt(pbar * (1 - pbar) / n) AS z, point FROM base),
+mr AS (SELECT pbar, abs(z - lag(z) OVER (ORDER BY point)) AS mr FROM z),
+lim AS (SELECT max(pbar) AS pbar, avg(mr) / 1.128 AS sigma_z, count(*) AS baseline_points FROM mr)
+SELECT point, round(100 * x / n, 1) AS service_level_pct, round(100 * pbar, 1) AS center,
+       round(greatest(0, 100 * (pbar - s.sigma * sqrt(pbar * (1 - pbar) / n) * sigma_z)), 1) AS lcl,
+       round(least(100, 100 * (pbar + s.sigma * sqrt(pbar * (1 - pbar) / n) * sigma_z)), 1) AS ucl,
+       n >= s.min_contacts AND abs(x / n - pbar) > s.sigma * sqrt(pbar * (1 - pbar) / n) * sigma_z AS outside_limits,
+       sum((n >= s.min_contacts AND abs(x / n - pbar) > s.sigma * sqrt(pbar * (1 - pbar) / n) * sigma_z)::int) OVER () AS points_outside, baseline_points
+FROM pts CROSS JOIN lim CROSS JOIN settings s
+WHERE part = 'period' AND n > 0
+ORDER BY point DESC;
+
+
+-- ====================================================================================================
+-- 10.3  Center line and limits for an average (individuals / XmR chart)
+-- On the page: the same labels when the metric is ASA or AHT
+-- Expected with the values below (checked Nov 24, 2026): AHT: center 468.7 (7m 49s), LCL 461.5 (7m 42s), UCL 476.0 (7m 56s), 12 weeks outside
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-05-16'              AS start_date,              -- first day of the period shown
+    DATE '2026-11-15'              AS end_date,                -- last day
+    DATE '2025-11-16'              AS baseline_start,          -- first day of the baseline
+    DATE '2026-05-15'              AS baseline_end,            -- last day of it
+    'week'::text                   AS grain,                   -- week or day
+    3.0                            AS sigma,                   -- control limit width, 1 to 3
+    'AHT'::text                    AS metric,                  -- AHT or ASA
+    20                             AS min_contacts,            -- points with fewer are left out of the limits
+    'Phone'::text                  AS channel,                 -- Phone; Chat; Email | Secure Message; Callback
+    'All'::text                    AS queue,                   -- e.g. Phone - Lending & Mortgage
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment                  -- Mass, Mass Affluent, Private, Small Business
+),
+pts AS (   -- one point per week (Sunday to Saturday) or day; only whole weeks inside the baseline or the period
+  SELECT point, part, sum(x)::numeric AS x, sum(n)::numeric AS n
+  FROM (
+    SELECT CASE WHEN s.grain = 'week' THEN d.full_date - extract(dow FROM d.full_date)::int ELSE d.full_date END AS point, CASE WHEN c.answered THEN CASE s.metric WHEN 'AHT' THEN c.handle_sec ELSE c.queue_wait_sec END ELSE 0 END AS x, c.answered::int AS n
+    FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+  JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+  JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+  JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+  LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+  CROSS JOIN settings s
+    WHERE d.full_date BETWEEN s.baseline_start AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+  ) z CROSS JOIN settings s
+  CROSS JOIN LATERAL (SELECT z.point + CASE WHEN s.grain = 'week' THEN 6 ELSE 0 END AS last) w
+  CROSS JOIN LATERAL (SELECT CASE WHEN z.point >= s.start_date AND w.last <= s.end_date THEN 'period'
+                                  WHEN z.point >= s.baseline_start AND w.last <= s.baseline_end THEN 'baseline' END AS part) k
+  WHERE part IS NOT NULL
+  GROUP BY 1, 2
+),
+base AS (SELECT point, x / n AS v FROM pts CROSS JOIN settings s WHERE part = 'baseline' AND n >= s.min_contacts),
+mr AS (SELECT v, abs(v - lag(v) OVER (ORDER BY point)) AS mr FROM base),
+lim AS (SELECT avg(v) AS center, avg(mr) / 1.128 AS sd, count(*) AS baseline_points FROM mr)
+SELECT point, round(x / n, 1) AS value_sec, round(center, 1) AS center, round(greatest(0, center - s.sigma * sd), 1) AS lcl, round(center + s.sigma * sd, 1) AS ucl,
+       n >= s.min_contacts AND abs(x / n - center) > s.sigma * sd AS outside_limits, baseline_points
+FROM pts CROSS JOIN lim CROSS JOIN settings s
+WHERE part = 'period' AND n > 0
+ORDER BY point DESC;
+
+
+-- ====================================================================================================
+-- 10.4  One category against the whole center
+-- On the page: the By category view
+-- Expected with the values below (checked Nov 24, 2026): whole center 82.2; Phone - Fraud & Disputes 79.8
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-05-16'              AS start_date,              -- first day of the period shown
+    DATE '2026-11-15'              AS end_date,                -- last day
+    'Queue'::text                  AS break_down_by,           -- Queue, Reason group, Persona, Segment
+    'Phone'::text                  AS channel,                 -- Phone; Chat; Email | Secure Message; Callback
+    'All'::text                    AS queue,                   -- e.g. Phone - Lending & Mortgage
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS persona,                 -- e.g. Credit Builder, Retiree Traditionalist
+    'All'::text                    AS segment                  -- Mass, Mass Affluent, Private, Small Business
+),
+x AS (
+  SELECT coalesce(CASE s.break_down_by WHEN 'Queue' THEN q.queue_name WHEN 'Reason group' THEN r.reason_group WHEN 'Persona' THEN p.persona_name WHEN 'Segment' THEN cu.segment END, 'Unidentified customer') AS grp,
+         (c.met_service_level)::int AS met, (c.answered OR (c.abandoned AND NOT c.short_abandon))::int AS eligible
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+  JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+  JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+  JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+  LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+  CROSS JOIN settings s
+  WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+)
+SELECT coalesce(grp, '** Whole center **') AS grp, sum(eligible) AS eligible_contacts, round(100.0 * sum(met) / nullif(sum(eligible), 0), 1) AS service_level_pct
+FROM x
+GROUP BY ROLLUP (grp)
+ORDER BY GROUPING(grp) DESC, 2 DESC;

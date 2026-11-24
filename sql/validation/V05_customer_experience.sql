@@ -1,0 +1,249 @@
+-- Validation queries: Customer experience
+-- The page defaults to the latest full month, October 2026.
+-- Run one query at a time (select it, then run). Every query only reads data.
+-- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
+-- Names must match exactly, including capitals. See README.md in this folder.
+
+-- ====================================================================================================
+-- 5.1  The seven KPI tiles
+-- On the page: tiles at the top
+-- Expected with the values below (checked Nov 24, 2026): CSAT 83.4, NPS +36, effort 5.28, FCR 77.1, repeat 15.7, complaints 47.6, response 8.8
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-10-01'              AS start_date,              -- first day
+    DATE '2026-10-31'              AS end_date,                -- last day (included)
+    'All'::text                    AS channel,                 -- Phone, Chat, Email, Callback, Secure Message
+    'All'::text                    AS queue,                   -- e.g. Chat - Sales
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS reason,                  -- e.g. Fee Complaint
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS persona                  -- e.g. Credit Builder, Retiree Traditionalist
+),
+ct AS (   -- contacts, by the day they were offered
+  SELECT 'all' AS grp, count(*) AS offered, count(*) FILTER (WHERE c.answered) AS answered,
+         count(*) FILTER (WHERE c.answered AND c.first_contact_resolved) AS resolved,
+         count(c.customer_id) AS identified, count(*) FILTER (WHERE c.customer_id IS NOT NULL AND c.repeat_within_7d) AS repeated
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+),
+sv AS (   -- surveys, by the day they were answered
+  SELECT 'all' AS grp, count(*) AS surveys, count(*) FILTER (WHERE v.csat >= 4) AS satisfied,
+         count(*) FILTER (WHERE v.nps >= 9) - count(*) FILTER (WHERE v.nps <= 6) AS net, sum(v.ces) AS ces
+  FROM cc.survey_response v JOIN cc.dim_date d ON d.date_key = v.date_key JOIN cc.contact c ON c.contact_id = v.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = v.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+),
+cp AS (   -- complaints, by the day they were opened
+  SELECT 'all' AS grp, count(*) AS complaints
+  FROM cc.complaint cp JOIN cc.dim_date d ON d.date_key = cp.date_key LEFT JOIN cc.contact c ON c.contact_id = cp.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = cp.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+)
+SELECT grp, surveys, round(100.0 * satisfied / nullif(surveys, 0), 1) AS csat_pct, round(100.0 * net / nullif(surveys, 0), 0) AS nps,
+       round(ces::numeric / nullif(surveys, 0), 2) AS effort_score, offered, round(100.0 * resolved / nullif(answered, 0), 1) AS fcr_pct,
+       round(100.0 * repeated / nullif(identified, 0), 1) AS repeat_pct, complaints, round(1000.0 * complaints / nullif(offered, 0), 1) AS complaints_per_1000,
+       round(100.0 * surveys / nullif(answered, 0), 1) AS response_pct
+FROM ct FULL JOIN sv USING (grp) FULL JOIN cp USING (grp)
+ORDER BY 1;
+
+
+-- ====================================================================================================
+-- 5.2  The same KPIs by group
+-- On the page: the "by contact reason" table (change break_down_by to match the By buttons; Month gives the trend)
+-- Expected with the values below (checked Nov 24, 2026): Fee Complaint CSAT 50.3 (342 surveys), Dispute a Charge 74.7 (443)
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-10-01'              AS start_date,              -- first day
+    DATE '2026-10-31'              AS end_date,                -- last day (included)
+    'Contact reason'::text         AS break_down_by,           -- Channel, Queue, Reason group, Contact reason, Segment, Persona, Month
+    'All'::text                    AS channel,                 -- Phone, Chat, Email, Callback, Secure Message
+    'All'::text                    AS queue,                   -- e.g. Chat - Sales
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS reason,                  -- e.g. Fee Complaint
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS persona                  -- e.g. Credit Builder, Retiree Traditionalist
+),
+ct AS (   -- contacts, by the day they were offered
+  SELECT coalesce(CASE s.break_down_by WHEN 'Channel' THEN ch.channel_name WHEN 'Queue' THEN q.queue_name WHEN 'Reason group' THEN r.reason_group
+         WHEN 'Contact reason' THEN r.reason WHEN 'Segment' THEN cu.segment WHEN 'Persona' THEN p.persona_name WHEN 'Month' THEN d.year_month END, 'Not identified') AS grp, count(*) AS offered, count(*) FILTER (WHERE c.answered) AS answered,
+         count(*) FILTER (WHERE c.answered AND c.first_contact_resolved) AS resolved,
+         count(c.customer_id) AS identified, count(*) FILTER (WHERE c.customer_id IS NOT NULL AND c.repeat_within_7d) AS repeated
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+),
+sv AS (   -- surveys, by the day they were answered
+  SELECT coalesce(CASE s.break_down_by WHEN 'Channel' THEN ch.channel_name WHEN 'Queue' THEN q.queue_name WHEN 'Reason group' THEN r.reason_group
+         WHEN 'Contact reason' THEN r.reason WHEN 'Segment' THEN cu.segment WHEN 'Persona' THEN p.persona_name WHEN 'Month' THEN d.year_month END, 'Not identified') AS grp, count(*) AS surveys, count(*) FILTER (WHERE v.csat >= 4) AS satisfied,
+         count(*) FILTER (WHERE v.nps >= 9) - count(*) FILTER (WHERE v.nps <= 6) AS net, sum(v.ces) AS ces
+  FROM cc.survey_response v JOIN cc.dim_date d ON d.date_key = v.date_key JOIN cc.contact c ON c.contact_id = v.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = v.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+),
+cp AS (   -- complaints, by the day they were opened
+  SELECT coalesce(CASE s.break_down_by WHEN 'Channel' THEN ch.channel_name WHEN 'Queue' THEN q.queue_name WHEN 'Reason group' THEN r.reason_group
+         WHEN 'Contact reason' THEN r.reason WHEN 'Segment' THEN cu.segment WHEN 'Persona' THEN p.persona_name WHEN 'Month' THEN d.year_month END, 'Not identified') AS grp, count(*) AS complaints
+  FROM cc.complaint cp JOIN cc.dim_date d ON d.date_key = cp.date_key LEFT JOIN cc.contact c ON c.contact_id = cp.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = cp.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+  GROUP BY 1
+)
+SELECT grp, surveys, round(100.0 * satisfied / nullif(surveys, 0), 1) AS csat_pct, round(100.0 * net / nullif(surveys, 0), 0) AS nps,
+       round(ces::numeric / nullif(surveys, 0), 2) AS effort_score, offered, round(100.0 * resolved / nullif(answered, 0), 1) AS fcr_pct,
+       round(100.0 * repeated / nullif(identified, 0), 1) AS repeat_pct, complaints, round(1000.0 * complaints / nullif(offered, 0), 1) AS complaints_per_1000,
+       round(100.0 * surveys / nullif(answered, 0), 1) AS response_pct
+FROM ct FULL JOIN sv USING (grp) FULL JOIN cp USING (grp)
+ORDER BY 1;
+
+
+-- ====================================================================================================
+-- 5.3  Complaints by category, severity, root cause or channel received
+-- On the page: the complaints section
+-- Expected with the values below (checked Nov 24, 2026): Fees & Charges 3,399, 3.5 days median; the rows add up to 8,974
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-10-01'              AS start_date,              -- first day
+    DATE '2026-10-31'              AS end_date,                -- last day (included)
+    'Category'::text               AS break_down_by,           -- Category, Severity, Root cause, Received through, Status
+    'All'::text                    AS channel,                 -- Phone, Chat, Email, Callback, Secure Message
+    'All'::text                    AS queue,                   -- e.g. Chat - Sales
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS reason,                  -- e.g. Fee Complaint
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS persona                  -- e.g. Credit Builder, Retiree Traditionalist
+)
+SELECT CASE s.break_down_by WHEN 'Category' THEN cp.category WHEN 'Severity' THEN cp.severity WHEN 'Root cause' THEN cp.root_cause
+         WHEN 'Received through' THEN cp.channel_received WHEN 'Status' THEN cp.status END AS grp,
+       count(*) AS complaints, count(*) FILTER (WHERE cp.severity = 'High') AS high_severity, count(*) FILTER (WHERE cp.regulatory_flag) AS regulatory,
+       count(*) FILTER (WHERE cp.closed_ts IS NOT NULL) AS closed,
+       round(avg(cp.days_to_close) FILTER (WHERE cp.closed_ts IS NOT NULL), 1) AS average_days_to_close,
+       round(percentile_cont(0.5) WITHIN GROUP (ORDER BY cp.days_to_close) FILTER (WHERE cp.closed_ts IS NOT NULL)::numeric, 1) AS median_days_to_close
+FROM cc.complaint cp JOIN cc.dim_date d ON d.date_key = cp.date_key LEFT JOIN cc.contact c ON c.contact_id = cp.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = cp.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+GROUP BY 1
+ORDER BY 2 DESC;
+
+
+-- ====================================================================================================
+-- 5.4  Survey scores by what happened on the contact
+-- On the page: "What goes with higher scores"
+-- Expected with the values below (checked Nov 24, 2026): CSAT: resolved 91.7, not resolved 57.1; transferred 67.2, not transferred 85.1; escalated 70.1, not escalated 83.9
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2026-10-01'              AS start_date,              -- first day
+    DATE '2026-10-31'              AS end_date,                -- last day (included)
+    'All'::text                    AS channel,                 -- Phone, Chat, Email, Callback, Secure Message
+    'All'::text                    AS queue,                   -- e.g. Chat - Sales
+    'All'::text                    AS reason_group,            -- Account Servicing, Card, Fraud/Dispute, Digital Access, Lending, Product Inquiry, Complaint
+    'All'::text                    AS reason,                  -- e.g. Fee Complaint
+    'All'::text                    AS segment,                 -- Mass, Mass Affluent, Private, Small Business
+    'All'::text                    AS persona                  -- e.g. Credit Builder, Retiree Traditionalist
+)
+SELECT x.outcome, x.happened, count(*) AS surveys, round(100.0 * count(*) FILTER (WHERE v.csat >= 4) / count(*), 1) AS csat_pct,
+       round(100.0 * (count(*) FILTER (WHERE v.nps >= 9) - count(*) FILTER (WHERE v.nps <= 6)) / count(*), 0) AS nps, round(avg(v.ces), 2) AS effort_score
+FROM cc.survey_response v JOIN cc.dim_date d ON d.date_key = v.date_key JOIN cc.contact c ON c.contact_id = v.contact_id
+LEFT JOIN cc.dim_queue q ON q.queue_id = c.queue_id
+LEFT JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+LEFT JOIN cc.customer cu ON cu.customer_id = v.customer_id
+LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id
+CROSS JOIN settings s
+CROSS JOIN LATERAL (VALUES ('Resolved on first contact', coalesce(c.first_contact_resolved, false)), ('Transferred', c.transferred), ('Escalated', c.escalated),
+  ('Answered within the service level', c.met_service_level), ('Contacted again within 7 days', c.repeat_within_7d)) x(outcome, happened)
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+    AND (s.channel = 'All' OR ch.channel_name = ANY (string_to_array(s.channel, ' | ')))
+    AND (s.queue = 'All' OR q.queue_name = ANY (string_to_array(s.queue, ' | ')))
+    AND (s.reason_group = 'All' OR r.reason_group = ANY (string_to_array(s.reason_group, ' | ')))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+    AND (s.segment = 'All' OR cu.segment = ANY (string_to_array(s.segment, ' | ')))
+    AND (s.persona = 'All' OR p.persona_name = ANY (string_to_array(s.persona, ' | ')))
+GROUP BY 1, 2
+ORDER BY 1, 2 DESC;

@@ -1,0 +1,170 @@
+-- Validation queries: Product launch impact
+-- The page opens on the newest launch. Weeks are 7 days counted from launch day; baseline is weeks -8 to -3, results are weeks 0 to 3.
+-- The page leaves out days after October 31, 2026 (the November loads replay October). Run 6.1 to get the dates for another launch.
+-- Run one query at a time (select it, then run). Every query only reads data.
+-- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
+-- Names must match exactly, including capitals. See README.md in this folder.
+
+-- ====================================================================================================
+-- 6.1  Launches and the dates to paste into the other queries
+-- On the page: the launch picker
+-- Expected with the values below (checked Nov 24, 2026): 16 launches; AI Chat Assistant: baseline Aug 3 - Sep 13, after Sep 28 - Oct 25, 2026
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    DATE '2024-01-01'              AS start_date,              -- launched on or after
+    DATE '2026-10-31'              AS end_date                 -- launched on or before
+)
+SELECT l.launch_name, l.launch_type, l.expected_contact_impact, l.launch_date,
+       l.launch_date - 56 AS baseline_start, l.launch_date - 15 AS baseline_end, l.launch_date AS after_start, l.launch_date + 27 AS after_end,
+       (SELECT string_agg(r.reason, ', ' ORDER BY r.reason) FROM cc.launch_reason_impact i JOIN cc.dim_contact_reason r USING (reason_id) WHERE i.launch_id = l.launch_id) AS affected_reasons
+FROM cc.product_launch l CROSS JOIN settings s
+WHERE l.launch_date BETWEEN s.start_date AND s.end_date
+ORDER BY l.launch_date DESC;
+
+
+-- ====================================================================================================
+-- 6.2  Weekly contacts against expected
+-- On the page: the weekly chart and the "Contacts against expected" tile
+-- Expected with the values below (checked Nov 24, 2026): extra_so_far in week 3 is 3,086 (23.6%); highest week is 1, +35.7%
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    'AI Chat Assistant (In-App)'::text AS launch_name,         -- exact name; query 6.1 lists them
+    DATE '2026-08-03'              AS baseline_start,          -- weeks -8 to -3: 56 days before launch ...
+    DATE '2026-09-13'              AS baseline_end,            -- ... to 15 days before launch
+    DATE '2026-08-03'              AS start_date,              -- first week to list
+    DATE '2026-10-25'              AS end_date                 -- last day to list (keep it at or before 2026-10-31)
+),
+l AS (SELECT pl.* FROM cc.product_launch pl JOIN settings s ON s.launch_name = pl.launch_name),
+affected AS (   -- reasons the launch was expected to affect
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN l USING (launch_id)
+),
+touched AS (    -- reasons affected by this launch or any launch near its window
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN cc.product_launch o USING (launch_id) CROSS JOIN l
+  WHERE o.launch_date BETWEEN l.launch_date - 70 AND l.launch_date + 91
+),
+wk AS (
+  SELECT floor((d.full_date - l.launch_date) / 7.0)::int AS week, min(d.full_date) AS week_start,
+         count(*) FILTER (WHERE c.reason_id IN (SELECT reason_id FROM affected)) AS actual,
+         count(*) FILTER (WHERE c.reason_id NOT IN (SELECT reason_id FROM touched)) AS other_reasons
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key CROSS JOIN settings s CROSS JOIN l
+  WHERE d.full_date BETWEEN s.start_date AND s.end_date
+  GROUP BY 1
+),
+base AS (   -- the average baseline week
+  SELECT count(*) FILTER (WHERE c.reason_id IN (SELECT reason_id FROM affected)) * 7.0 / (max(s.baseline_end) - max(s.baseline_start) + 1) AS actual,
+         count(*) FILTER (WHERE c.reason_id NOT IN (SELECT reason_id FROM touched)) * 7.0 / (max(s.baseline_end) - max(s.baseline_start) + 1) AS other_reasons
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key CROSS JOIN settings s
+  WHERE d.full_date BETWEEN s.baseline_start AND s.baseline_end
+),
+x AS (SELECT wk.*, base.actual * wk.other_reasons / nullif(base.other_reasons, 0) AS expected FROM wk CROSS JOIN base)
+SELECT week, week_start, actual, round(expected, 0) AS expected, round(100.0 * (actual / nullif(expected, 0) - 1), 1) AS against_expected_pct,
+       CASE WHEN week >= 0 THEN round(sum(actual - expected) FILTER (WHERE week >= 0) OVER (ORDER BY week), 0) END AS extra_so_far,
+       CASE WHEN week >= 0 THEN round(100.0 * sum(actual - expected) FILTER (WHERE week >= 0) OVER (ORDER BY week)
+            / nullif(sum(expected) FILTER (WHERE week >= 0) OVER (ORDER BY week), 0), 1) END AS extra_so_far_pct
+FROM x
+ORDER BY week;
+
+
+-- ====================================================================================================
+-- 6.3  Rates after the launch against the baseline
+-- On the page: the AHT, FCR, CSAT, repeat and service level tiles
+-- Expected with the values below (checked Nov 24, 2026): affected: AHT 544 s (9m 04s) from 535 s, FCR 72.6 from 74.2, CSAT 79.0 from 80.3, repeat 19.8 from 18.0, service level 85.7 from 84.8
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    'AI Chat Assistant (In-App)'::text AS launch_name,         -- exact name; query 6.1 lists them
+    DATE '2026-08-03'              AS baseline_start,          -- weeks -8 to -3: 56 days before launch ...
+    DATE '2026-09-13'              AS baseline_end,            -- ... to 15 days before launch
+    DATE '2026-09-28'              AS after_start,             -- weeks 0 to 3: launch day ...
+    DATE '2026-10-25'              AS after_end,               -- ... to 27 days after launch
+    'All'::text                    AS reason                   -- or one affected reason, e.g. Mobile App Error
+),
+l AS (SELECT pl.* FROM cc.product_launch pl JOIN settings s ON s.launch_name = pl.launch_name),
+affected AS (   -- reasons the launch was expected to affect
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN l USING (launch_id)
+),
+touched AS (    -- reasons affected by this launch or any launch near its window
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN cc.product_launch o USING (launch_id) CROSS JOIN l
+  WHERE o.launch_date BETWEEN l.launch_date - 70 AND l.launch_date + 91
+),
+x AS (
+  SELECT CASE WHEN c.reason_id IN (SELECT reason_id FROM affected) THEN 'Affected reasons' ELSE 'Other reasons' END AS reasons,
+         CASE WHEN d.full_date BETWEEN s.after_start AND s.after_end THEN 'After' ELSE 'Baseline' END AS period, c.*, v.survey_id, v.csat
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key JOIN cc.dim_contact_reason r ON r.reason_id = c.reason_id
+  LEFT JOIN cc.survey_response v ON v.contact_id = c.contact_id CROSS JOIN settings s
+  WHERE (d.full_date BETWEEN s.baseline_start AND s.baseline_end OR d.full_date BETWEEN s.after_start AND s.after_end)
+    AND (c.reason_id IN (SELECT reason_id FROM affected) OR c.reason_id NOT IN (SELECT reason_id FROM touched))
+    AND (s.reason = 'All' OR r.reason = ANY (string_to_array(s.reason, ' | ')))
+)
+SELECT reasons, period, count(*) AS contacts, round(sum(handle_sec) FILTER (WHERE answered)::numeric / nullif(count(*) FILTER (WHERE answered), 0), 0) AS aht_sec,
+       round(100.0 * count(*) FILTER (WHERE answered AND first_contact_resolved) / nullif(count(*) FILTER (WHERE answered), 0), 1) AS fcr_pct,
+       round(100.0 * count(*) FILTER (WHERE csat >= 4) / nullif(count(survey_id), 0), 1) AS csat_pct, count(survey_id) AS surveys,
+       round(100.0 * count(*) FILTER (WHERE customer_id IS NOT NULL AND repeat_within_7d) / nullif(count(customer_id), 0), 1) AS repeat_pct,
+       round(100.0 * count(*) FILTER (WHERE met_service_level) / nullif(count(*) FILTER (WHERE answered OR (abandoned AND NOT short_abandon)), 0), 1) AS service_level_pct
+FROM x
+GROUP BY 1, 2
+ORDER BY 1, 2 DESC;
+
+
+-- ====================================================================================================
+-- 6.4  Contact reasons the launch was expected to affect
+-- On the page: the contact reasons table
+-- Expected with the values below (checked Nov 24, 2026): Mobile App Error: expected 1,824 a week, actual 2,266, extra 1,768, +24.2%
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    'AI Chat Assistant (In-App)'::text AS launch_name,         -- exact name; query 6.1 lists them
+    DATE '2026-08-03'              AS baseline_start,          -- weeks -8 to -3: 56 days before launch ...
+    DATE '2026-09-13'              AS baseline_end,            -- ... to 15 days before launch
+    DATE '2026-09-28'              AS after_start,             -- weeks 0 to 3: launch day ...
+    DATE '2026-10-25'              AS after_end                -- ... to 27 days after launch
+),
+l AS (SELECT pl.* FROM cc.product_launch pl JOIN settings s ON s.launch_name = pl.launch_name),
+affected AS (   -- reasons the launch was expected to affect
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN l USING (launch_id)
+),
+touched AS (    -- reasons affected by this launch or any launch near its window
+  SELECT i.reason_id FROM cc.launch_reason_impact i JOIN cc.product_launch o USING (launch_id) CROSS JOIN l
+  WHERE o.launch_date BETWEEN l.launch_date - 70 AND l.launch_date + 91
+),
+n AS (
+  SELECT c.reason_id, count(*) FILTER (WHERE d.full_date BETWEEN s.baseline_start AND s.baseline_end) * 7.0 / (max(s.baseline_end) - max(s.baseline_start) + 1) AS base_week,
+         count(*) FILTER (WHERE d.full_date BETWEEN s.after_start AND s.after_end) * 7.0 / (max(s.after_end) - max(s.after_start) + 1) AS after_week,
+         (max(s.after_end) - max(s.after_start) + 1) / 7.0 AS weeks
+  FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key CROSS JOIN settings s
+  WHERE d.full_date BETWEEN s.baseline_start AND s.after_end GROUP BY 1
+),
+factor AS (SELECT sum(after_week) / nullif(sum(base_week), 0) AS f FROM n WHERE reason_id NOT IN (SELECT reason_id FROM touched))
+SELECT r.reason, round(base_week * f, 0) AS expected_a_week, round(after_week, 0) AS actual_a_week,
+       round((after_week - base_week * f) * weeks, 0) AS extra_contacts, round(100.0 * (after_week / nullif(base_week * f, 0) - 1), 1) AS against_expected_pct
+FROM n JOIN affected USING (reason_id) JOIN cc.dim_contact_reason r USING (reason_id) CROSS JOIN factor
+ORDER BY extra_contacts DESC;
+
+
+-- ====================================================================================================
+-- 6.5  Contacts and complaints recorded as caused by the launch
+-- On the page: the persona, channel and complaints tables
+-- Expected with the values below (checked Nov 24, 2026): 2,747 contacts and 15 complaints in total; Digital Native Starter 994 (36.2%), Chat 1,635 (59.5%)
+-- ====================================================================================================
+WITH settings AS (
+  SELECT   -- <<< CHANGE THESE VALUES >>>
+    'AI Chat Assistant (In-App)'::text AS launch_name,         -- exact name; query 6.1 lists them
+    DATE '2026-09-28'              AS start_date,              -- launch day
+    DATE '2026-10-25'              AS end_date,                -- 27 days later
+    'Persona'::text                AS break_down_by            -- Persona or Channel
+),
+l AS (SELECT pl.* FROM cc.product_launch pl JOIN settings s ON s.launch_name = pl.launch_name),
+comp AS (
+  SELECT count(*) AS n, count(*) FILTER (WHERE cp.severity = 'High') AS high
+  FROM cc.complaint cp JOIN cc.dim_date d ON d.date_key = cp.date_key JOIN l ON l.launch_id = cp.launch_id CROSS JOIN settings s WHERE d.full_date BETWEEN s.start_date AND s.end_date
+)
+SELECT CASE s.break_down_by WHEN 'Channel' THEN ch.channel_name ELSE coalesce(p.persona_name, 'Not identified') END AS grp, count(*) AS contacts,
+       round(100.0 * count(*) / sum(count(*)) OVER (), 1) AS share_pct, sum(count(*)) OVER () AS all_contacts,
+       max(comp.n) AS all_complaints, max(comp.high) AS high_severity_complaints
+FROM cc.contact c JOIN cc.dim_date d ON d.date_key = c.date_key JOIN l ON l.launch_id = c.launch_id JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id
+LEFT JOIN cc.customer cu ON cu.customer_id = c.customer_id LEFT JOIN cc.dim_persona p ON p.persona_id = cu.persona_id CROSS JOIN settings s CROSS JOIN comp
+WHERE d.full_date BETWEEN s.start_date AND s.end_date
+GROUP BY 1
+ORDER BY 2 DESC;
