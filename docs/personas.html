@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/personas.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -105,7 +105,7 @@
     <div class="tiles" id="tiles"></div>
     <p class="note">Identified customers only. Digital enrollment and persona are today's, in every quarter. Closed customer relationships aren't recorded, so the number of customers can only grow.</p>
     <section class="card" aria-labelledby="t-grp">
-      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"><option value="p">Persona</option><option value="s">Segment</option><option value="a">Age band</option><option value="d">Digital enrollment</option></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"><option value="p">Persona</option><option value="s">Segment</option><option value="a">Age band</option><option value="d">Digital enrollment</option></select></label><label class="filter sortby"><span>Sort by</span><select id="f-sg"></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-grp"></div><p class="note" id="n-grp"></p>
     </section>
     <section class="card" aria-labelledby="t-tr">
@@ -117,7 +117,7 @@
       <div class="chart" id="c-ch"></div><div class="legend" id="lg-ch"></div><div class="tbl" id="tbl-ch" tabindex="0" role="region" aria-label="Channel mix" hidden></div><p class="note" id="n-ch"></p>
     </section>
     <section class="card wide-only" aria-labelledby="t-rea">
-      <div class="head"><div><h2 id="t-rea"></h2><div class="sub" id="s-rea"></div></div><div class="tools"><button class="btn" id="csv-rea" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-rea"></h2><div class="sub" id="s-rea"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-sr"></select></label><button class="btn" id="csv-rea" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-rea"></div><p class="note" id="n-rea"></p>
     </section>
     <section class="card wide-only" aria-labelledby="t-hv">
@@ -131,7 +131,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), P = Personas, M = P.METRICS;
   Site.renderChrome('personas');
-  const DEF = { q: '', cmp: 'prior', p: '', s: '', a: '', d: '', metric: 'csat', dim: 'p' }, S = { ...DEF }, files = {}; let IDX, K, CELL, req = 0, cur = {}, NOW, WAS; const tbl = { tr: false, ch: false };
+  const DEF = { q: '', cmp: 'prior', p: '', s: '', a: '', d: '', metric: 'csat', dim: 'p', sg: '', sr: '' }, S = { ...DEF }, files = {}; let IDX, K, CELL, req = 0, cur = {}, NOW, WAS; const tbl = { tr: false, ch: false };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/personas/${m}.json.gz`);
   const shift = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); }, qOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${y}-${String(Math.floor((mo - 1) / 3) * 3 + 1).padStart(2, '0')}`; }, qName = (q) => `Q${(+q.slice(5) + 2) / 3} ${q.slice(0, 4)}`, qMonths = (q) => [0, 1, 2].map((i) => shift(q, i));
@@ -143,8 +143,8 @@
     IDX.rch = new Map(); for (const r of i.reach) (IDX.rch.get(r[0]) || (IDX.rch.set(r[0], []), IDX.rch.get(r[0]))).push(r);
     DEF.q = S.q = i.quarters[i.quarters.length - 1]; $('f-q').innerHTML = [...i.quarters].reverse().map((q) => `<option value="${q}">${qName(q)}</option>`).join('');
     const opt = (id, rows) => { $(id).innerHTML = '<option value="">All</option>' + rows.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); }; opt('f-p', i.personas.map((x) => [x.id, x.name])); opt('f-s', Object.entries(i.names.s)); opt('f-a', Object.entries(i.names.a));
-    const p = new URLSearchParams(location.search); for (const key of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) { const v = p.get(key); if (v && [...$('f-' + key).options].some((o) => o.value === v)) S[key] = v; } if (M.includes(p.get('metric'))) S.metric = p.get('metric');
-    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer & persona insights v1.0`;
+    const p = new URLSearchParams(location.search); for (const key of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) { const v = p.get(key); if (v && [...$('f-' + key).options].some((o) => o.value === v)) S[key] = v; } if (M.includes(p.get('metric'))) S.metric = p.get('metric'); for (const k of ['sg', 'sr']) S[k] = p.get(k) || '';
+    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer & persona insights v1.1`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer data could not be loaded. ' + e.message; }
@@ -192,11 +192,13 @@
   const groups = () => [...NOW.dim].sort((a, b) => a[0] - b[0]), poolOf = (map) => { const all = {}; for (const t of map.values()) P.add(all, t); return all; };
   function renderGroups() {
     const D = DIM[S.dim], all = poolOf(NOW.dim), m = S.metric; cur.pool = all;
-    $('t-grp').textContent = `Each group against the rest, by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${qName(S.q)} · the second line is the difference from all customers shown · ◆ less favorable and ▲ more favorable than the rest, beyond chance · click a name to filter`;
+    $('t-grp').textContent = `Each group against the rest, by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${qName(S.q)} · the second line is the difference from all customers shown · ◆ less favorable and ▲ more favorable than the rest, beyond chance · click a name to filter`; const sub = $('s-grp').textContent;
     const cell = (k, t) => { const lo = low(k, t), v = P.value(k, t), rest = P.minus(all, t), real = !lo && P.beyond(k, t, rest), ch = fmt.change(v, P.value(k, all), F(k)), q = real ? changeQuality(K[k], v, P.value(k, all), ch) : 'neutral'; return `<td class="${lo ? 'low' : ''}${k === m ? ' on' : ''}">${q === 'worse' ? '<span class="w" aria-hidden="true">◆ </span>' : q === 'better' ? '<span class="b" aria-hidden="true">▲ </span>' : ''}${V(k, v)}<div class="${q === 'worse' ? 'w' : 'muted'}">${lo ? 'too few' : dt(k, v, P.value(k, all))}${q === 'worse' || q === 'better' ? `<span class="sr-only"> ${q === 'worse' ? 'less' : 'more'} favorable than the rest</span>` : ''}</div></td>`; };
     const byAll = totals(NOW.datas, (c, ch, r) => `${ch}|${r}`, S.dim), byG = new Map();
     for (const [k, t] of totals(NOW.datas, (c, ch, r) => `${c[S.dim]}~${ch}|${r}`, S.dim)) { const [g, rest] = k.split('~'); (byG.get(+g) || (byG.set(+g, new Map()), byG.get(+g))).set(rest, t); }
     const hasMix = P.M[m].mix; cur.grp = groups().map(([id, t]) => ({ id, name: D.label(id), t, mix: hasMix && !low(m, t) ? P.mixGap(m, byG.get(id) || new Map(), byAll, all) : null }));
+    const top = (k, word) => [`${K[k].short}, ${word} first`, (r) => (word === 'lowest' ? -1 : 1) * P.value(k, r.t), (r) => low(k, r.t)];
+    cur.grpBy = Site.sortList($('f-sg'), S.sg, { ...(S.dim === 'a' ? { o: ['Age, youngest first', (r) => -r.id] } : {}), n: ['Customers, most first', (r) => r.t.cust || 0], rate: top('rate', 'highest'), csat: top('csat', 'lowest'), repeat: top('repeat', 'highest'), complaints: top('complaints', 'highest') }, cur.grp); $('s-grp').textContent = sub.replace(' · click', ` · ${cur.grpBy} · click`);
     $('tbl-grp').innerHTML = `<table><thead><tr><th scope="col">${D.name}</th><th scope="col">Customers</th>${M.map((k) => `<th scope="col">${esc(K[k].short)}</th>`).join('')}${hasMix ? `<th scope="col">${esc(K[m].short)} gap: from what they ask</th><th scope="col">The rest of the gap</th>` : ''}</tr></thead><tbody>${cur.grp.map(({ id, name, t, mix }) => { const on = S[S.dim] === String(id), gap = fmt.displayed(P.value(m, t), F(m)) - fmt.displayed(P.value(m, all), F(m)), part = mix == null ? null : fmt.displayed(mix, F(m)); return `<tr class="${S[S.dim] !== '' ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="grp|${id}" data-v="${id}" aria-pressed="${on}">${esc(name)}</button></td><td>${fmt.count(t.cust || 0)}</td>${M.map((k) => cell(k, t)).join('')}${hasMix ? (mix == null ? '<td>–</td><td>–</td>' : `<td>${gapTxt(m, part)}</td><td>${gapTxt(m, gap - part)}</td>`) : ''}</tr>`; }).join('')}<tr><td><b>All shown</b></td><td>${fmt.count(all.cust || 0)}</td>${M.map((k) => `<td><b>${V(k, P.value(k, all))}</b></td>`).join('')}${hasMix ? '<td></td><td></td>' : ''}</tr></tbody></table>`;
     $('n-grp').textContent = hasMix ? `From what they ask is the gap you would expect from the group's channels and contact reasons alone, at everyone's results. The rest is how those same contacts turned out for this group. The two add up to the gap.` : 'Contact rate, reach, digital share and complaints have no mix split. Select a tile such as customer satisfaction to see one.';
   }
@@ -247,8 +249,9 @@
     const save = { p: S.p, s: S.s, a: S.a, d: S.d }; let base = everyone; if (filt) { Object.assign(S, { p: '', s: '', a: '', d: '' }); base = totals(NOW.datas, (c, ch, r) => r || null); Object.assign(S, save); }
     const sum = (mp) => { const t = {}; for (const v of mp.values()) P.add(t, v); return t; }, a = sum(everyone), b = sum(base);
     const custA = NOW.all.cm || 0, custB = [...IDX.cust.get(S.q).values()].reduce((x, y) => x + y, 0) * 3;
-    const rows = [...everyone].filter(([, t]) => t.o > 0).map(([id, t]) => { const o = base.get(id); return { id, name: (IDX.reasons.find((x) => x[0] === id) || [0, 'Other'])[1], t, share: t.o / a.o * 100, base: o.o / b.o * 100, rate: custA ? t.o / custA * 100 : 0, bRate: custB ? o.o / custB * 100 : 0, o }; }); cur.rea = rows.sort((x, y) => (filt ? Math.abs(y.rate - y.bRate) - Math.abs(x.rate - x.bRate) : y.t.o - x.t.o));
-    $('t-rea').textContent = filt ? `What ${S.p && cur.chips.length === 1 ? DIM.p.label(S.p) + ' customers' : 'the selected customers'} contact about` : 'What customers contact about'; $('s-rea').textContent = `${qName(S.q)} · ${filt ? 'reasons whose contact rate differs most from all customers first' : 'most contacts first; filter to a group to compare it with all customers'}`;
+    const rows = [...everyone].filter(([, t]) => t.o > 0).map(([id, t]) => { const o = base.get(id); return { id, name: (IDX.reasons.find((x) => x[0] === id) || [0, 'Other'])[1], t, share: t.o / a.o * 100, base: o.o / b.o * 100, rate: custA ? t.o / custA * 100 : 0, bRate: custB ? o.o / custB * 100 : 0, o }; }); cur.rea = rows;
+    const few = (r) => r.t.o < 50 || !r.bRate; cur.reaBy = Site.sortList($('f-sr'), S.sr, { n: ['Contacts, most first', (r) => r.t.o], ...(filt ? { diff: ['Difference from all customers, largest first', (r) => Math.abs(r.rate - r.bRate), few], times: ['Times the usual rate, highest first', (r) => r.rate / r.bRate, few] } : {}), csat: ['CSAT, lowest first', (r) => -P.value('csat', r.t), (r) => low('csat', r.t)], fcr: ['FCR, lowest first', (r) => -P.value('fcr', r.t), (r) => low('fcr', r.t)] }, rows);
+    $('t-rea').textContent = filt ? `What ${S.p && cur.chips.length === 1 ? DIM.p.label(S.p) + ' customers' : 'the selected customers'} contact about` : 'What customers contact about'; $('s-rea').textContent = `${qName(S.q)} · ${cur.reaBy}${filt ? '' : ' · filter to a group to compare it with all customers'}`;
     const c = (m, t, o) => { const lo = low(m, t); return `<td class="${lo ? 'low' : ''}">${V(m, P.value(m, t))}${filt ? `<div class="muted">${lo ? 'too few' : dt(m, P.value(m, t), P.value(m, o))}</div>` : lo ? '<div class="muted">too few</div>' : ''}</td>`; };
     $('tbl-rea').innerHTML = `<table><thead><tr><th scope="col">Contact reason</th><th scope="col">Contacts</th><th scope="col">Share</th>${filt ? '<th scope="col">All customers</th>' : ''}<th scope="col">Per 100 customers a month</th>${filt ? '<th scope="col">Times the usual rate</th>' : ''}<th scope="col">CSAT</th><th scope="col">FCR</th></tr></thead><tbody>${cur.rea.slice(0, 15).map((r) => `<tr><td>${esc(r.name)}</td><td>${fmt.count(r.t.o)}</td><td>${r.share.toFixed(1)}%</td>${filt ? `<td>${r.base.toFixed(1)}%</td>` : ''}<td>${r.rate.toFixed(2)}</td>${filt ? `<td><b>${r.t.o < 50 || !r.bRate ? '–' : (r.rate / r.bRate).toFixed(2) + '×'}</b></td>` : ''}${c('csat', r.t, r.o)}${c('fcr', r.t, r.o)}</tr>`).join('')}</tbody></table>`;
     $('n-rea').textContent = `${rows.length > 15 ? `First 15 of ${rows.length} reasons; the CSV has them all. ` : ''}${filt ? 'The second line is the difference from all customers for the same reason.' : ''}`;
@@ -264,14 +267,15 @@
   for (const k of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; go(); });
   $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { S[b.dataset.q] = ''; go(); } });
   $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { S[S.dim] = S[S.dim] === b.dataset.v ? '' : b.dataset.v; go(); } });
+  for (const [k, draw] of [['sg', () => renderGroups()], ['sr', () => renderReasons()]]) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.selectedIndex ? e.target.value : ''; writeUrl(); draw(); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); tbl.tr = tbl.ch = false; go(); }); $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
   $('tb-tr').addEventListener('click', () => { tbl.tr = !tbl.tr; renderTrend(); }); $('tb-ch').addEventListener('click', () => { tbl.ch = !tbl.ch; renderChannels(); });
   const csv = (n, w, h, r) => Site.downloadCsv(`personas_${n}`, IDX.data_through, `Customer and persona insights · ${w} · ${qName(S.q)} · filters: ${cur.chips.map((c) => c[1]).join('; ') || 'none'} · data through ${IDX.data_through}`, h, r);
-  $('csv-grp').addEventListener('click', () => csv('groups', 'by ' + DIM[S.dim].name, ['group', 'customers', ...M.flatMap((m) => [m, m + '_n']), S.metric + '_gap_from_mix'], cur.grp.map((r) => [r.name, r.t.cust, ...M.flatMap((m) => [P.value(m, r.t), P.n(m, r.t)]), r.mix])));
+  $('csv-grp').addEventListener('click', () => csv('groups', 'by ' + DIM[S.dim].name + ', ' + cur.grpBy, ['group', 'customers', ...M.flatMap((m) => [m, m + '_n']), S.metric + '_gap_from_mix'], cur.grp.map((r) => [r.name, r.t.cust, ...M.flatMap((m) => [P.value(m, r.t), P.n(m, r.t)]), r.mix])));
   $('csv-tr').addEventListener('click', () => csv('trend', K[cur.trend.m].name + ' by month', ['month', ...cur.trend.rows.map((r) => r.name), 'all_shown'], cur.tm.map((mm, i) => [mm, ...cur.trend.rows.map((r) => r.pts[i].v), cur.trend.all[i]]).reverse()));
   $('csv-ch').addEventListener('click', () => csv('channels', 'channel mix', ['group', ...ORDER.map((c) => IDX.channels.find((x) => x[0] === c)[1])], cur.ch.map((r) => [r.name, ...r.o])));
-  $('csv-rea').addEventListener('click', () => csv('reasons', 'contact reasons', ['reason', 'contacts', 'share_pct', 'all_customers_share_pct', 'per_100_customers_a_month', 'all_customers_per_100', 'csat', 'fcr'], cur.rea.map((r) => [r.name, r.t.o, r.share, r.base, r.rate, r.bRate, P.value('csat', r.t), P.value('fcr', r.t)])));
+  $('csv-rea').addEventListener('click', () => csv('reasons', 'contact reasons, ' + cur.reaBy, ['reason', 'contacts', 'share_pct', 'all_customers_share_pct', 'per_100_customers_a_month', 'all_customers_per_100', 'csat', 'fcr'], cur.rea.map((r) => [r.name, r.t.o, r.share, r.base, r.rate, r.bRate, P.value('csat', r.t), P.value('fcr', r.t)])));
   $('csv-hv').addEventListener('click', () => csv('how-often', 'customers by number of contacts', ['group', 'customers', 'one', 'two_three', 'four_or_more', 'contacts', 'contacts_from_four_or_more'], cur.hv.map((r) => [r.name, r.t.cust, r.t.c1, r.t.c2, r.t.c4, r.t.k, r.t.k4])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (NOW) { renderTrend(); renderChannels(); } }, 150); });
 })();

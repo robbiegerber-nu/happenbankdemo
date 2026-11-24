@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/launch.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -104,7 +104,7 @@
       <div class="chart" id="c-plan"></div>
     </section>
     <section class="card wide-only" aria-labelledby="t-all">
-      <div class="head"><div><h2 id="t-all">All launches</h2><div class="sub">Newest first · click a name to open it</div></div><div class="tools"><button class="btn" id="csv-all" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-all">All launches</h2><div class="sub" id="s-all"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-sort"></select></label><button class="btn" id="csv-all" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-all"></div><p class="note">Bold changes are beyond chance (3 standard errors). A change can come from another launch in the same weeks; open the launch to see overlaps.</p>
     </section>
   </div>
@@ -125,11 +125,11 @@
     const all = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); for (const m of ['aht', 'fcr', 'csat', 'repeat']) K[m] = all[m];
     IDX = i; LA = i.launches; EV = e.events; IDX.rowsBy = new Map();
     for (const r of i.rows) { const o = Object.fromEntries(i.keys.map((c, j) => [c, r[j]])); (IDX.rowsBy.get(o.l) || (IDX.rowsBy.set(o.l, []), IDX.rowsBy.get(o.l))).push(o); }
-    DEF = { l: LA[LA.length - 1].id, metric: 'volume' }; S = { ...DEF };
+    DEF = { l: LA[LA.length - 1].id, metric: 'volume', sort: '' }; S = { ...DEF };
     $('f-l').innerHTML = [...LA].reverse().map((x) => `<option value="${x.id}">${esc(x.name)} (${fmt.date(x.date)})</option>`).join('');
-    const p = new URLSearchParams(location.search); if (LA.some((x) => String(x.id) === p.get('l'))) S.l = +p.get('l'); if (L.METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    const p = new URLSearchParams(location.search); if (LA.some((x) => String(x.id) === p.get('l'))) S.l = +p.get('l'); if (L.METRICS.includes(p.get('metric'))) S.metric = p.get('metric'); S.sort = p.get('sort') || '';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)}; launches use data to ${fmt.date(i.used_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Product launch impact v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)}; launches use data to ${fmt.date(i.used_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Product launch impact v1.1`;
     update();
   }).catch((e) => { $('loading').hidden = false; $('loading').textContent = 'The launch data could not be loaded. ' + e.message; });
 
@@ -149,7 +149,7 @@
   function update() {
     const W = win(LA.find((x) => x.id === S.l)); cur.W = W;
     $('loading').hidden = true; $('content').hidden = false; $('f-l').value = S.l;
-    const p = new URLSearchParams(); if (S.l !== DEF.l) p.set('l', S.l); if (S.metric !== DEF.metric) p.set('metric', S.metric); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+    const p = new URLSearchParams(); if (S.l !== DEF.l) p.set('l', S.l); if (S.metric !== DEF.metric) p.set('metric', S.metric); if (S.sort) p.set('sort', S.sort); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
     const l = W.l, last = W.sum ? W.sum.last : 0;
     $('s-page').textContent = `${l.name} · launched ${fmt.date(l.date)} · 8 weeks before to ${last + 1} ${last ? 'weeks' : 'week'} after`;
     renderSummary(W); renderTiles(W); renderSeries(W); renderReasons(W); renderWho(W); renderPlan(); renderAll();
@@ -250,20 +250,22 @@
     arrows(s);
   }
   function renderAll() {
-    const rows = [...LA].reverse().map(win); cur.all = rows;
+    const rows = [...LA].reverse().map(win), none = (o) => !o.sum, by = (m, d) => [(o) => d * o.change[m].d, (o) => none(o) || !o.change[m] || o.change[m].n < K[m].minN]; cur.all = rows;
+    cur.allBy = Site.sortList($('f-sort'), S.sort, { d: ['Launch date, newest first', (o) => ts(o.l.date)], peak: ['Peak, highest first', (o) => o.sum.peak, none], extra: ['Extra contacts, most first', (o) => o.sum.extra4, none], aht: ['AHT, largest rise first', ...by('aht', 1)], fcr: ['FCR, largest drop first', ...by('fcr', -1)], csat: ['CSAT, largest drop first', ...by('csat', -1)], comp: ['Complaints, most first', (o) => o.comp, none] }, rows); $('s-all').textContent = `${cur.allBy.charAt(0).toUpperCase() + cur.allBy.slice(1)} · click a name to open it`;
     const c = (m, o) => { const q = o.change[m]; if (!q) return '<td>–</td>'; const few = q.n < K[m].minN; return `<td class="${few ? 'low' : ''}">${few ? 'too few' : q.sure ? `<b>${dt(m, q.v, q.e)}</b>` : dt(m, q.v, q.e)}</td>`; };
     $('tbl-all').innerHTML = `<table><thead><tr><th scope="col">Launch</th><th scope="col">Type</th><th scope="col">Planned</th><th scope="col">Peak</th><th scope="col">Extra, weeks 0–3</th><th scope="col">Back to normal</th><th scope="col">AHT</th><th scope="col">FCR</th><th scope="col">CSAT</th><th scope="col">Complaints</th></tr></thead><tbody>${rows.map((o) => { const q = o.sum, on = o.l.id === S.l; return `<tr class="${on ? 'sel' : ''}"><td><button type="button" class="name" data-k="all|${o.l.id}" data-l="${o.l.id}" aria-pressed="${on}">${esc(o.l.name)}</button><div class="muted">${fmt.date(o.l.date)}</div></td><td>${o.l.type}</td><td>${o.l.planned}</td>${q ? `<td>${sg(q.peak, 1)}%<div class="muted">week ${q.peakW}</div></td><td>${sg(q.extra4)}</td><td>${!q.any ? 'never left it' : q.back != null ? 'week ' + q.back : q.last >= 12 ? 'not in 12 weeks' : 'not yet, ' + (q.last + 1) + ' weeks'}</td>${c('aht', o)}${c('fcr', o)}${c('csat', o)}<td>${fmt.count(o.comp)}</td>` : '<td colspan="7">no full week yet</td>'}</tr>`; }).join('')}</tbody></table>`;
   }
   // ---------- Events ----------
   $('f-l').addEventListener('change', (e) => { S.l = +e.target.value; go(); });
   $('tbl-all').addEventListener('click', (e) => { const b = e.target.closest('[data-l]'); if (b) { S.l = +b.dataset.l; go(); } });
+  $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; go(); });
   $('f-reset').addEventListener('click', () => { S = { ...DEF }; table = false; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget)); $('tb-ser').addEventListener('click', () => { table = !table; renderSeries(cur.W); });
   const csv = (n, w, h, r) => Site.downloadCsv(`launch_${n}`, IDX.data_through, `Product launch impact · ${w} · uses data to ${IDX.used_through}`, h, r);
   $('csv-ser').addEventListener('click', () => csv('by-week', `${cur.W.l.name} · ${K[S.metric].name}`, ['week', 'from', S.metric, 'expected', 'range_low', 'range_high', 'other_reasons', 'n'], cur.ser.map((p) => [p.w, wDate(cur.W.l, p.w), p.v, p.e, p.lo, p.hi, p.other, p.n])));
   $('csv-rea').addEventListener('click', () => csv('reasons', cur.W.l.name + ' · reasons', ['reason', 'expected_a_week', 'actual_a_week', 'extra_contacts', 'aht', 'aht_baseline', 'fcr', 'fcr_baseline', 'csat', 'csat_baseline'], cur.rea.map((r) => [rName(r.id), r.e, r.v, r.x, ...['aht', 'fcr', 'csat'].flatMap((m) => [L.rate(m, r.p), L.rate(m, r.b)])])));
   $('csv-who').addEventListener('click', () => csv('who', cur.W.l.name + ' · personas and channels', ['group', 'name', 'contacts', 'share_pct', 'usual_share_pct'], [...cur.who.per.rows.map((r) => ['persona', (IDX.personas.find((x) => x[0] === r.id) || [0, 'Not identified'])[1], r.n, r.p, r.u]), ...cur.who.cha.rows.map((r) => ['channel', IDX.channels.find((x) => x[0] === r.id)[1], r.n, r.p, r.u])]));
-  $('csv-all').addEventListener('click', () => csv('all', 'all launches', ['launch', 'date', 'type', 'planned', 'peak_pct', 'peak_week', 'extra_weeks_0_3', 'back_week', 'aht_change', 'fcr_change', 'csat_change', 'complaints'], cur.all.map((o) => [o.l.name, o.l.date, o.l.type, o.l.planned, ...(o.sum ? [o.sum.peak, o.sum.peakW, o.sum.extra4, o.sum.back] : ['', '', '', '']), ...['aht', 'fcr', 'csat'].map((m) => o.change[m] && o.change[m].d), o.comp])));
+  $('csv-all').addEventListener('click', () => csv('all', 'all launches, ' + cur.allBy, ['launch', 'date', 'type', 'planned', 'peak_pct', 'peak_week', 'extra_weeks_0_3', 'back_week', 'aht_change', 'fcr_change', 'csat_change', 'complaints'], cur.all.map((o) => [o.l.name, o.l.date, o.l.type, o.l.planned, ...(o.sum ? [o.sum.peak, o.sum.peakW, o.sum.extra4, o.sum.back] : ['', '', '', '']), ...['aht', 'fcr', 'csat'].map((m) => o.change[m] && o.change[m].d), o.comp])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (cur.W) { renderSeries(cur.W); renderPlan(); } }, 150); });
 })();
 </script>

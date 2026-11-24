@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -107,7 +107,7 @@
       <div class="chart" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
     </section>
     <section class="card" aria-labelledby="t-grp">
-      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-grp"></h2><div class="sub" id="s-grp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-dim"></select></label><label class="filter sortby"><span>Sort by</span><select id="f-sg"></select></label><button class="btn" id="csv-grp" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-grp"></div><p class="note" id="n-grp"></p>
     </section>
     <section class="card" aria-labelledby="t-mom">
@@ -120,11 +120,11 @@
       <h3 class="mini-h" id="t-dc"></h3><div class="tbl" id="tbl-dc" tabindex="0" role="region" aria-labelledby="t-dc"></div>
     </section>
     <section class="card" aria-labelledby="t-th">
-      <div class="head"><div><h2 id="t-th">What customers said</h2><div class="sub" id="s-th"></div></div><div class="tools"><button class="btn" id="csv-th" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-th">What customers said</h2><div class="sub" id="s-th"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-st"></select></label><button class="btn" id="csv-th" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-th"></div>
     </section>
     <section class="card" aria-labelledby="t-cp">
-      <div class="head"><div><h2 id="t-cp"></h2><div class="sub" id="s-cp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-cdim"><option value="cat">Category</option><option value="cause">Root cause</option><option value="sev">Severity</option><option value="via">Received through</option></select></label><button class="btn" id="csv-cp" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-cp"></h2><div class="sub" id="s-cp"></div></div><div class="tools"><label class="filter"><span>By</span><select id="f-cdim"><option value="cat">Category</option><option value="cause">Root cause</option><option value="sev">Severity</option><option value="via">Received through</option></select></label><label class="filter sortby"><span>Sort by</span><select id="f-sc"></select></label><button class="btn" id="csv-cp" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-cp"></div><p class="note" id="n-cp"></p>
     </section>
   </div>
@@ -134,7 +134,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), M = CX.METRICS;
   Site.renderChrome('cx');
-  const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason' }, S = { ...DEF };
+  const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason', sg: '', st: '', sc: '' }, S = { ...DEF };
   let base = '', IDX, KPI, EV, TR, NOW, WAS, QCH, RG, req = 0, events = true, cur = {}; const tbl = { tr: false, dist: false }, files = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
@@ -164,9 +164,9 @@
     for (const key of ['cmp', 'ch', 'rg', 's', 'p', 'dim']) if (one('f-' + key, p.get(key))) S[key] = p.get(key);
     if (i.queues.some((x) => String(x[0]) === p.get('q'))) S.q = p.get('q');
     if (i.reasons.some((x) => String(x[0]) === p.get('r'))) S.r = p.get('r');
-    if (M.includes(p.get('metric'))) S.metric = p.get('metric');
+    if (M.includes(p.get('metric'))) S.metric = p.get('metric'); for (const k of ['sg', 'st', 'sc']) S[k] = p.get(k) || '';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.2`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.3`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer experience data could not be loaded. ' + e.message; }
@@ -258,8 +258,9 @@
   const pullText = (m, v) => { const a = Math.abs(v), d = m === 'ces' ? 3 : 2, t = a.toFixed(d); return (+t === 0 ? '' : v > 0 ? '+' : '−') + t; };
   function renderGroups() {
     const m = S.metric, k = kpi(m), D = DIMS[S.dim], now = parts(NOW.d, S.dim), was = WAS ? parts(WAS.d, S.dim) : new Map(), all = NOW.t, dir = k.better === 'lower' ? -1 : 1, av = CX.value(m, all);
-    const rows = [...now].filter(([, t]) => t[m].n > 0).map(([id, t]) => ({ id, name: D.label(id), t, v: CX.value(m, t), pull: CX.pull(m, t, all), low: low(m, t), real: CX.beyond(m, t, CX.minus(all, t)), x: was.get(id) ? chg(m, t, was.get(id)) : null })).sort((a, b) => a.low - b.low || dir * (a.pull - b.pull)); cur.grp = rows;
-    $('t-grp').textContent = `${k.name} by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${fmt.month(S.m)} · ${k.better === 'none' ? 'lowest pull first' : 'largest downside first'} · click a name to filter`;
+    const rows = [...now].filter(([, t]) => t[m].n > 0).map(([id, t]) => ({ id, name: D.label(id), t, v: CX.value(m, t), pull: CX.pull(m, t, all), low: low(m, t), real: CX.beyond(m, t, CX.minus(all, t)), x: was.get(id) ? chg(m, t, was.get(id)) : null })); cur.grp = rows;
+    const worst = k.better === 'none' ? 'lowest' : 'largest downside'; cur.grpBy = Site.sortList($('f-sg'), S.sg, { d: [`Pull on overall, ${worst} first`, (r) => -dir * r.pull, (r) => r.low], n: ['Sample (n), most first', (r) => r.t[m].n], v: [`${k.short}, ${dir < 0 ? 'highest' : 'lowest'} first`, (r) => -dir * r.v, (r) => r.low], ch: ['Change, largest first', (r) => Math.abs(r.x.c.delta), (r) => r.low || !r.x] }, rows);
+    $('t-grp').textContent = `${k.name} by ${D.name.toLowerCase()}`; $('s-grp').textContent = `${fmt.month(S.m)} · ${cur.grpBy} · click a name to filter`;
     const b = k.better === 'none' ? null : true, max = Math.max(...rows.filter((r) => !r.low).map((r) => Math.abs(r.pull)), 1e-9);
     const bar = (r) => { const w = Math.max(1, Math.abs(r.pull) / max * 34), worse = b && dir * r.pull < 0; return `<svg width="76" height="14" aria-hidden="true"><line x1="38" x2="38" y2="14" class="sep2"/><rect class="${worse ? 'bw' : 'bb'}" x="${r.pull < 0 ? 38 - w : 38}" y="3" width="${w}" height="8"/></svg>`; };
     $('tbl-grp').innerHTML = rows.length ? `<table><thead><tr><th scope="col">${D.name}</th><th scope="col">${esc(k.short)}</th><th scope="col">vs all ${V(m, av)}</th><th scope="col">Reading</th><th scope="col">Pull on overall</th><th scope="col">vs ${cmpName()}</th><th scope="col">n</th></tr></thead><tbody>${rows.map((r) => { const diff = dir * (r.v - av); return `<tr><td>${r.id === 0 || r.id === '' ? esc(r.name) : `<button type="button" class="name" data-k="grp|${esc(r.id)}" data-v="${esc(r.id)}">${esc(r.name)}</button>`}</td><td class="${r.low ? 'low' : ''}">${V(m, r.v)}</td><td>${gapText(m, r.v, av)}</td><td>${r.low ? '<span class="muted">too few</span>' : !r.real || !b ? (r.real ? 'beyond chance' : '<span class="muted">within chance</span>') : diff < 0 ? '<b>less favorable than the rest</b>' : 'more favorable than the rest'}</td><td>${r.low ? '' : bar(r)} ${pullText(m, r.pull)}</td><td>${r.x ? `<span class="chg ${r.x.q}">${Site.changeMark(r.x.q, arrow(r.x))}</span>${r.x.real || r.x.c.flat ? '' : '<div class="muted">within chance</div>'}` : '–'}</td><td>${fmt.count(r.t[m].n)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No data for these filters.</p>';
@@ -296,8 +297,9 @@
   // ---------- Themes ----------
   function themes(d) { const o = new Map(); let n = 0; each(d.v, (j) => { n++; const k = d.v.t[j]; CX.survey(o.get(k) || (o.set(k, CX.blank()), o.get(k)), d.v, j); }); return { o, n }; }
   function renderThemes() {
-    const a = themes(NOW.d), b = WAS ? themes(WAS.d) : null, rows = [...a.o].map(([id, t]) => ({ name: IDX.names.theme[id], t, n: t.csat.n, share: t.csat.n / a.n * 100, was: b && b.n ? (b.o.get(id) ? b.o.get(id).csat.n : 0) / b.n * 100 : null })).sort((x, y) => CX.value('csat', x.t) - CX.value('csat', y.t) || y.n - x.n); cur.th = rows;
-    $('s-th').textContent = `Theme of each survey comment, ${fmt.month(S.m)} · ${fmt.count(a.n)} surveys · themes from dissatisfied or neutral customers first`;
+    const a = themes(NOW.d), b = WAS ? themes(WAS.d) : null, rows = [...a.o].map(([id, t]) => ({ name: IDX.names.theme[id], t, n: t.csat.n, share: t.csat.n / a.n * 100, was: b && b.n ? (b.o.get(id) ? b.o.get(id).csat.n : 0) / b.n * 100 : null })); cur.th = rows;
+    cur.thBy = Site.sortList($('f-st'), S.st, { n: ['Surveys, most first', (r) => r.n], v: ['CSAT, lowest first', (r) => -CX.value('csat', r.t), (r) => r.n < 30], ces: ['CES, lowest first', (r) => -CX.value('ces', r.t), (r) => r.n < 30], ch: ['Change in share, largest first', (r) => Math.abs(r.share - r.was), (r) => r.was == null || r.n < 30] }, rows);
+    $('s-th').textContent = `Theme of each survey comment, ${fmt.month(S.m)} · ${fmt.count(a.n)} surveys · ${cur.thBy}`;
     $('tbl-th').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Theme</th><th scope="col">Surveys</th><th scope="col">Share</th><th scope="col">vs ${cmpName()}</th><th scope="col">CSAT</th><th scope="col">CES</th></tr></thead><tbody>${rows.map((r) => { const lo = r.n < 30, v = (m) => `<td class="${lo ? 'low' : ''}">${V(m, CX.value(m, r.t))}</td>`; return `<tr><td>${esc(r.name)}${lo ? ' <span class="muted">(too few)</span>' : ''}</td><td>${fmt.count(r.n)}</td><td>${r.share.toFixed(1)}%</td><td>${r.was == null ? '–' : gapText('csat', r.share, r.was)}</td>${v('csat')}${v('ces')}</tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No surveys for these filters.</p>';
   }
   // ---------- Complaints ----------
@@ -305,8 +307,9 @@
   const median = (a) => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), h = s.length >> 1; return s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2; };
   function renderComplaints() {
     const dim = $('f-cdim').value, NM = { cat: 'category', cause: 'cause', sev: 'severity', via: 'via' }[dim], a = comps(NOW.d, dim), b = WAS ? comps(WAS.d, dim) : null, offered = NOW.t.complaints.n, offWas = WAS ? WAS.t.complaints.n : 0;
-    const rows = [...a.o].map(([id, p]) => ({ id, name: IDX.names[NM][id], ...p, rate: offered ? p.n / offered * 1000 : null, wasRate: b && offWas ? (b.o.get(id) ? b.o.get(id).n : 0) / offWas * 1000 : null, med: median(p.days) })).sort((x, y) => (dim === 'sev' ? x.id - y.id : y.n - x.n)); cur.cp = rows;
-    $('t-cp').textContent = `Complaints by ${$('f-cdim').selectedOptions[0].textContent.toLowerCase()}`; $('s-cp').textContent = `Opened in ${fmt.month(S.m)} · ${fmt.count(a.n)} complaints · rates are per 1,000 contacts offered`;
+    const rows = [...a.o].map(([id, p]) => ({ id, name: IDX.names[NM][id], ...p, rate: offered ? p.n / offered * 1000 : null, wasRate: b && offWas ? (b.o.get(id) ? b.o.get(id).n : 0) / offWas * 1000 : null, med: median(p.days) })); cur.cp = rows;
+    const few = (r) => r.n < 30; cur.cpBy = Site.sortList($('f-sc'), S.sc, { ...(dim === 'sev' ? { o: ['Severity, highest first', (r) => -r.id] } : {}), n: ['Complaints, most first', (r) => r.n], ...(dim === 'sev' ? {} : { hi: ['High severity share, highest first', (r) => r.hi / r.n, few] }), reg: ['Regulatory share, highest first', (r) => r.reg / r.n, few], med: ['Median days to close, longest first', (r) => r.med, (r) => few(r) || r.med == null], open: ['Still open, most first', (r) => r.open] }, rows);
+    $('t-cp').textContent = `Complaints by ${$('f-cdim').selectedOptions[0].textContent.toLowerCase()}`; $('s-cp').textContent = `Opened in ${fmt.month(S.m)} · ${fmt.count(a.n)} complaints · rates are per 1,000 contacts offered · ${cur.cpBy}`;
     const real = (r) => { if (!b) return false; const n1 = r.n, n0 = b.o.get(r.id) ? b.o.get(r.id).n : 0; return Math.abs(n1 / offered - n0 / offWas) >= 3 * Math.sqrt(n1 / offered ** 2 + n0 / offWas ** 2); };
     $('tbl-cp').innerHTML = rows.length ? `<table><thead><tr><th scope="col">${$('f-cdim').selectedOptions[0].textContent}</th><th scope="col">Complaints</th><th scope="col">Share</th><th scope="col">Per 1,000</th><th scope="col">vs ${cmpName()}</th>${dim === 'sev' ? '' : '<th scope="col">High severity</th>'}<th scope="col">Regulatory</th><th scope="col">Median days to close</th><th scope="col">Closed within 7 days</th><th scope="col">Still open</th></tr></thead><tbody>${rows.map((r) => { const c = r.wasRate == null ? null : fmt.change(r.rate, r.wasRate, 'rate2'), rl = c && real(r), q = c && !c.flat ? (c.delta < 0 ? 'better' : 'worse') : 'neutral', few = r.n < 30; return `<tr><td>${esc(r.name)}</td><td>${fmt.count(r.n)}</td><td>${(r.n / a.n * 100).toFixed(1)}%</td><td>${r.rate == null ? '–' : r.rate.toFixed(2)}</td><td>${c ? `<span class="chg ${rl ? q : 'neutral'}">${Site.changeMark(rl ? q : '', c.flat ? '– No change' : (c.delta > 0 ? '▲ ' : '▼ ') + c.text)}</span>${rl || c.flat ? '' : '<div class="muted">within chance</div>'}` : '–'}</td>${dim === 'sev' ? '' : `<td class="${few ? 'low' : ''}">${(r.hi / r.n * 100).toFixed(1)}%</td>`}<td class="${few ? 'low' : ''}">${(r.reg / r.n * 100).toFixed(1)}%</td><td class="${few ? 'low' : ''}">${r.med == null ? '–' : r.med.toFixed(1)}</td><td class="${few ? 'low' : ''}">${(r.days.filter((x) => x <= 7).length / r.n * 100).toFixed(1)}%</td><td>${fmt.count(r.open)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No complaints for these filters.</p>';
     $('n-cp').textContent = `Open and closed are as of ${fmt.date(IDX.data_through)}. Median days to close counts closed complaints only, so it can read low for a recent month with complaints still open. Closed within 7 days counts every complaint. Regulatory is the share flagged as a regulatory matter. Grey percentages come from fewer than 30 complaints.`;
@@ -314,6 +317,7 @@
   // ---------- Events ----------
   for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') { base = S.m; carried(S.m === DEF.m ? null : S.m); } if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
   $('f-dim').addEventListener('change', (e) => { S.dim = e.target.value; writeUrl(); renderGroups(); }); $('f-cdim').addEventListener('change', renderComplaints);
+  for (const [k, draw] of [['sg', () => renderGroups()], ['st', () => renderThemes()], ['sc', () => renderComplaints()]]) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.selectedIndex ? e.target.value : ''; writeUrl(); draw(); });
   $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') { toLatest(); go(); } else { S[b.dataset.q] = ''; go(); } });
   $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const k = DIMS[S.dim].f, v = b.dataset.v; S[k] = S[k] === v ? '' : v; go(); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); base = DEF.m; carried(null); events = $('t-events').checked = true; $('f-cdim').value = 'cat'; go(); });
@@ -323,11 +327,11 @@
   $('tb-tr').addEventListener('click', () => { tbl.tr = !tbl.tr; renderTrend(); }); $('tb-dist').addEventListener('click', () => { tbl.dist = !tbl.dist; renderDist(); });
   const csv = (n, w, h, r) => Site.downloadCsv(`cx_${n}`, IDX.data_through, `Customer experience · ${w} · ${S.m} · filters: ${cur.filters} · data through ${IDX.data_through}`, h, r);
   $('csv-tr').addEventListener('click', () => csv('trend', kpi(S.metric).name + ' by month', ['month', S.metric, 'n'], cur.tr.slice().reverse().map((x) => [x.m, x.v, x.t[S.metric].n])));
-  $('csv-grp').addEventListener('click', () => csv('by-' + S.dim, `${kpi(S.metric).name} by ${DIMS[S.dim].name}`, [S.dim, S.metric, 'pull_on_overall', 'beyond_chance', 'n'], cur.grp.map((r) => [r.name, r.v, r.pull, r.real, r.t[S.metric].n])));
+  $('csv-grp').addEventListener('click', () => csv('by-' + S.dim, `${kpi(S.metric).name} by ${DIMS[S.dim].name}, ${cur.grpBy}`, [S.dim, S.metric, 'pull_on_overall', 'beyond_chance', 'n'], cur.grp.map((r) => [r.name, r.v, r.pull, r.real, r.t[S.metric].n])));
   $('csv-mom').addEventListener('click', () => { const m = SV(); csv('what-goes-with-scores', kpi(m).name, ['on_the_contact', m + '_when_it_did', 'n_did', m + '_when_it_did_not', 'n_did_not'], cur.mom.map((r) => [r.name, CX.value(m, r.g), r.g[m].n, CX.value(m, r.o), r.o[m].n])); });
   $('csv-dist').addEventListener('click', () => { const B = BANDS[SV()]; csv('score-mix', kpi(SV()).name + ' mix', ['month', ...B.map((b) => b[0]), 'surveys'], cur.dist.slice().reverse().map((r) => [r.m, ...r.n, r.t])); });
-  $('csv-th').addEventListener('click', () => csv('themes', 'survey themes', ['theme', 'surveys', 'share_pct', 'comparison_share_pct', 'csat', 'ces'], cur.th.map((r) => [r.name, r.n, r.share, r.was, CX.value('csat', r.t), CX.value('ces', r.t)])));
-  $('csv-cp').addEventListener('click', () => csv('complaints', $('t-cp').textContent, ['group', 'complaints', 'per_1000', 'comparison_per_1000', 'high_severity', 'regulatory', 'median_days_to_close', 'still_open'], cur.cp.map((r) => [r.name, r.n, r.rate, r.wasRate, r.hi, r.reg, r.med, r.open])));
+  $('csv-th').addEventListener('click', () => csv('themes', 'survey themes, ' + cur.thBy, ['theme', 'surveys', 'share_pct', 'comparison_share_pct', 'csat', 'ces'], cur.th.map((r) => [r.name, r.n, r.share, r.was, CX.value('csat', r.t), CX.value('ces', r.t)])));
+  $('csv-cp').addEventListener('click', () => csv('complaints', $('t-cp').textContent + ', ' + cur.cpBy, ['group', 'complaints', 'per_1000', 'comparison_per_1000', 'high_severity', 'regulatory', 'median_days_to_close', 'still_open'], cur.cp.map((r) => [r.name, r.n, r.rate, r.wasRate, r.hi, r.reg, r.med, r.open])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (TR) { renderTrend(); renderDist(); } }, 150); });
 })();
 </script>

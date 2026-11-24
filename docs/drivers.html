@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -116,7 +116,7 @@
     </section>
     <section class="card" id="c-water" aria-labelledby="t-water"><h2 id="t-water"></h2><div class="sub" id="s-water"></div><div class="line" id="l-water"></div><div class="chart" id="water"></div><div class="legend" id="lg-water"></div></section>
     <section class="card" id="c-break" aria-labelledby="t-break">
-      <div class="head"><div><h2 id="t-break"></h2><div class="sub" id="s-break"></div></div><div class="tools"><button class="btn" id="csv-break" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-break"></h2><div class="sub" id="s-break"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-sort"></select></label><button class="btn" id="csv-break" type="button">Download CSV</button></div></div>
       <div class="tbl" tabindex="0" role="region" aria-label="Breakdown" id="tbl-break"></div><p class="note" id="n-break"></p></section>
     <section class="card" id="c-minis" aria-labelledby="t-minis"><h2 id="t-minis">Other ways to look at it</h2><div class="sub" id="s-minis"></div><div class="minis" id="minis"></div></section>
     <details class="card how"><summary>How the drivers are calculated</summary><ul>
@@ -138,7 +138,7 @@
   Site.renderChrome('drivers');
   const PATHS = [['Channel', 'Queue', 'Reason group', 'Reason'], ['Site', 'Team', 'Agent'], ['Persona', 'Segment', 'Age band']];
   const DIMS = PATHS.flat(), WORK = ['Site', 'Team', 'Agent'], CUST = PATHS[2], PL = { Channel: 'channels', Queue: 'queues', 'Reason group': 'reason groups', Reason: 'reasons', Site: 'sites', Team: 'teams', Agent: 'agents', Persona: 'personas', Segment: 'segments', 'Age band': 'age bands' };
-  const S = { month: null, cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} };
+  const S = { month: null, cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', f: {} };
   let IDX, KPIS, SECTIONS, EV, N = {}, META = {}, events = true, tblTrend = false, req = 0, cur = null;
   const files = {}, carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const K = () => KPIS.find((k) => k.id === S.metric), P = () => D.PARTS[S.metric], allowed = (d) => !WORK.includes(d) || !!P().agent;
@@ -161,10 +161,10 @@
     base = S.month;
     if (p.get('cmp') === 'year') S.cmp = 'year';
     if (D.PARTS[p.get('metric')]) S.metric = p.get('metric');
-    if (DIMS.includes(p.get('by'))) S.by = p.get('by');
+    if (DIMS.includes(p.get('by'))) S.by = p.get('by'); S.sort = p.get('sort') || '';
     for (const d of DIMS) if (p.getAll(d).length) S.f[d] = p.getAll(d);
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.2`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.3`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The explorer data could not be loaded. ' + e.message; }
@@ -289,7 +289,7 @@
     if (S.month !== last || carried()) p.set('m', S.month);
     if (S.cmp !== 'prior') p.set('cmp', S.cmp);
     if (S.metric !== 'sl_phone') p.set('metric', S.metric);
-    if (S.by !== 'Queue') p.set('by', S.by);
+    if (S.by !== 'Queue') p.set('by', S.by); if (S.sort) p.set('sort', S.sort);
     for (const [d, v] of Object.entries(S.f)) v.forEach((x) => p.append(d, x));
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
@@ -399,9 +399,10 @@
   function renderBreak() {
     const d = cur.by, k = K(), dim = S.by;
     $('t-break').textContent = `${k.name} by ${dim.toLowerCase()}, ${fmt.month(cur.m)} vs ${cmpName()}`;
-    $('s-break').textContent = 'Largest contribution first. Click a name to filter every chart; Drill down goes to the next level.';
     if (!d) { $('tbl-break').innerHTML = ''; return; }
-    const rows = d.rows.slice().sort((a, b) => lowRow(a) - lowRow(b) || Math.abs(b.total) - Math.abs(a.total)), sel = S.f[dim], ratio = P().scale != null;
+    const rows = d.rows.slice(), sel = S.f[dim], ratio = P().scale != null, up = k.better === 'higher' ? -1 : 1;
+    cur.sortBy = Site.sortList($('f-sort'), S.sort, { d: ['Contribution, largest first', (r) => Math.abs(r.total), lowRow], n: ['Sample (n), most first', (r) => r.n1], v: [`${k.short}, ${up < 0 ? 'lowest' : 'highest'} first`, (r) => up * r.v1, (r) => lowRow(r) || r.v1 == null], ...(ratio ? { rate: ['Rate effect, largest first', (r) => Math.abs(r.rate), lowRow], mix: ['Mix effect, largest first', (r) => Math.abs(r.mix), lowRow] } : {}) }, rows);
+    $('s-break').textContent = `${cur.sortBy.charAt(0).toUpperCase() + cur.sortBy.slice(1)}. Click a name to filter every chart; Drill down goes to the next level.`;
     $('tbl-break').innerHTML = `<table><thead><tr><th scope="col">${dim}</th><th scope="col">${fmt.month(cur.m)}</th><th scope="col">${cmpName()}</th><th scope="col">Share now</th><th scope="col">Share before</th>${ratio ? '<th scope="col">Mix</th><th scope="col">Rate</th>' : ''}<th scope="col">Contribution</th><th scope="col">Sample (n)</th><th scope="col"><span class="sr-only">Drill down</span></th></tr></thead><tbody>` +
       rows.map((r, i) => { const low = lowRow(r), n = nextLevel(dim, r.key), st = low ? 'none' : statusOf(k, r.v1), ic = low || k.target == null ? '' : ' ' + { good: '✓', watch: '!', off: '✕' }[st];
         const sup = dim === 'Team' ? (Object.values(META.t).find((t) => t.name === r.key) || {}).extra : null;
@@ -451,7 +452,8 @@
     go();
   });
   $('tbl-break').addEventListener('click', (e) => { const n = e.target.closest('[data-i]'), dr = e.target.closest('[data-drill]'); if (n) toggle(S.by, cur.rows[+n.dataset.i].key, e.ctrlKey || e.metaKey); if (dr) drill(S.by, cur.rows[+dr.dataset.drill].key); });
-  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} }); base = S.month; carried(null); events = $('t-events').checked = true; go(); });
+  $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; writeUrl(); renderBreak(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', f: {} }); base = S.month; carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
   $('tb-trend').addEventListener('click', () => { tblTrend = !tblTrend; if (cur && cur.trend) renderTrend(); });
@@ -460,7 +462,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && more.open) { more.open = false; more.querySelector('summary').focus(); } });
   const about = (w) => `Performance driver explorer · ${K().name} · ${w} · filters: ${Object.entries(S.f).map(([d, v]) => d + '=' + v.join(' or ')).join('; ') || 'none'} · data through ${IDX.data_through}`;
   $('csv-trend').addEventListener('click', () => Site.downloadCsv('performance-drivers_' + S.metric + '_trend', IDX.data_through, about('monthly'), ['month', S.metric, 'n'], cur.trend.slice().reverse().map((p) => [p.m, p.v, p.n])));
-  $('csv-break').addEventListener('click', () => Site.downloadCsv('performance-drivers_' + S.metric + '_by-' + S.by.toLowerCase().replace(/ /g, '-'), IDX.data_through, about(`${cur.m} vs ${cur.c} by ${S.by}`), [S.by, cur.m, cur.c, 'share_now', 'share_before', 'mix', 'rate', 'contribution', 'n_now', 'n_before'], (cur.rows || []).map((r) => [r.key, r.v1, r.v0, r.s1, r.s0, r.mix, r.rate, r.total, r.n1, r.n0])));
+  $('csv-break').addEventListener('click', () => Site.downloadCsv('performance-drivers_' + S.metric + '_by-' + S.by.toLowerCase().replace(/ /g, '-'), IDX.data_through, about(`${cur.m} vs ${cur.c} by ${S.by}, ${cur.sortBy}`), [S.by, cur.m, cur.c, 'share_now', 'share_before', 'mix', 'rate', 'contribution', 'n_now', 'n_before'], (cur.rows || []).map((r) => [r.key, r.v1, r.v0, r.s1, r.s0, r.mix, r.rate, r.total, r.n1, r.n0])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (cur) { renderWater(); renderMinis(); if (cur.trend) renderTrend(); } }, 150); });
 })();
 </script>

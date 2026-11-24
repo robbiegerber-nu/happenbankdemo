@@ -360,5 +360,16 @@
     return months.slice(Math.max(0, end - 12), end + 1);
   }
 
-  window.Site = { monthWindow, ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  // "Sort by" lists. opts: { key: [label, value to rank by (largest first), true where a row has too few to rank] }; the first is the default.
+  // Fills the list, sorts rows in place (too few to rank last, ties by the default order) and returns the text that names the order.
+  function sortList(sel, key, opts, rows) {
+    const ks = Object.keys(opts), k = opts[key] ? key : ks[0], html = ks.map((q) => `<option value="${q}">${esc(opts[q][0])}</option>`).join('');
+    if (sel.dataset.o !== html) { sel.innerHTML = html; sel.dataset.o = html; }
+    sel.value = k;
+    const [label, by, few = () => false] = opts[k], tie = opts[ks[0]][1];
+    rows.sort((a, b) => few(a) - few(b) || (few(a) ? 0 : by(b) - by(a)) || tie(b) - tie(a));
+    return 'sorted by ' + label.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase());
+  }
+
+  window.Site = { sortList, monthWindow, ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

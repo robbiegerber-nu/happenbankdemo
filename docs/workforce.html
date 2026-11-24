@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/workforce.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -112,7 +112,7 @@
       <div class="tbl" id="tbl-prof" tabindex="0" role="region" aria-label="Values by time of day" hidden></div>
     </section>
     <section class="card" id="sec-slots" aria-labelledby="t-slots">
-      <div class="head"><div><h2 id="t-slots"></h2><div class="sub" id="s-slots"></div></div><div class="tools"><button class="btn" id="csv-slots" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h2 id="t-slots"></h2><div class="sub" id="s-slots"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-sort"></select></label><button class="btn" id="csv-slots" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-slots"></div><p class="note" id="n-slots"></p>
     </section>
     <section class="card" aria-labelledby="t-shr">
@@ -134,7 +134,7 @@
   const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   // agent groups, and the channels their requirement covers (phone agents also make callbacks)
   const GROUPS = { 1: { name: 'Phone', serves: 'phone and callback', ch: [1, 4] }, 2: { name: 'Chat', serves: 'chat', ch: [2] }, 3: { name: 'Email', serves: 'email and secure message', ch: null } };
-  const DEF = { days: '30', end: 'latest', ch: '1', site: '', metric: 'adherence', team: [], dow: [], iv: null, day: null }, S = { ...DEF, team: [], dow: [] };
+  const DEF = { days: '30', end: 'latest', ch: '1', site: '', metric: 'adherence', team: [], dow: [], iv: null, day: null, sort: '' }, S = { ...DEF, team: [], dow: [] };
   const files = {}; let IDX, SVC, KPI, EV, ROWS, W, req = 0, events = true, tblDay = false, tblProf = false, A, B0, cur = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
@@ -156,11 +156,11 @@
     if (one('f-ch', p.get('ch'))) S.ch = p.get('ch');
     if (teams().some((t) => t.site === p.get('site'))) S.site = p.get('site');
     if (['adherence', 'conformance', 'shrinkage', 'occupancy', 'staffing', 'forecast'].includes(p.get('metric'))) S.metric = p.get('metric');
-    S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x)); S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
+    S.sort = p.get('sort') || ''; S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x)); S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
     if (p.get('iv') != null && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
     if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day');
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Workforce management v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Workforce management v1.1`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The workforce data could not be loaded. ' + e.message; }
@@ -224,7 +224,7 @@
   function writeUrl() {
     const p = new URLSearchParams(); for (const k of ['days', 'end', 'ch', 'site', 'metric']) if (S[k] !== DEF[k]) p.set(k, S[k]);
     if (S.end === 'latest' && carried()) p.set('end', 'latest');
-    S.team.forEach((x) => p.append('team', x)); S.dow.forEach((x) => p.append('dow', x)); if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day);
+    S.team.forEach((x) => p.append('team', x)); S.dow.forEach((x) => p.append('dow', x)); if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
   function toggle(k, v, add) { const a = S[k]; S[k] = a.includes(v) ? (add ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : add ? [...a, v] : [v]; go(); }
@@ -316,10 +316,11 @@
   function renderSlots() {
     const R = canReq(); $('sec-slots').hidden = !R; if (!R) return;
     const nd = {}; new Set(A.iv.filter((x) => okDay(x.d, ['dow'])).map((x) => x.d)).forEach((d) => { nd[dowOf(d)] = (nd[dowOf(d)] || 0) + 1; });
-    const rows = [...intervals(A, (x) => dowOf(x.d) * 100 + x.i, ['dow', 'iv'])].map(([k, p]) => { const dow = Math.floor(k / 100), q = 15 * (nd[dow] || 1); return { dow, i: k % 100, req: (p.req || 0) / q, open: (p.open || 0) / q, av: (p.avail || 0) / q, off: ((p.sbrk || 0) + (p.slun || 0) + (p.smtg || 0)) / q, aux: (p.aux || 0) / q, abs: (p.absent || 0) / q }; }).filter((r) => r.open > 0 && r.req > 0).map((r) => ({ ...r, gap: r.av - r.req })).filter((r) => r.gap < 0).sort((a, b) => a.gap - b.gap); cur.slots = rows;
+    const rows = [...intervals(A, (x) => dowOf(x.d) * 100 + x.i, ['dow', 'iv'])].map(([k, p]) => { const dow = Math.floor(k / 100), q = 15 * (nd[dow] || 1); return { dow, i: k % 100, req: (p.req || 0) / q, open: (p.open || 0) / q, av: (p.avail || 0) / q, off: ((p.sbrk || 0) + (p.slun || 0) + (p.smtg || 0)) / q, aux: (p.aux || 0) / q, abs: (p.absent || 0) / q }; }).filter((r) => r.open > 0 && r.req > 0).map((r) => ({ ...r, gap: r.av - r.req })).filter((r) => r.gap < 0); cur.slots = rows;
+    const short = (r) => Math.min(-r.gap, Math.max(0, r.req - r.open)); cur.slotsBy = Site.sortList($('f-sort'), S.sort, { d: ['Gap, shortest of staff first', (r) => -r.gap], sch: ['Short on schedule, most first', short], lost: ['Lost on the day, most first', (r) => -r.gap - short(r)] }, rows);
     // where the shortfall comes from: already short on the schedule, or lost on the day
     const planned = rows.reduce((s, r) => s + Math.min(-r.gap, Math.max(0, r.req - r.open)), 0), all = rows.reduce((s, r) => s - r.gap, 0);
-    $('t-slots').textContent = 'Time slots that run shortest of staff'; $('s-slots').textContent = `Average FTE per week slot, shortest first · available minus required`;
+    $('t-slots').textContent = 'Time slots that run short of staff'; $('s-slots').textContent = `Average FTE per week slot · ${cur.slotsBy} · gap is available minus required`;
     const f = (v) => v.toFixed(1), sg = (v) => (v < 0 ? '−' : v > 0 ? '+' : '') + Math.abs(v).toFixed(1);
     $('tbl-slots').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Day and time</th><th scope="col">Required</th><th scope="col">Scheduled</th><th scope="col">Available</th><th scope="col">Gap</th><th scope="col">Short on schedule</th><th scope="col">Lost on the day</th><th scope="col">Off queue by schedule</th><th scope="col">Unplanned</th><th scope="col">Absent</th></tr></thead><tbody>${rows.slice(0, 10).map((r, i) => { const sh = Math.min(-r.gap, Math.max(0, r.req - r.open)); return `<tr><td><button type="button" class="name" data-k="slot|${r.dow}|${r.i}" data-i="${i}">${DOW[r.dow]}, ${slot(r.i)}</button></td><td>${f(r.req)}</td><td>${f(r.open)}</td><td>${f(r.av)}</td><td><b>${sg(r.gap)}</b></td><td>${f(sh)}</td><td>${f(-r.gap - sh)}</td><td>${f(r.off)}</td><td>${f(r.aux)}</td><td>${f(r.abs)}</td></tr>`; }).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No slot averages fewer available staff than required.</p>';
     $('n-slots').textContent = rows.length ? `Off queue by schedule is breaks, lunches, coaching, meetings and training planned for that slot. ${rows.length} weekly slots average fewer available staff than required. Across them, ${(planned / all * 100).toFixed(1)}% of the shortfall was already there on the schedule; the rest was lost on the day to absence, unplanned time, or late starts and breaks.` : '';
@@ -352,6 +353,7 @@
   $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; if (k === 'team' || k === 'dow') S[k] = S[k].filter((x) => x !== +b.dataset.v); else S[k] = k === 'site' ? '' : null; go(); });
   $('tbl-team').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) toggle('team', +b.dataset.id, e.ctrlKey || e.metaKey); });
   $('tbl-slots').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const r = cur.slots[+b.dataset.i]; S.dow = [r.dow]; S.iv = r.i; go(); } });
+  $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; writeUrl(); renderSlots(); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF, { team: [], dow: [] }); carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
@@ -361,7 +363,7 @@
   const csv = (n, w, h, r) => Site.downloadCsv(`workforce_${n}_${G().name.toLowerCase()}`, IDX.data_through, about(w), h, r);
   $('csv-day').addEventListener('click', () => csv('by-day', kpi(S.metric).name + ' by day', ['date', S.metric, 'n'], cur.day.slice().reverse().map((x) => [x.d, x.v, WF.n(S.metric, x.p)])));
   $('csv-prof').addEventListener('click', () => csv('average-day', 'average day, FTE', ['time', 'required', 'scheduled', 'available', ...OFF.map((o) => o[0])], cur.prof.map((x) => [slot(x.i), ...[x.p.req, x.p.open, x.p.avail, ...OFF.map((o) => o[1](x.p))].map((v) => (v || 0) / 15 / cur.nd)])));
-  $('csv-slots').addEventListener('click', () => csv('short-slots', 'slots short of staff, FTE', ['day_of_week', 'time', 'required', 'scheduled', 'available', 'gap', 'on_scheduled_break_lunch_meeting', 'unplanned', 'absent'], cur.slots.map((r) => [DOW[r.dow], slot(r.i), r.req, r.open, r.av, r.gap, r.off, r.aux, r.abs])));
+  $('csv-slots').addEventListener('click', () => csv('short-slots', 'slots short of staff, FTE, ' + cur.slotsBy, ['day_of_week', 'time', 'required', 'scheduled', 'available', 'gap', 'on_scheduled_break_lunch_meeting', 'unplanned', 'absent'], cur.slots.map((r) => [DOW[r.dow], slot(r.i), r.req, r.open, r.av, r.gap, r.off, r.aux, r.abs])));
   $('csv-shr').addEventListener('click', () => csv('shrinkage', 'shrinkage by reason', ['reason', 'planned', 'minutes', 'share_of_scheduled_pct', 'prior_pct'], cur.shr.map((r) => [r.n, r.planned ? 'planned' : 'unplanned', r.m, r.v, r.w])));
   $('csv-team').addEventListener('click', () => csv('teams', 'teams', ['team', 'site', 'supervisor', 'adherence', 'conformance', 'shrinkage', 'occupancy', ...WF.DAY], cur.team.map(({ t, p }) => [t.name, t.site, t.sup, val('adherence', p), val('conformance', p), val('shrinkage', p), val('occupancy', p), ...WF.DAY.map((k) => p[k])])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (A) { renderDay(); renderProfile(); renderShrink(); } }, 150); });

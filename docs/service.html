@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.6">
-<script src="assets/site.js?v=3.0"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.7">
+<script src="assets/site.js?v=3.1"></script>
 <script src="assets/service.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -106,7 +106,7 @@
     <section class="card" aria-labelledby="t-heat">
       <div class="head"><div><h2 id="t-heat"></h2><div class="sub" id="s-heat"></div></div></div>
       <div class="chart x" id="c-heat" role="group"></div><div class="legend" id="lg-heat"></div>
-      <div class="head"><h3 id="t-worst"></h3><div class="tools"><button class="btn" id="csv-worst" type="button">Download CSV</button></div></div>
+      <div class="head"><div><h3 id="t-worst"></h3><div class="sub" id="s-worst"></div></div><div class="tools"><label class="filter sortby"><span>Sort by</span><select id="f-sort"></select></label><button class="btn" id="csv-worst" type="button">Download CSV</button></div></div>
       <div class="tbl" id="tbl-worst"></div><p class="note" id="n-worst"></p>
     </section>
     <section class="card" aria-labelledby="t-prof">
@@ -127,7 +127,7 @@
   Site.renderChrome('service');
   const DAY = 864e5, iso = (t) => new Date(t).toISOString().slice(0, 10), ts = (s) => Date.parse(s + 'T00:00:00Z');
   const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DEF = { days: '30', end: 'latest', ch: '1', metric: 'sl', q: [], dow: [], iv: null, day: null };
+  const DEF = { days: '30', end: 'latest', ch: '1', metric: 'sl', q: [], dow: [], iv: null, day: null, sort: '' };
   const S = { ...DEF }, files = {};
   let IDX, KPI, EV, B = [], B0 = [], W, req = 0, events = true, tblDay = false, tblProf = false, cur = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
@@ -149,9 +149,9 @@
     S.q = p.getAll('q').map(Number).filter((x) => queues().some((q) => q.id === x));
     S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
     if (p.get('iv') && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
-    if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day');
+    if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day'); S.sort = p.get('sort') || '';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.1`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The service data could not be loaded. ' + e.message; }
@@ -229,7 +229,7 @@
     for (const k of ['days', 'end', 'ch', 'metric']) if (S[k] !== DEF[k]) p.set(k, S[k]);
     if (S.end === 'latest' && carried()) p.set('end', 'latest');
     S.q.forEach((x) => p.append('q', x)); S.dow.forEach((x) => p.append('dow', x));
-    if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day);
+    if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
   function toggle(k, v, add) { const a = S[k]; S[k] = a.includes(v) ? (add ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : add ? [...a, v] : [v]; go(); }
@@ -364,11 +364,12 @@
   }
   // the weekly time slots where the most customers missed the threshold
   function worst(cells) {
-    const rows = cells.map((c) => ({ ...c, miss: SV.eligible(c.p) - c.p.w })).filter((c) => c.miss > 0).sort((a, b) => b.miss - a.miss), tot = rows.reduce((s, c) => s + c.miss, 0);
-    cur.worst = rows; const L = live();
-    $('t-worst').textContent = 'Time slots with the most contacts past the threshold';
+    cur.cells = cells; const rows = cells.map((c) => ({ ...c, miss: SV.eligible(c.p) - c.p.w })).filter((c) => c.miss > 0), tot = rows.reduce((s, c) => s + c.miss, 0);
+    cur.worst = rows; const L = live(), by = (m, d) => [(c) => d * SV.value(m, c.p), (c) => low(m, c.p) || SV.value(m, c.p) == null];
+    cur.worstBy = Site.sortList($('f-sort'), S.sort, { d: ['Past threshold, most first', (c) => c.miss], sl: ['Service level, lowest first', ...by('sl', -1)], ...(L ? { asa: ['ASA, longest first', ...by('asa', 1)], abandon: ['Abandon rate, highest first', ...by('abandon', 1)], staffing: ['Staffing gap, shortest of staff first', ...by('staffing', -1)] } : {}) }, rows);
+    $('t-worst').textContent = 'Time slots with contacts past the threshold'; $('s-worst').textContent = cur.worstBy.charAt(0).toUpperCase() + cur.worstBy.slice(1);
     $('tbl-worst').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Day and time</th><th scope="col">Past threshold</th><th scope="col">Share of all</th><th scope="col">Service level</th>${L ? '<th scope="col">ASA</th><th scope="col">Abandon rate</th><th scope="col">Staffing gap</th>' : ''}<th scope="col">vs forecast</th></tr></thead><tbody>${rows.slice(0, 10).map((c, i) => `<tr><td><button type="button" class="name" data-k="worst|${c.dow}|${c.i}" data-i="${i}">${DOW[c.dow]}, ${slot(c.i)}</button></td><td>${fmt.count(c.miss)}</td><td>${(c.miss / tot * 100).toFixed(1)}%</td>${['sl', ...(L ? ['asa', 'abandon', 'staffing'] : []), 'forecast'].map((m) => `<td class="${low(m, c.p) ? 'low' : ''}">${V(m, SV.value(m, c.p), true)}${low(m, c.p) ? ' (too few)' : ''}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No contacts past the threshold for these filters.</p>';
-    $('n-worst').textContent = rows.length ? `Top ${Math.min(10, rows.length)} of ${rows.length} slots hold ${(rows.slice(0, 10).reduce((s, c) => s + c.miss, 0) / tot * 100).toFixed(1)}% of the ${fmt.count(tot)} contacts past the threshold. Abandons over 5 seconds count as past it.` : '';
+    $('n-worst').textContent = rows.length ? `The ${Math.min(10, rows.length)} shown, of ${rows.length} slots, hold ${(rows.slice(0, 10).reduce((s, c) => s + c.miss, 0) / tot * 100).toFixed(1)}% of the ${fmt.count(tot)} contacts past the threshold. Abandons over 5 seconds count as past it.` : '';
   }
 
   // ---------- Average day: forecast and staffing ----------
@@ -420,6 +421,7 @@
   $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; if (k === 'q' || k === 'dow') S[k] = S[k].filter((x) => x !== +b.dataset.v); else S[k] = null; go(); });
   $('tbl-q').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) toggle('q', +b.dataset.id, e.ctrlKey || e.metaKey); });
   $('tbl-worst').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const c = cur.worst[+b.dataset.i]; S.iv = c.i; S.dow = [c.dow]; go(); } });
+  $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; writeUrl(); if (cur.cells) worst(cur.cells); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF, { q: [], dow: [] }); carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
@@ -430,7 +432,7 @@
   const csv = (name, w, head, rows) => Site.downloadCsv(`service-access_${name}_${chan().name.toLowerCase().replace(/ /g, '-')}`, IDX.data_through, about(w), head, rows);
   const raw = ['offered', 'answered', 'within_threshold', 'abandoned', 'short_abandoned', 'forecast', 'scheduled_fte', 'required_fte'], vals = (p) => [p.o, p.a, p.w, p.b, p.s, p.f, p.h, p.r];
   $('csv-day').addEventListener('click', () => csv('by-day', kpi(S.metric).name + ' by day', ['date', S.metric, ...raw], cur.day.slice().reverse().map((x) => [x.d, x.v, ...vals(x.p)])));
-  $('csv-worst').addEventListener('click', () => csv('time-slots', 'time slots', ['day_of_week', 'time', 'past_threshold', 'service_level', 'asa', 'abandon_rate', ...raw], cur.worst.map((c) => [DOW[c.dow], slot(c.i), c.miss, SV.value('sl', c.p), SV.value('asa', c.p), SV.value('abandon', c.p), ...vals(c.p)])));
+  $('csv-worst').addEventListener('click', () => csv('time-slots', 'time slots, ' + cur.worstBy, ['day_of_week', 'time', 'past_threshold', 'service_level', 'asa', 'abandon_rate', ...raw], cur.worst.map((c) => [DOW[c.dow], slot(c.i), c.miss, SV.value('sl', c.p), SV.value('asa', c.p), SV.value('abandon', c.p), ...vals(c.p)])));
   $('csv-prof').addEventListener('click', () => csv('average-day', 'average day', ['time', 'offered', 'forecast', 'scheduled_fte', 'required_fte'], cur.prof.map((x) => [slot(x.i), x.o, x.f, x.h, x.r])));
   $('csv-q').addEventListener('click', () => csv('queues', 'queues', ['queue', 'threshold_sec', 'service_level', 'asa', 'abandon_rate', 'days_below_target', 'days_rated', ...raw], cur.q.map((r) => [r.q.name, r.q.sec, SV.value('sl', r.p), SV.value('asa', r.p), SV.value('abandon', r.p), r.miss, r.days, ...vals(r.p)])));
   let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (B.length) { renderDay(); renderHeat(); renderProfile(); } }, 150); });
