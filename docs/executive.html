@@ -105,6 +105,16 @@
   td.low { color: var(--text-muted); }
   .hidden { display: none !important; }
   .loading { padding: 80px 0; text-align: center; color: var(--text-muted); }
+  .seg { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+  .seg .opts { display: inline-flex; border: 1px solid var(--control); border-radius: 8px; overflow: hidden; background: var(--surface); }
+  .seg label { position: relative; cursor: pointer; }
+  .seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .seg label span { display: flex; align-items: center; justify-content: center; min-height: 38px; padding: 0 14px; font-size: 14px; color: var(--text-primary); }
+  .seg label + label span { border-left: 1px solid var(--control); }
+  .seg label:hover span { background: var(--surface-warm); }
+  .seg input:checked + span { background: var(--text-primary); color: var(--surface); font-weight: 700; }
+  .seg input:focus-visible + span { outline: 2px solid var(--brand-blue); outline-offset: -4px; box-shadow: inset 0 0 0 4px var(--surface); }
+  @media (forced-colors: active) { .seg input:checked + span { forced-color-adjust: none; background: Highlight; color: HighlightText; } }
   .ctls { display: contents; } .phone-f { display: none; }
   @media (max-width: 767px) {
     .phone-f { display: inline-flex; align-items: center; }
@@ -112,6 +122,8 @@
     .ctls.open { display: flex; }
     .ctls .filter { flex: none; }
     .ctls .filter .flabel { position: static; width: auto; height: auto; clip: auto; min-width: 90px; }
+    .seg > .flabel { min-width: 90px; }
+    .seg .opts { flex: 1; } .seg label { flex: 1; } .seg label span { min-height: 42px; }
     .tiles { grid-template-columns: 1fr; }
     .summary .headline { font-size: 18px; }
     .detail { padding: 16px; }
@@ -123,12 +135,14 @@
   <div class="wrap">
     <button class="btn phone-f" id="phone-f" type="button" aria-expanded="false" aria-controls="ctls">Filters</button>
     <div class="ctls" id="ctls">
-    <label class="filter"><span class="flabel">Month</span>
-      <select id="f-month" aria-label="Month"></select></label>
+    <div class="seg" role="radiogroup" aria-labelledby="seg-label"><span class="flabel" id="seg-label">View by</span>
+      <span class="opts"><label><input type="radio" name="view" value="m" checked><span>Month</span></label><label><input type="radio" name="view" value="q"><span>Quarter</span></label></span></div>
+    <label class="filter"><span class="flabel" id="period-label">Month</span>
+      <select id="f-period" aria-labelledby="period-label"></select></label>
     <label class="filter"><span class="flabel">Compare to</span>
       <select id="f-cmp" aria-label="Compare to">
-        <option value="prior">Prior month</option>
-        <option value="year">Same month last year</option>
+        <option value="prior"></option>
+        <option value="year"></option>
       </select></label>
     <button class="link-btn" id="f-reset" type="button">Reset to default</button>
     </div>
@@ -177,10 +191,10 @@
   const { fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, DISCLAIMER } = Site;
   Site.renderChrome('executive');
   const SVGNS = 'http://www.w3.org/2000/svg';
-  const TREND_MONTHS = 24, SPARK_MONTHS = 13;
+  const TREND = { m: 24, q: 8 }, SPARK = { m: 13, q: 8 };   // periods shown, by view
 
-  let KPIS, SECTIONS, DATA, months, fullMonths, partialMonth, total = {}, drivers = {}, events = [];
-  const state = { month: null, cmp: 'prior', kpi: null, events: true, table: false };
+  let KPIS, SECTIONS, DATA, months, fullMonths, partialMonth, quarters, partialQuarter, total = {}, drivers = {}, events = [];
+  const state = { view: 'm', month: null, quarter: null, cmp: 'prior', kpi: null, events: true, table: false };
   let defaults;
 
   Promise.all([
@@ -192,10 +206,10 @@
   // ---------- Data ----------
   function prepare() {
     for (const r of DATA.rows) {
-      if (r.g == null) { (total[r.k] ||= {})[r.m] = { v: r.v, n: r.n }; }
+      if (r.g == null) { (total[r.k] ||= {})[r.m] = { v: r.v, n: r.n, d: r.d }; }
       else {
         const d = (drivers[r.k] ||= { dim: r.g, members: {} });
-        (d.members[r.name] ||= {})[r.m] = { v: r.v, n: r.n };
+        (d.members[r.name] ||= {})[r.m] = { v: r.v, n: r.n, d: r.d };
       }
     }
     months = [...new Set(DATA.rows.map((r) => r.m))].sort();
@@ -204,21 +218,56 @@
     const [y, mo] = last.split('-').map(Number), lastDay = new Date(Date.UTC(y, mo, 0)).getUTCDate();
     partialMonth = +t.slice(8, 10) < lastDay && t.slice(0, 7) === last ? last : null;
     fullMonths = months.filter((m) => m !== partialMonth);
+    // A quarter is offered only when all three of its months are complete
+    quarters = [...new Set(fullMonths.map(qOf))].filter((q) => qMonths(q).every((m) => fullMonths.includes(m)));
+    const lastQ = qOf(last);
+    partialQuarter = quarters.includes(lastQ) ? null : lastQ;
+    for (const q of quarters) {
+      for (const k in total) { const c = combine(k, total[k], q); if (c) total[k][q] = c; }
+      for (const k in drivers) for (const name in drivers[k].members) { const ms = drivers[k].members[name], c = combine(k, ms, q); if (c) ms[q] = c; }
+    }
     events = DATA.events || [];
-    defaults = { month: fullMonths[fullMonths.length - 1], cmp: 'prior', kpi: null };
-    const sel = document.getElementById('f-month');
-    sel.innerHTML = fullMonths.slice().reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
+    const lastM = fullMonths[fullMonths.length - 1];
+    defaults = { view: 'm', month: lastM, quarter: quarterFor(lastM), cmp: 'prior', kpi: null };
     Site.setDataThrough(DATA.data_through);
     document.getElementById('footer-generated').textContent =
-      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.0`;
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.1`;
   }
   const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
   const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
   const kpiById = (id) => KPIS.find((k) => k.id === id);
   function shiftMonth(m, by) { const [y, mo] = m.split('-').map(Number); const d = new Date(Date.UTC(y, mo - 1 + by, 1)); return d.toISOString().slice(0, 7); }
-  const cmpMonth = (m) => shiftMonth(m, state.cmp === 'year' ? -12 : -1);
-  const cmpLabel = (m) => (state.cmp === 'year' ? fmt.month(cmpMonth(m)) : fmt.monthShort(cmpMonth(m)));
-  function windowEnding(m, n) { const i = months.indexOf(m); return months.slice(Math.max(0, i - n + 1), i + 1); }
+
+  // ---------- Periods: a month is 'YYYY-MM', a calendar quarter is 'YYYY-Qn' ----------
+  const isQ = (p) => p[5] === 'Q';
+  function qOf(m) { return `${m.slice(0, 5)}Q${Math.ceil(+m.slice(5) / 3)}`; }
+  function qMonths(q) { const m0 = `${q.slice(0, 5)}${String(q[6] * 3 - 2).padStart(2, '0')}`; return [0, 1, 2].map((i) => shiftMonth(m0, i)); }
+  function quarterFor(m) { const q = qOf(m); return quarters.includes(q) ? q : m < quarters[0] ? quarters[0] : quarters[quarters.length - 1]; }
+  // A quarter's value comes from its monthly totals (value x denominator), never from averaging three percentages
+  function combine(k, byMonth, q) {
+    const ms = qMonths(q), rows = ms.map((m) => byMonth[m]).filter(Boolean);
+    if (!rows.length) return null;
+    const sum = (f) => rows.reduce((t, r) => t + f(r), 0);
+    if (k === 'volume') return { v: sum((r) => r.v), n: sum((r) => r.n) };
+    // a category with no complaints in a month has no row, but that month's contacts still count
+    if (k === 'complaints') { const n = ms.reduce((t, m) => t + (total.complaints[m] ? total.complaints[m].n : 0), 0); return n ? { v: sum((r) => r.v * r.n) / n, n } : null; }
+    const den = (r) => r.d ?? r.n, d = sum(den);
+    return d ? { v: sum((r) => r.v * den(r)) / d, n: sum((r) => r.n) } : null;
+  }
+  const cur = () => (state.view === 'q' ? state.quarter : state.month);
+  const periods = () => (state.view === 'q' ? quarters : months);
+  const unit = () => (state.view === 'q' ? 'quarter' : 'month');
+  const pName = (p) => (isQ(p) ? `${p.slice(5)} ${p.slice(0, 4)}` : fmt.month(p));
+  const pSpan = (p) => { const ms = qMonths(p); return `${fmt.monthShort(ms[0])}–${fmt.monthShort(ms[2])}`; };
+  const pLong = (p) => (isQ(p) ? `${pName(p)} (${pSpan(p)})` : fmt.month(p));
+  const pStart = (p) => (isQ(p) ? qMonths(p)[0] : p) + '-01';
+  const pEnd = (p) => (isQ(p) ? qMonths(p)[2] : p) + '-31';   // compared as text only
+  const pDays = (p) => { const [y, mo] = pStart(p).split('-').map(Number); return (Date.UTC(y, mo - 1 + (isQ(p) ? 3 : 1), 1) - Date.UTC(y, mo - 1, 1)) / 864e5; };
+  const shiftP = (p, by) => (isQ(p) ? qOf(shiftMonth(qMonths(p)[0], by * 3)) : shiftMonth(p, by));
+  const yearAgo = (p) => shiftP(p, isQ(p) ? -4 : -12);
+  const cmpOf = (p) => (state.cmp === 'year' ? yearAgo(p) : shiftP(p, -1));
+  const cmpLabel = (p) => (isQ(p) || state.cmp === 'year' ? pName(cmpOf(p)) : fmt.monthShort(cmpOf(p)));
+  function windowEnding(p, n) { const all = periods(), i = all.indexOf(p); return all.slice(Math.max(0, i - n + 1), i + 1); }
 
   // ---------- URL state (filters are shareable) ----------
   function readUrl() {
@@ -226,16 +275,22 @@
     // a month chosen on another dashboard carries over for this visit
     let carried = null; try { carried = sessionStorage.getItem('happen-demo-month'); } catch (e) { /* not remembered */ }
     state.month = [p.get('m'), carried, defaults.month].find((x) => fullMonths.includes(x));
+    // a shared quarter link (q = the quarter's first month) opens in the quarter view
+    const q = /^\d{4}-(01|04|07|10)$/.test(p.get('q') || '') ? qOf(p.get('q')) : null;
+    state.view = quarters.includes(q) ? 'q' : 'm';
+    state.quarter = state.view === 'q' ? q : quarterFor(state.month);
+    if (state.view === 'q' && quarterFor(state.month) !== q) state.month = qMonths(q)[2];
     state.cmp = p.get('cmp') === 'year' ? 'year' : 'prior';
     state.kpi = kpiById(p.get('kpi')) ? p.get('kpi') : null;
     state.kpiPicked = !!state.kpi;
   }
   function carriedMonth(set) { try { if (set === null) sessionStorage.removeItem('happen-demo-month'); else if (set) sessionStorage.setItem('happen-demo-month', set); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } }
   function writeUrl() {
-    const nf = (state.month !== defaults.month ? 1 : 0) + (state.cmp !== defaults.cmp ? 1 : 0);
+    const nf = (state.view !== defaults.view ? 1 : 0) + ((state.view === 'q' ? state.quarter !== defaults.quarter : state.month !== defaults.month) ? 1 : 0) + (state.cmp !== defaults.cmp ? 1 : 0);
     document.getElementById('phone-f').textContent = nf ? `Filters (${nf})` : 'Filters';
     const p = new URLSearchParams();
-    if (state.month !== defaults.month || carriedMonth()) p.set('m', state.month);
+    if (state.view === 'q') p.set('q', qMonths(state.quarter)[0]);
+    else if (state.month !== defaults.month || carriedMonth()) p.set('m', state.month);
     if (state.cmp !== 'prior') p.set('cmp', state.cmp);
     if (state.kpi && state.kpiPicked) p.set('kpi', state.kpi);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
@@ -244,9 +299,9 @@
   // ---------- Findings (Style Guide: titles state the finding; neutral, factual) ----------
   function streak(k, m) {
     const kpi = kpiById(k), s = statusOf(kpi, val(k, m));
-    let n = 0, i = months.indexOf(m);
-    while (i >= 0 && val(k, months[i]) != null && statusOf(kpi, val(k, months[i])) === s) { n++; i--; }
-    return { s, n, prev: i >= 0 ? statusOf(kpi, val(k, months[i])) : null };
+    const all = periods(); let n = 0, i = all.indexOf(m);
+    while (i >= 0 && val(k, all[i]) != null && statusOf(kpi, val(k, all[i])) === s) { n++; i--; }
+    return { s, n, prev: i >= 0 ? statusOf(kpi, val(k, all[i])) : null };
   }
   function missWord(kpi, v) {
     if (kpi.better === 'lower') return 'above target';
@@ -255,24 +310,24 @@
   }
   function finding(kpi, m) {
     const v = val(kpi.id, m);
-    if (v == null) return 'No data for this month';
+    if (v == null) return `No data for this ${unit()}`;
     if (kpi.target == null) {
-      const w = windowEnding(m, SPARK_MONTHS).map((x) => val(kpi.id, x)).filter((x) => x != null);
-      const yo = fmt.change(v, val(kpi.id, shiftMonth(m, -12)), kpi.format);
-      if (w.length >= 6 && fmt.displayed(v, kpi.format) >= Math.max(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Highest in ${w.length} months`;
-      if (w.length >= 6 && fmt.displayed(v, kpi.format) <= Math.min(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Lowest in ${w.length} months`;
-      return yo ? (yo.flat ? `Unchanged vs ${fmt.month(shiftMonth(m, -12))}` : `${yo.text} vs ${fmt.month(shiftMonth(m, -12))}`) : 'No target; read the trend';
+      const w = windowEnding(m, SPARK[state.view]).map((x) => val(kpi.id, x)).filter((x) => x != null);
+      const yo = fmt.change(v, val(kpi.id, yearAgo(m)), kpi.format);
+      if (w.length >= 6 && fmt.displayed(v, kpi.format) >= Math.max(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Highest in ${w.length} ${unit()}s`;
+      if (w.length >= 6 && fmt.displayed(v, kpi.format) <= Math.min(...w.map((x) => fmt.displayed(x, kpi.format)))) return `Lowest in ${w.length} ${unit()}s`;
+      return yo ? (yo.flat ? `Unchanged vs ${pName(yearAgo(m))}` : `${yo.text} vs ${pName(yearAgo(m))}`) : 'No target; read the trend';
     }
-    const st = streak(kpi.id, m), run = st.n === 1 ? '' : ` ${st.n} months running`;
-    if (st.s === 'good') return st.n === 1 && st.prev ? `Back on target after ${st.prev === 'off' ? 'missing' : 'a watch month'}` : `On target${run}`;
+    const st = streak(kpi.id, m), run = st.n === 1 ? '' : ` ${st.n} ${unit()}s running`;
+    if (st.s === 'good') return st.n === 1 && st.prev ? `Back on target after ${st.prev === 'off' ? 'missing' : 'a watch ' + unit()}` : `On target${run}`;
     if (st.s === 'watch') return `In the watch range${run}, ${missWord(kpi, v)}`;
     return `${missWord(kpi, v)[0].toUpperCase() + missWord(kpi, v).slice(1)}${run}`;
   }
   function eventsIn(m) {
-    const start = m + '-01', end = m + '-31';
+    const start = pStart(m), end = pEnd(m);
     return events.filter((e) => e.start <= end && e.end >= start);
   }
-  // "So what": the weakest driver for the month, plus any event in the month. Only when watch or off target.
+  // "So what": the weakest driver for the period, plus any event in it. Only when watch or off target.
   function soWhat(kpi, m) {
     const v = val(kpi.id, m), s = statusOf(kpi, v);
     if (s !== 'watch' && s !== 'off') return null;
@@ -299,11 +354,12 @@
   function render() {
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('content').classList.remove('hidden');
-    document.getElementById('f-month').value = state.month;
-    document.getElementById('f-cmp').value = state.cmp;
-    document.getElementById('page-sub').textContent = `${fmt.month(state.month)} · all channels · compared with ${state.cmp === 'year' ? 'the same month last year' : 'the prior month'}`;
-    document.getElementById('partial-note').textContent = partialMonth
-      ? `${fmt.month(partialMonth)} is left out until the month is complete (data through ${fmt.dateShort(DATA.data_through)}).` : '';
+    renderControls();
+    const p = cur(), c = cmpOf(p), hasCmp = periods().includes(c);
+    document.getElementById('page-sub').textContent = `${pLong(p)} · all channels · ${hasCmp ? `compared with ${pLong(c)}` : `nothing to compare with: data starts in ${pName(periods()[0])}`}`;
+    const gone = state.view === 'q' ? partialQuarter : partialMonth;
+    document.getElementById('partial-note').textContent = gone
+      ? `${pName(gone)} is left out until the ${unit()} is complete (data through ${fmt.dateShort(DATA.data_through)}).` : '';
     renderSummary();
     renderTiles();
     if (!state.kpi) state.kpi = pickDefaultKpi();
@@ -311,17 +367,34 @@
     writeUrl();
   }
 
+  // The period list and the comparison choices follow "View by", and each comparison names the period it means
+  function renderControls() {
+    const p = cur(), q = state.view === 'q';
+    document.querySelectorAll('input[name="view"]').forEach((r) => { r.checked = r.value === state.view; });
+    document.getElementById('period-label').textContent = q ? 'Quarter' : 'Month';
+    const sel = document.getElementById('f-period');
+    if (sel.dataset.view !== state.view) {
+      sel.innerHTML = (q ? quarters : fullMonths).slice().reverse().map((x) => `<option value="${x}">${pLong(x)}</option>`).join('');
+      sel.dataset.view = state.view;
+    }
+    sel.value = p;
+    const cs = document.getElementById('f-cmp'), opt = (text, x) => `${text} (${periods().includes(x) ? pName(x) : 'no data'})`;
+    cs.options[0].textContent = opt(`Prior ${unit()}`, shiftP(p, -1));
+    cs.options[1].textContent = opt(`Same ${unit()} last year`, yearAgo(p));
+    cs.value = state.cmp;
+  }
+
   function pickDefaultKpi() {   // open the detail on the first off-target KPI, then the first watch KPI
-    for (const s of ['off', 'watch']) { const k = KPIS.find((k) => statusOf(k, val(k.id, state.month)) === s); if (k) return k.id; }
+    for (const s of ['off', 'watch']) { const k = KPIS.find((k) => statusOf(k, val(k.id, cur())) === s); if (k) return k.id; }
     return KPIS[0].id;
   }
 
   function renderSummary() {
-    const m = state.month, pm = cmpMonth(m);
+    const m = cur(), pm = cmpOf(m);
     const withT = KPIS.filter((k) => k.target != null && val(k.id, m) != null);
     const by = (mm) => { const c = { good: [], watch: [], off: [] }; withT.forEach((k) => { const s = statusOf(k, val(k.id, mm)); if (c[s]) c[s].push(k); }); return c; };
     const c = by(m), cp = withT.every((k) => val(k.id, pm) != null) ? by(pm) : null;
-    let head = `${c.good.length} of ${withT.length} KPIs with targets were on target in ${fmt.month(m)}`;
+    let head = `${c.good.length} of ${withT.length} KPIs with targets were on target in ${pName(m)}`;
     if (cp) { const d = c.good.length - cp.good.length; head += d === 0 ? `, the same as ${cmpLabel(m)}` : `, ${d > 0 ? 'up' : 'down'} from ${cp.good.length} in ${cmpLabel(m)}`; }
     const list = (arr) => arr.map((k) => `${esc(k.name)} (${fmt.value(val(k.id, m), k.format)})`).join(', ');
     const lines = [];
@@ -341,7 +414,7 @@
   function renderTiles() {
     const host = document.getElementById('sections');
     host.innerHTML = '';
-    const m = state.month, pm = cmpMonth(m);
+    const m = cur(), pm = cmpOf(m);
     for (const sec of SECTIONS) {
       const s = document.createElement('section');
       s.className = 'kpi-section';
@@ -374,7 +447,7 @@
     const select = () => { state.kpi = kpi.id; state.kpiPicked = true; const fk = Site.focusKey(); render(); Site.restoreFocus(fk); document.getElementById('detail').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); };
     t.querySelector('.tile-select').addEventListener('click', (e) => { e.stopPropagation(); select(); });
     t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn')) select(); });
-    requestAnimationFrame(() => sparkline(t.querySelector('.spark'), kpi, windowEnding(m, SPARK_MONTHS)));
+    requestAnimationFrame(() => sparkline(t.querySelector('.spark'), kpi, windowEnding(m, SPARK[state.view])));
     return t;
   }
 
@@ -425,11 +498,11 @@
   }
 
   function renderDetail() {
-    const kpi = kpiById(state.kpi), m = state.month, v = val(kpi.id, m);
-    const ms = windowEnding(m, TREND_MONTHS);
+    const kpi = kpiById(state.kpi), m = cur(), v = val(kpi.id, m);
+    const ms = windowEnding(m, TREND[state.view]);
     const f = finding(kpi, m);
-    document.getElementById('detail-title').textContent = `${kpi.name}: ${f.charAt(0).toLowerCase() + f.slice(1)}, at ${fmt.value(v, kpi.format)} in ${fmt.month(m)}`;
-    document.getElementById('detail-sub').textContent = `${kpi.short}, monthly, ${fmt.month(ms[0])} – ${fmt.month(ms[ms.length - 1])}` +
+    document.getElementById('detail-title').textContent = `${kpi.name}: ${f.charAt(0).toLowerCase() + f.slice(1)}, at ${fmt.value(v, kpi.format)} in ${pName(m)}`;
+    document.getElementById('detail-sub').textContent = `${kpi.short}, ${unit()}ly, ${pName(ms[0])} – ${pName(ms[ms.length - 1])}` +
       (kpi.target == null ? ' · no target' : ` · target ${kpi.targetLabel}`);
     document.getElementById('t-events').checked = state.events;
     const tb = document.getElementById('t-table');
@@ -453,13 +526,12 @@
     const iw = W - M.l - M.r, ih = H - M.t - M.b, step = iw / ms.length;
     const x = (i) => M.l + step * (i + 0.5);
     const y = (v) => M.t + ih - ((v - lo) / (hi - lo)) * ih;
-    const xDate = (iso) => {   // fractional position of a date inside its month column
-      const mm = iso.slice(0, 7), i = ms.indexOf(mm);
-      if (i < 0) return iso < ms[0] ? M.l : iso > ms[ms.length - 1] + '-31' ? M.l + iw : null;
-      const [yy, mo, dd] = iso.split('-').map(Number), days = new Date(Date.UTC(yy, mo, 0)).getUTCDate();
-      return M.l + step * (i + (dd - 1) / days);
+    const xDate = (iso) => {   // fractional position of a date inside its month or quarter column
+      const i = ms.findIndex((p) => iso >= pStart(p) && iso <= pEnd(p));
+      if (i < 0) return iso < pStart(ms[0]) ? M.l : iso > pEnd(ms[ms.length - 1]) ? M.l + iw : null;
+      return M.l + step * (i + (Date.parse(iso) - Date.parse(pStart(ms[i]))) / 864e5 / pDays(ms[i]));
     };
-    svg.setAttribute('aria-label', `${kpi.name}, monthly from ${fmt.month(ms[0])} to ${fmt.month(ms[ms.length - 1])}. Latest ${fmt.value(val(kpi.id, ms[ms.length - 1]), kpi.format)}. Use View as table for exact values.`);
+    svg.setAttribute('aria-label', `${kpi.name}, ${unit()}ly from ${pName(ms[0])} to ${pName(ms[ms.length - 1])}. Latest ${fmt.value(val(kpi.id, ms[ms.length - 1]), kpi.format)}. Use View as table for exact values.`);
 
     // grid + y axis
     const ticks = niceTicks(lo, hi, phone ? 4 : 5);
@@ -471,7 +543,7 @@
     }
     // x axis: every month on desktop when it fits, otherwise every 3rd; January shows the year
     // Labels are placed from the latest month backwards, skipping any closer than the minimum gap, so they never collide
-    const label = (m, i) => (m.endsWith('-01') || i === 0 ? fmt.month(m).replace(' 20', " '") : fmt.monthShort(m));
+    const label = (m, i) => (isQ(m) ? pName(m).replace(' 20', " '") : m.endsWith('-01') || i === 0 ? pName(m).replace(' 20', " '") : fmt.monthShort(m));
     const gap = phone ? 48 : 40;
     let lastX = Infinity;
     for (let i = ms.length - 1; i >= 0; i--) {
@@ -490,9 +562,9 @@
       for (const e of events) {
         const x1 = xDate(e.start), x2 = xDate(e.end);
         if (x1 == null && x2 == null) continue;
-        if (e.end < ms[0] || e.start > ms[ms.length - 1] + '-31') continue;
+        if (e.end < pStart(ms[0]) || e.start > pEnd(ms[ms.length - 1])) continue;
         num++;
-        const a = x1 ?? M.l, b = (x2 ?? M.l + iw) + (e.span === 'Period' ? step / 30 : 0);
+        const a = x1 ?? M.l, b = (x2 ?? M.l + iw) + (e.span === 'Period' ? step / pDays(ms[ms.length - 1]) : 0);
         if (e.span === 'Period') {
           svgEl('rect', { class: 'm-evband', x: a, y: M.t, width: Math.max(2, b - a), height: ih }, gE);
           if (b - a > 90 && !phone) { const l = svgEl('text', { class: 'm-evlabel', x: a + 6, y: M.t + 14 }, gE); l.textContent = e.name; }
@@ -518,7 +590,7 @@
       svgEl('line', { class: 'm-target', x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, svg);
       if (!phone) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(t) + 4 }, svg); l.textContent = 'Target ' + tickLabel(kpi, t, true); }
     }
-    // selected month column
+    // selected period column
     svgEl('rect', { class: 'm-selband', x: M.l + step * (ms.length - 1), y: M.t, width: step, height: ih }, svg);
     // line + points (points below the minimum sample are hollow grey and not used for status)
     const seg = pts.map((p, i) => (p.v == null ? null : [x(i), y(p.v)]));
@@ -535,17 +607,17 @@
       if (lp.v != null && !targetLines(kpi).length) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(lp.v) + 4 }, svg); l.textContent = fmt.value(lp.v, kpi.format); }
     }
 
-    // hover layer: crosshair + tooltip per month, and event markers
+    // hover layer: crosshair + tooltip per period, and event markers
     const cross = svgEl('line', { class: 'm-cross', y1: M.t, y2: M.t + ih, visibility: 'hidden' }, svg);
-    const hit = svgEl('rect', { x: M.l, y: M.t, width: iw, height: ih, fill: 'transparent', tabindex: 0, role: 'application', 'aria-label': 'Use left and right arrow keys to move between months' }, svg);
+    const hit = svgEl('rect', { x: M.l, y: M.t, width: iw, height: ih, fill: 'transparent', tabindex: 0, role: 'application', 'aria-label': `Use left and right arrow keys to move between ${unit()}s` }, svg);
     const onMove = (cx, cy, clientX, clientY) => {
       const i = Math.max(0, Math.min(ms.length - 1, Math.floor((cx - M.l) / step)));
       const p = pts[i];
       cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i)); cross.setAttribute('visibility', 'visible');
-      if (p.v == null) { showTip(`<b>${fmt.month(p.m)}</b><br>No data`, clientX, clientY); return; }
+      if (p.v == null) { showTip(`<b>${pName(p.m)}</b><br>No data`, clientX, clientY); return; }
       const st = statusOf(kpi, p.v), low = p.n != null && p.n < kpi.minN;
       const evNames = eventsIn(p.m).map((e) => esc(e.name));
-      showTip(`<b>${fmt.month(p.m)}</b><br>${esc(kpi.short)}: <b>${fmt.value(p.v, kpi.format, true)}</b>` +
+      showTip(`<b>${pName(p.m)}</b><br>${esc(kpi.short)}: <b>${fmt.value(p.v, kpi.format, true)}</b>` +
         (kpi.target != null ? `<br><span class="status ${low ? 'none' : st}">${low ? 'Too few to rate' : STATUS_WORD[st]}</span> target ${esc(kpi.targetLabel)}` : '') +
         (p.n != null && kpi.minN ? `<br>n = ${fmt.count(p.n)}${low ? ', below ' + kpi.minN : ''}` : '') +
         (evNames.length ? `<br><span class="muted">Events: ${evNames.join(', ')}</span>` : ''), clientX, clientY);
@@ -562,7 +634,7 @@
       at = Math.max(0, Math.min(ms.length - 1, n));
       const r = svg.getBoundingClientRect(), p = pts[at];
       onMove(x(at), 0, r.left + x(at) * r.width / W, r.top + (p.v == null ? M.t : y(p.v)) * r.height / H);
-      live.textContent = `${fmt.month(p.m)}: ${fmt.value(p.v, kpi.format, true)}${kpi.target == null ? '' : ', ' + STATUS_WORD[statusOf(kpi, p.v)]}`;
+      live.textContent = `${pName(p.m)}: ${fmt.value(p.v, kpi.format, true)}${kpi.target == null ? '' : ', ' + STATUS_WORD[statusOf(kpi, p.v)]}`;
     });
     hit.addEventListener('blur', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
     for (const it of evs) {
@@ -592,7 +664,7 @@
   }
   function eventDates(e) { return e.start === e.end ? fmt.date(e.start) : `${fmt.dateShort(e.start)} – ${fmt.date(e.end)}`; }
 
-  // Drivers for the selected month: sorted horizontal bars
+  // Drivers for the selected period: sorted horizontal bars
   function renderDrivers(kpi, m) {
     const host = document.getElementById('drivers');
     const d = drivers[kpi.id];
@@ -600,13 +672,13 @@
     const rows = Object.entries(d.members).map(([name, ms]) => ({ name, ...(ms[m] || {}) })).filter((r) => r.v != null);
     const highIsBad = kpi.better === 'lower';
     rows.sort((a, b) => (highIsBad ? b.v - a.v : a.v - b.v));
-    host.innerHTML = `<h3>${esc(kpi.short)} by ${esc(d.dim.toLowerCase())}, ${fmt.month(m)}</h3>
+    host.innerHTML = `<h3>${esc(kpi.short)} by ${esc(d.dim.toLowerCase())}, ${pName(m)}</h3>
       <div class="sub">${highIsBad ? 'Highest' : 'Lowest'} first. Greyed rows have fewer than ${kpi.minN} ${kpi.id === 'csat' || kpi.id === 'nps' ? 'surveys' : kpi.section === 'workforce' ? 'agent-days' : 'contacts'} and are not rated.</div>
       <div class="chart" id="driver-chart"></div>`;
     const ch = host.querySelector('#driver-chart');
     const W = ch.clientWidth || 800, phone = W < 560, rowH = 30, labelW = phone ? 130 : 260, valW = phone ? 92 : 140;
     const H = rows.length * rowH + 8;
-    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${kpi.short} by ${d.dim}, ${fmt.month(m)}` }, ch);
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': `${kpi.short} by ${d.dim}, ${pName(m)}` }, ch);
     // Bars start at zero (Style Guide). NPS can be negative, so its axis includes the lowest value.
     const allV = rows.map((r) => r.v).concat(targetLines(kpi));
     const min = Math.min(0, ...allV), max = Math.max(0, ...allV) * 1.04 || 1;
@@ -638,25 +710,31 @@
       return { m, v, n, st: low ? 'none' : statusOf(kpi, v), low };
     });
     host.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="csv-btn" type="button">Download CSV</button></div>
-      <div class="tbl-wrap" tabindex="0" role="region" aria-label="Values by month"><table><thead><tr><th scope="col">Month</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
-      ${rows.map((r) => `<tr><td>${fmt.month(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
+      <div class="tbl-wrap" tabindex="0" role="region" aria-label="Values by ${unit()}"><table><thead><tr><th scope="col">${state.view === 'q' ? 'Quarter' : 'Month'}</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${pName(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
       </tbody></table></div>`;
     host.querySelector('#csv-btn').addEventListener('click', () => {
       const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
-      const lines = ['# ' + DISCLAIMER, `# Executive scorecard · ${kpi.name} · ${fmt.month(ms[0])} to ${fmt.month(ms[ms.length - 1])} · data through ${DATA.data_through}`,
-        ['month', kpi.id, 'status', 'n'].join(',')];
+      const lines = ['# ' + DISCLAIMER, `# Executive scorecard · ${kpi.name} · ${pName(ms[0])} to ${pName(ms[ms.length - 1])} · data through ${DATA.data_through}`,
+        [unit(), kpi.id, 'status', 'n'].join(',')];
       rows.slice().reverse().forEach((r) => lines.push([r.m, r.v ?? '', r.low ? 'too few' : STATUS_WORD[r.st], r.n ?? ''].map(q).join(',')));
       const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `happen-demo_executive-scorecard_${kpi.id}_${DATA.data_through}.csv`;
+      a.download = `happen-demo_executive-scorecard_${kpi.id}${state.view === 'q' ? '_quarterly' : ''}_${DATA.data_through}.csv`;
       document.body.append(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     });
   }
 
   // ---------- Controls ----------
-  document.getElementById('f-month').addEventListener('change', (e) => { state.month = e.target.value; carriedMonth(state.month); render(); });
+  // Switching view keeps the last month and quarter chosen; picking one moves the other to match
+  document.querySelectorAll('input[name="view"]').forEach((r) => r.addEventListener('change', () => { state.view = r.value; if (!state.kpiPicked) state.kpi = null; render(); }));
+  document.getElementById('f-period').addEventListener('change', (e) => {
+    if (state.view === 'q') { state.quarter = e.target.value; state.month = qMonths(state.quarter)[2]; }
+    else { state.month = e.target.value; state.quarter = quarterFor(state.month); }
+    carriedMonth(state.month); render();
+  });
   document.getElementById('f-cmp').addEventListener('change', (e) => { state.cmp = e.target.value; render(); });
   document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); carriedMonth(null); render(); });
   document.getElementById('phone-f').addEventListener('click', (e) => { const o = document.getElementById('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });

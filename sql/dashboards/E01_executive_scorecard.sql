@@ -6,6 +6,8 @@
 --
 -- Output rows: k = KPI id, g = driver dimension (NULL for the KPI total), name = driver
 -- member, m = 'YYYY-MM', v = value, n = sample size (the KPI's denominator).
+-- d = the true denominator, only where it isn't n (staffing, adherence, occupancy). The page
+-- combines months into quarters as sum(v * denominator) / sum(denominator), never as a plain average.
 
 SET work_mem = '256MB';
 
@@ -138,13 +140,24 @@ rows AS (
   -- IVR containment
   UNION ALL
   SELECT 'ivr_containment', NULL, NULL, m, contained::numeric / nullif(sessions, 0) * 100, sessions FROM ivr
+),
+den AS (   -- denominators that differ from the sample size (n)
+  SELECT 'staffing' AS k, NULL::text AS name, m, sum(req_fte) AS d FROM iv WHERE channel_id IN (1, 2) GROUP BY m
+  UNION ALL SELECT 'adherence', NULL, m, sum(sched) FROM a GROUP BY m
+  UNION ALL SELECT 'adherence', site_name, m, sched FROM a
+  UNION ALL SELECT 'occupancy', NULL, m, sum(avail) FROM a GROUP BY m
+  UNION ALL SELECT 'occupancy', site_name, m, avail FROM a
 )
 SELECT json_build_object(
   'generated_at', to_char(now() AT TIME ZONE 'America/Chicago', 'YYYY-MM-DD"T"HH24:MI:SS'),
   'timezone', 'America/Chicago',
   'data_through', (SELECT max(d.full_date) FROM cc.interval_volume v JOIN cc.dim_date d USING (date_key)),
-  'rows', (SELECT json_agg(json_build_object('k', k, 'g', g, 'name', name, 'm', m, 'v', round(v, 4), 'n', n)
-                           ORDER BY k, g NULLS FIRST, name, m) FROM rows WHERE v IS NOT NULL),
+  'rows', (SELECT json_agg(CASE WHEN den.d IS NULL
+                             THEN json_build_object('k', r.k, 'g', r.g, 'name', r.name, 'm', r.m, 'v', round(r.v, 4), 'n', r.n)
+                             ELSE json_build_object('k', r.k, 'g', r.g, 'name', r.name, 'm', r.m, 'v', round(r.v, 4), 'n', r.n, 'd', round(den.d, 2)) END
+                           ORDER BY r.k, r.g NULLS FIRST, r.name, r.m)
+           FROM rows r LEFT JOIN den ON den.k = r.k AND den.m = r.m AND den.name IS NOT DISTINCT FROM r.name
+           WHERE r.v IS NOT NULL),
   'events', (SELECT json_agg(json_build_object('start', start_date, 'end', end_date, 'name', name, 'kind', kind,
                                                'span', span, 'description', description) ORDER BY start_date) FROM dash.v_events)
 );
