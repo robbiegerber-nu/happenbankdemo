@@ -162,6 +162,11 @@ button { font: inherit; color: inherit; }
 .chg.better { color: var(--good-ink); }
 .chg.worse { color: var(--off-ink); }
 .chg.flat, .chg.neutral { color: var(--text-muted); }
+.chg .res, .chg .amt { display: block; }
+.chg .res { font-weight: 700; }
+.chg .amt { text-wrap: balance; font-weight: 400; font-size: 12px; color: var(--text-muted); }
+.tile .chg.flat, .tile .chg.neutral { font-weight: 400; font-size: 12px; }
+.tile .chg { display: block; margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); white-space: normal; }
 
 /* ---------- Info popover ---------- */
 .info-btn {

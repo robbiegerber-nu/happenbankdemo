@@ -135,7 +135,7 @@
     if (a.compare_from) {
       const cs = period(a.compare_from, a.compare_to, 'comparison period'), b = (await RUN[engine](a.metric, cs, flt)).get('all'); if (!b || b.v == null) fail('There are no records for the comparison period.');
       const c = Site.fmt.change(t.v, b.v, kpi.format), s = show(kpi, engine, a.metric, b, flt.some((x) => x[0] === 'channel' || x[0] === 'queue')), real = beyond(engine, a.metric, t, b);
-      out.comparison = { period: label(cs), ...s, change: c.flat ? 'no change' : c.text, beyond_chance: real, reading: s.too_few || out.too_few ? 'too few records to compare' : c.flat ? 'no change' : real === false ? 'within chance, so it can’t be told apart from no change' : real ? { better: 'better, beyond chance', worse: 'worse, beyond chance', neutral: 'changed, beyond chance' }[Site.changeQuality(kpi, t.v, b.v, c)] : 'chance not tested for this measure' };
+      out.comparison = { period: label(cs), ...s, change: c.flat ? 'no change' : c.text, beyond_chance: real, reading: s.too_few || out.too_few ? 'too few records to compare' : c.flat ? 'no change' : real === false ? 'within chance, so it can’t be told apart from no change' : real ? { better: 'improved, beyond chance', worse: 'slipped, beyond chance', neutral: 'changed, beyond chance' }[Site.changeQuality(kpi, t.v, b.v, c)] : 'chance not tested for this measure' };
     }
     const ev = (await file('events.json')).events.filter((e) => e.start <= lastDay(ms[ms.length - 1]) && e.end >= ms[0] + '-01'); if (ev.length) out.events_in_period = ev.map((e) => `${e.name} (${Site.fmt.date(e.start)}${e.end !== e.start ? ' – ' + Site.fmt.date(e.end) : ''})`);
     return out;

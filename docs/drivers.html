@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -243,7 +243,7 @@
     const st = small ? 'none' : statusOf(k, t.R1), q = ch ? (ch.flat ? 'flat' : good(ch.delta)) : 'neutral';
     const bf = cur.byF, mix = bf ? bf.rows.reduce((s, r) => s + r.mix, 0) : null, rate = bf ? bf.rows.reduce((s, r) => s + r.rate, 0) : null;
     $('kpi').innerHTML = `<span class="v">${V(t.R1)}</span>${k.target == null ? '' : `<span class="status ${st}">${small ? 'Too few to rate' : STATUS_WORD[st]}</span>`}
-      <span class="chg ${small ? 'neutral' : q}">${!ch ? 'No earlier month to compare' : ch.flat ? 'No change vs ' + cmpName() : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text} vs ${cmpName()}${!small && Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}`}</span>
+      <span class="chg ${small ? 'neutral' : q}">${!ch ? 'No earlier month to compare' : ch.flat ? 'No change vs ' + cmpName() : Site.changeMark(small ? '' : q, `${ch.delta > 0 ? '▲' : '▼'} ${ch.text} vs ${cmpName()}`)}</span>
       ${cur.hasCmp && P().scale != null && bf && bf.change != null ? `<span class="p">By ${esc(S.by.toLowerCase())}: mix ${C(mix)} · rate ${C(rate)}</span>` : ''}`;
     $('so').innerHTML = soWhat(small);
   }

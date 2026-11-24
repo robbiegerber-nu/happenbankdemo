@@ -141,7 +141,9 @@
     return 'neutral';
   }
 
-  const QUALITY_WORD = { better: 'better', worse: 'worse' };
+  const QUALITY_WORD = { better: 'Improved', worse: 'Slipped' };
+  // Result first, then the amount: "Improved" above "▲ +4.0 pts vs prior month". No word when the change is neutral.
+  const changeMark = (q, text) => (QUALITY_WORD[q] ? `<b class="res">${QUALITY_WORD[q]}</b> <span class="amt">${text}</span>` : text);
 
   // ---------- Header, disclaimer, footer ----------
   function el(tag, attrs, html) {
@@ -325,5 +327,5 @@
     else done('Copy failed');
   }
 
-  window.Site = { setDataThrough, focusKey, restoreFocus, QUALITY_WORD, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  window.Site = { setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

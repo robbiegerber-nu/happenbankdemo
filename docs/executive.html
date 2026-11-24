@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -43,6 +43,7 @@
   .tile-select:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
   .tile-value { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
   .tile-value .v { font-size: 30px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .tile-meta .chg { flex: 1 0 100%; }
   .tile-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-muted); flex-wrap: wrap; }
   .spark { width: 100%; height: 44px; display: block; }
   .tile .finding { font-size: 13px; color: var(--text-secondary); }
@@ -231,7 +232,7 @@
     defaults = { view: 'm', month: lastM, quarter: quarterFor(lastM), cmp: 'prior', kpi: null };
     Site.setDataThrough(DATA.data_through);
     document.getElementById('footer-generated').textContent =
-      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.1`;
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.2`;
   }
   const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
   const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
@@ -433,13 +434,12 @@
     t.className = 'tile ' + st + (state.kpi === kpi.id ? ' selected' : '');
     const arrow = !chg ? '' : chg.flat ? '–' : chg.delta > 0 ? '▲' : '▼';
     const chgText = !chg ? 'No comparison' : chg.flat ? `No change vs ${cmpLabel(m)}` : `${arrow} ${chg.text} vs ${cmpLabel(m)}`;
-    const qWord = { better: 'better', worse: 'worse', flat: 'no change', neutral: 'neutral' }[q];
     const sw = soWhat(kpi, m);
     t.innerHTML = `
       <div class="tile-top"><button class="tile-select" type="button" data-k="${kpi.id}" aria-pressed="${state.kpi === kpi.id}">${esc(kpi.name)}</button></div>
       <div class="tile-value"><span class="v">${fmt.value(v, kpi.format)}</span><span class="status ${st}">${STATUS_WORD[st]}</span></div>
       <div class="tile-meta"><span>${kpi.target == null ? '' : 'Target ' + esc(kpi.targetLabel)}</span>
-        <span class="chg ${chg ? q : 'neutral'}" title="${chg ? 'Change: ' + qWord : ''}">${chgText}${Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span></div>
+        <span class="chg ${chg ? q : 'neutral'}">${Site.changeMark(q, chgText)}</span></div>
       <svg class="spark" aria-hidden="true"></svg>
       <div class="finding">${esc(finding(kpi, m))}</div>
       ${sw ? `<div class="sowhat">${sw}</div>` : ''}`;

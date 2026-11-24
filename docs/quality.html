@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <style>
   /* Colors, type, header and buttons come from assets/site.css. These aliases map this page's names onto the shared tokens. */
   :root {
@@ -871,7 +871,7 @@ function renderChanges() {
     // the check itself changed (its wording or what it measures), not the data
     if (c.prev_rule && c.prev_rule !== c.rule) return { label: 'Check refined', cls: rank[c.status] < rank[c.prev_status] ? 'better' : 'worse' };
     if (rank[c.status] < rank[c.prev_status]) return c.status === 'Pass' ? { label: 'Fixed', cls: 'better' } : { label: 'Improved', cls: 'better' };
-    return c.prev_status === 'Pass' ? { label: c.status === 'Warn' ? 'New warning' : 'New problem', cls: 'worse' } : { label: 'Got worse', cls: 'worse' };
+    return c.prev_status === 'Pass' ? { label: c.status === 'Warn' ? 'New warning' : 'New problem', cls: 'worse' } : { label: 'Slipped', cls: 'worse' };
   };
   const kinds = changed.map(kindOf);
   const tally = {}; kinds.forEach(k => tally[k.label] = (tally[k.label] || 0) + 1);

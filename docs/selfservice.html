@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <script src="assets/selfservice.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -34,7 +34,6 @@
   .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
   .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
   .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
   .chart { margin-top: 10px; }
   .chart svg { display: block; width: 100%; overflow: visible; }
   .x { overflow-x: auto; }
@@ -185,7 +184,7 @@
   function renderTiles() {
     const host = $('tiles'); host.innerHTML = '';
     for (const m of METRICS) { const k = K[m], x = change(m, NOW, WAS), d = document.createElement('div'); d.className = 'tile' + (S.metric === m ? ' sel' : ''); const before = m === 'stuck' && NOW.done.k ? `${fmt.value(NOW.done.b7 / NOW.done.k * 100, 'pct')} contacted in the 7 days before` : 'No target';
-      d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${fmt.value(NOW.val[m], k.format)}</div><div class="m">${before}</div>${x ? `<span class="chg ${x.q}">${arrow(x)} vs ${cmpName()}${Site.QUALITY_WORD[x.q] ? ' · ' + x.q : ''}</span>${x.c.flat || !NOW.X[m] ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
+      d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${fmt.value(NOW.val[m], k.format)}</div><div class="m">${before}</div>${x ? `<span class="chg ${x.q}">${Site.changeMark(x.q, `${arrow(x)} vs ${cmpName()}`)}</span>${x.c.flat || !NOW.X[m] ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
       if (k.format === 'count') d.querySelector('.v').title = fmt.count(NOW.val[m]); d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d); }
   }
   // ---------- Chart helpers ----------
@@ -241,7 +240,7 @@
     cur.tk = [...groups.values()].map((g) => { const t = tot(NOW, g.ids), b = WAS ? tot(WAS, g.ids) : null, ph = g.r ? (NOW.pr.get(g.r) || { o: 0 }).o : null, pb = WAS && g.r ? (WAS.pr.get(g.r) || { o: 0 }).o : null; return { ...g, t, b, ph, s: share(NOW, g, t), sb: b ? share(WAS, g, b) : null, real: b && g.r ? Q.beyond(t.n, t.n + ph, b.n, b.n + pb) : false }; }).sort((a, b) => b.t.n - a.t.n);
     $('s-tk').textContent = `${fmt.month(S.m)} · ${fmt.count(NOW.done.n)} tasks finished in the menu; ${fmt.count(NOW.out)} menu sessions went to an agent`;
     const p = (a, b) => (b >= 50 ? (a / b * 100).toFixed(1) + '%' : '<span class="muted">too few</span>');
-    $('tbl-tk').innerHTML = `<table><thead><tr><th scope="col">Menu task</th><th scope="col">Finished in the menu</th><th scope="col">Phone contacts for the same need</th><th scope="col">Finished in the menu, share</th><th scope="col">vs ${cmpName()}</th><th scope="col">Contacted within 1 day</th><th scope="col">Within 7 days</th><th scope="col">7 days before</th></tr></thead><tbody>${cur.tk.map((r) => `<tr><td>${esc(r.names.join(' + '))}${r.r ? `<div class="muted">${esc(rName(r.r))}</div>` : ''}</td><td>${fmt.count(r.t.n)}</td><td>${r.ph == null ? '–' : fmt.count(r.ph)}</td><td>${r.s == null ? '–' : `<b>${r.s.toFixed(1)}%</b>`}</td><td>${r.s == null || r.sb == null ? '–' : `<span class="chg ${r.real ? (fmt.change(r.s, r.sb, 'pct').delta > 0 ? 'better' : 'worse') : 'neutral'}">${pts(r.s, r.sb)}${r.real ? (fmt.change(r.s, r.sb, 'pct').delta > 0 ? ' · better' : fmt.change(r.s, r.sb, 'pct').delta < 0 ? ' · worse' : '') : ''}</span>${r.real ? '' : '<div class="muted">within chance</div>'}`}</td><td>${p(r.t.a1, r.t.k)}</td><td>${p(r.t.a7, r.t.k)}</td><td>${p(r.t.b7, r.t.k)}</td></tr>`).join('')}</tbody></table>`;
+    $('tbl-tk').innerHTML = `<table><thead><tr><th scope="col">Menu task</th><th scope="col">Finished in the menu</th><th scope="col">Phone contacts for the same need</th><th scope="col">Finished in the menu, share</th><th scope="col">vs ${cmpName()}</th><th scope="col">Contacted within 1 day</th><th scope="col">Within 7 days</th><th scope="col">7 days before</th></tr></thead><tbody>${cur.tk.map((r) => `<tr><td>${esc(r.names.join(' + '))}${r.r ? `<div class="muted">${esc(rName(r.r))}</div>` : ''}</td><td>${fmt.count(r.t.n)}</td><td>${r.ph == null ? '–' : fmt.count(r.ph)}</td><td>${r.s == null ? '–' : `<b>${r.s.toFixed(1)}%</b>`}</td><td>${r.s == null || r.sb == null ? '–' : `<span class="chg ${r.real ? (fmt.change(r.s, r.sb, 'pct').delta > 0 ? 'better' : 'worse') : 'neutral'}">${Site.changeMark(!r.real ? '' : fmt.change(r.s, r.sb, 'pct').delta > 0 ? 'better' : fmt.change(r.s, r.sb, 'pct').delta < 0 ? 'worse' : '', pts(r.s, r.sb))}</span>${r.real ? '' : '<div class="muted">within chance</div>'}`}</td><td>${p(r.t.a1, r.t.k)}</td><td>${p(r.t.a7, r.t.k)}</td><td>${p(r.t.b7, r.t.k)}</td></tr>`).join('')}</tbody></table>`;
     $('n-tk').textContent = 'Phone contacts for the same need are calls whose recorded reason matches the task; the match is ours. Contacts before and after are by the same customers, on any channel and for any reason: if finishing in the menu failed customers, the 7 days after would be clearly higher than the 7 days before. The data does not record where in the menu a customer gave up, so drop-out points cannot be shown.';
   }
   // ---------- Reasons with no task ----------

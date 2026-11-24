@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <script src="assets/service.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -35,7 +35,6 @@
   .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
   .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
   .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
   .chart { margin-top: 10px; }
   .chart svg { display: block; width: 100%; overflow: visible; }
   .x { overflow-x: auto; }
@@ -247,7 +246,7 @@
       if (m === 'forecast') { const f = days.filter((x) => x.p.f > 0), ok = f.filter((x) => Math.abs(fmt.displayed(SV.value('forecast', x.p), 'signedpct')) <= 10); meta = `${ok.length} of ${f.length} days within ±10%`; st = S.day ? st : ''; }
       const t = document.createElement('div'); t.className = 'tile' + (S.metric === m ? ' sel' : '');
       t.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${val}</div>${st}<div class="m">${esc(meta)}${lo ? `${meta ? ' · ' : ''}n = ${fmt.count(SV.n(m, now))}, below ${k.minN}` : ''}</div>
-        ${ch ? `<span class="chg ${lo ? 'neutral' : q}">${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} vs prior ${S.days} days${!lo && Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span>` : ''}`;
+        ${ch ? `<span class="chg ${lo ? 'neutral' : q}">${Site.changeMark(lo ? '' : q, `${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} vs prior ${S.days} days`)}</span>` : ''}`;
       t.querySelector('.tile-top').append(Site.infoButton(k));
       const pick = () => { if (S.metric === m) return; S.metric = m; go(); };
       t.addEventListener('click', (e) => { if (!e.target.closest('.info-btn')) pick(); });
@@ -320,7 +319,7 @@
     const cells = [...map].map(([key, p]) => ({ dow: Math.floor(key / 100), i: key % 100, p, v: f(p, dayset.get(Math.floor(key / 100)) || 1), low: m === 'forecast' ? p.f <= 0 : low(m, p) })).filter((c) => c.v != null && isFinite(c.v) && (c.p.o > 0 || c.p.f > 0));
     cur.cells = cells;
     $('t-heat').textContent = `${name} by day of week and 15 minutes, ${chan().name.toLowerCase()}`;
-    $('s-heat').textContent = `${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))} · stronger color is ${m === 'volume' ? 'busier' : 'worse'} · click a cell to filter to that time, or a day name to filter to that day`;
+    $('s-heat').textContent = `${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))} · stronger color is ${m === 'volume' ? 'busier' : 'less favorable'} · click a cell to filter to that time, or a day name to filter to that day`;
     host.innerHTML = ''; $('lg-heat').innerHTML = ''; worst(cells);
     const ok = cells.filter((c) => !c.low); if (!cells.length) { host.textContent = 'No contacts for these filters.'; return; }
     const i0 = Math.min(...cells.map((c) => c.i)), i1 = Math.max(...cells.map((c) => c.i)), n = i1 - i0 + 1, rows = [1, 2, 3, 4, 5, 6, 0].filter((d) => cells.some((c) => c.dow === d)), order = [0, 1, 2, 3, 4, 5, 6].filter((d) => rows.includes(d));
@@ -409,7 +408,7 @@
     cur.q = rows; $('t-q').textContent = `Queues, ${chan().name.toLowerCase()}`;
     $('tbl-q').innerHTML = `<table><thead><tr><th scope="col">Queue</th><th scope="col">Threshold</th><th scope="col">Service level</th><th scope="col">Status</th>${cmp ? `<th scope="col">vs prior ${S.days} days</th>` : ''}<th scope="col">Days below target</th>${L ? '<th scope="col">ASA</th><th scope="col">Abandon rate</th><th scope="col">Staffing gap</th>' : ''}<th scope="col">Offered</th><th scope="col">vs forecast</th></tr></thead><tbody>${rows.map((r) => {
       const ch = cmp && r.w ? fmt.change(SV.value('sl', r.p), SV.value('sl', r.w), 'pct') : null, q = ch && !low('sl', r.p) ? changeQuality(kpi('sl'), SV.value('sl', r.p), SV.value('sl', r.w), ch) : 'neutral', on = S.q.includes(r.q.id), cell = (m) => `<td class="${low(m, r.p) ? 'low' : ''}">${V(m, SV.value(m, r.p), true)}${m !== 'forecast' && m !== 'staffing' && low(m, r.p) ? ' (too few)' : ''}</td>`;
-      return `<tr class="${S.q.length ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="q|${r.q.id}" data-id="${r.q.id}" aria-pressed="${on}">${esc(r.q.name)}</button></td><td>${kpi('sl').target}% in ${secs(r.q.sec)}</td>${cell('sl')}<td>${badge('sl', r.p)}</td>${cmp ? `<td>${ch ? `<span class="chg ${q}">${ch.flat ? '– No change' : (ch.delta > 0 ? '▲ ' : '▼ ') + ch.text}${Site.QUALITY_WORD[q] ? ' · ' + Site.QUALITY_WORD[q] : ''}</span>` : '–'}</td>` : ''}<td>${r.days ? `${r.miss} of ${r.days}` : '–'}</td>${L ? cell('asa') + cell('abandon') + cell('staffing') : ''}<td>${fmt.count(r.p.o)}</td>${cell('forecast')}</tr>`; }).join('')}</tbody></table>`;
+      return `<tr class="${S.q.length ? (on ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="q|${r.q.id}" data-id="${r.q.id}" aria-pressed="${on}">${esc(r.q.name)}</button></td><td>${kpi('sl').target}% in ${secs(r.q.sec)}</td>${cell('sl')}<td>${badge('sl', r.p)}</td>${cmp ? `<td>${ch ? `<span class="chg ${q}">${Site.changeMark(q, ch.flat ? '– No change' : (ch.delta > 0 ? '▲ ' : '▼ ') + ch.text)}</span>` : '–'}</td>` : ''}<td>${r.days ? `${r.miss} of ${r.days}` : '–'}</td>${L ? cell('asa') + cell('abandon') + cell('staffing') : ''}<td>${fmt.count(r.p.o)}</td>${cell('forecast')}</tr>`; }).join('')}</tbody></table>`;
     $('n-q').textContent = `Days below target counts days with at least ${kpi('sl').minN} contacts to rate.`;
   }
 

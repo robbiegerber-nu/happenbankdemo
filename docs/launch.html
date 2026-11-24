@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.6"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.4">
+<script src="assets/site.js?v=2.7"></script>
 <script src="assets/launch.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -32,7 +32,6 @@
   .tile-top button.t:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
   .tile .v { font-size: 27px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em; line-height: 1.2; }
   .tile .m { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
-  .tile .chg { display: block; margin-top: 4px; white-space: normal; }
   .chart { margin-top: 10px; }
   .chart svg { display: block; width: 100%; overflow: visible; }
   .x { overflow-x: auto; }
@@ -175,7 +174,7 @@
       if (m === 'volume' && q) { v = sg(q.pct4, 1) + '%'; body = `<div class="m">${sg(q.extra4)} against expected</div><div class="m">Peak ${sg(q.peak, 1)}% in week ${q.peakW}</div>`; }
       else if (c) {
         const lo = c.n < k.minN, ch = fmt.change(c.v, c.e, k.format), qual = lo || !c.sure ? 'neutral' : changeQuality(k, c.v, c.e, ch), mix = W.mix(m);
-        v = V(m, c.v); body = `<span class="chg ${qual}">${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} from ${V(m, c.e)}${Site.QUALITY_WORD[qual] ? ' · ' + qual : ''}</span><div class="m">${lo ? `n = ${fmt.count(c.n)}, below ${k.minN}` : c.sure ? 'Beyond chance' : 'Within chance'}</div><div class="m">${mix == null || Math.abs(mix) < (m === 'aht' ? 1 : .1) ? '' : `${dt(m, c.e + mix, c.e)} from the mix of reasons · `}other reasons ${c.other == null ? '–' : dt(m, c.e + c.other, c.e)}</div>`;
+        v = V(m, c.v); body = `<span class="chg ${qual}">${Site.changeMark(qual, `${ch.flat ? '– No change' : `${ch.delta > 0 ? '▲' : '▼'} ${ch.text}`} from ${V(m, c.e)}`)}</span><div class="m">${lo ? `n = ${fmt.count(c.n)}, below ${k.minN}` : c.sure ? 'Beyond chance' : 'Within chance'}</div><div class="m">${mix == null || Math.abs(mix) < (m === 'aht' ? 1 : .1) ? '' : `${dt(m, c.e + mix, c.e)} from the mix of reasons · `}other reasons ${c.other == null ? '–' : dt(m, c.e + c.other, c.e)}</div>`;
       }
       d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(m === 'volume' ? 'Contacts against expected' : k.name)}</button></div><div class="v">${v}</div>${body}`;
       d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d);
