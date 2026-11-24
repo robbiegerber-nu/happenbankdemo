@@ -8,7 +8,7 @@
 
   // Site navigation. href = null means the dashboard is planned but not built yet.
   const NAV = [
-    { group: 'Overview', items: [{ name: 'Executive scorecard', href: 'executive.html', id: 'executive' }] },
+    { group: 'Overview', items: [{ name: 'Executive scorecard', href: 'executive.html', id: 'executive' }, { name: 'Ask the data', href: 'chat.html', id: 'chat' }] },
     { group: 'Operations', items: [
       { name: 'Service & access', href: 'service.html', id: 'service' }, { name: 'Workforce management', href: 'workforce.html', id: 'workforce' }, { name: 'Agent & team coaching', href: 'coaching.html', id: 'coaching' }] },
     { group: 'Analysis', items: [{ name: 'Performance driver explorer', href: 'drivers.html', id: 'drivers' }, { name: 'Process stability monitor', href: 'stability.html', id: 'stability' }] },

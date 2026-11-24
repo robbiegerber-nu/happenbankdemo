@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.3"></script>
+<script src="assets/site.js?v=2.4"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <script src="assets/workforce.js?v=1.0"></script>
@@ -136,7 +136,7 @@
   $('main').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) ask(PREPARED[+c.dataset.i].q, true); });
   $('form').addEventListener('submit', (e) => { e.preventDefault(); const t = $('q').value.trim(); if (!t) return; if (busy) return say('Still working on the last question.'); $('q').value = ''; ask(t); $('q').focus(); });
   showMode();
-  ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => Site.setDataThrough(x.data_through)); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data, preview`; });
+  ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => Site.setDataThrough(x.data_through)); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data`; });
 })();
 </script>
 </body>
