@@ -1,7 +1,7 @@
 // Recaptures Home page previews (docs/assets/home/*.jpg, 1120 x 664, light theme).
 // Serve docs/ first (launch entry "dashboard-2", port 8767), then: node tools/home-previews.mjs <out-folder> [page ...]
 // Look at the pictures before copying them to docs/assets/home, then raise ?v= on the image links in docs/index.html.
-// Pages not listed in P yet: chat, workforce, stability, personas, selfservice, quality. Add a line that matches the current picture's framing.
+// Pages not listed in P yet: chat, workforce. Add a line that matches the current picture's framing.
 import {spawn} from 'child_process';import fs from 'fs';
 const S=process.argv[2],only=process.argv.slice(3),B='http://127.0.0.1:8767/';
 const P={ // viewport width, clip width, anchor, offset above
@@ -9,7 +9,11 @@ const P={ // viewport width, clip width, anchor, offset above
  service:[1280,1248,"[...document.querySelectorAll('h2,h3')].find(h=>/^Service level by day/.test(h.textContent)).closest('section,.card')",6],
  coaching:[960,928,"[...document.querySelectorAll('h2,h3')].find(h=>/gap to the group, by team/.test(h.textContent)).closest('section,.card')",8],
  drivers:[1280,1248,"[...document.querySelectorAll('h2,h3')].find(h=>/rose|fell|unchanged/.test(h.textContent)).closest('section,.card')",2],
- launch:[1280,1248,"document.querySelector('.tile')",2],cx:[1280,1248,"document.querySelector('.tile')",2]};
+ launch:[1280,1248,"document.querySelector('.tile')",2],cx:[1280,1248,"document.querySelector('.tile')",2],
+ stability:[1280,1248,"document.querySelector('#t-main').closest('section,.card')",0],
+ personas:[1280,602,"document.querySelector('#c-tr')",8,9],
+ selfservice:[1280,1248,"document.querySelector('#t-mix').closest('section')",6],
+ quality:[1280,1248,"document.querySelector('.tile')",8]};
 const p=spawn('C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',['--headless=new','--disable-gpu','--remote-debugging-port=9333','--user-data-dir='+S+'/../edge-profile','about:blank'],{stdio:'ignore'});
 const sl=ms=>new Promise(r=>setTimeout(r,ms));let t;for(let i=0;i<40&&!t;i++){await sl(500);try{t=(await(await fetch('http://127.0.0.1:9333/json')).json()).find(x=>x.type==='page')}catch{}}
 const ws=new WebSocket(t.webSocketDebuggerUrl);await new Promise(r=>ws.onopen=r);let id=0;const w=new Map();ws.onmessage=m=>{const d=JSON.parse(m.data);if(w.has(d.id)){w.get(d.id)(d.result||d);w.delete(d.id)}};

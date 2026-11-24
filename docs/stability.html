@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <script src="assets/spc.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -293,7 +293,7 @@
   function legend(r) {
     const i = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`;
     $('lg-main').innerHTML = [[`<line class="c-line" x1="0" x2="20" y1="7" y2="7"/>`, M.k.short], ['<line class="c-cl" x1="0" x2="20" y1="7" y2="7"/>', 'Center line'], ['<line class="c-lim" x1="0" x2="20" y1="7" y2="7"/>', `Limits (${+S.sigma}σ)`],
-      ['<path class="c-out" d="M10,0L17,7L10,14L3,7Z"/>', 'Outside the limits'], ['<circle class="c-run" cx="10" cy="7" r="4.5"/>', 'Run-rule signal'], ['<circle class="c-low" cx="10" cy="7" r="3.5"/>', 'Too few to rate'],
+      ['<path class="c-out" d="M10,0L17,7L10,14L3,7Z"/>', 'Outside the limits'], ['<circle class="c-run" cx="10" cy="7" r="4.5"/>', 'Run-rule signal'], ['<circle class="c-low" cx="10" cy="7" r="3.5"/>', 'Too few to rate'], ...(r.beyond ? [['<path class="c-low" d="M6,11h8l-4,-7Z"/>', 'Too few, beyond the scale']] : []),
       ...(S.base === 'self' ? [] : [['<rect class="c-base" style="fill-opacity:.18" width="20" height="14"/>', 'Baseline']])].map(([a, b]) => `<span>${i(a)}${esc(b)}</span>`).join('');
   }
 
@@ -369,6 +369,7 @@
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
   const diamond = (x, y, r) => `M${x},${y - r}L${x + r},${y}L${x},${y + r}L${x - r},${y}Z`;
+  // control charts are scaled to their limits, not to zero (Style Guide): the limits are what the reader compares with
   function pad(a, b) { const d = (b - a || Math.abs(b) || 1) * .08, [lo, hi] = bounds() || [-Infinity, Infinity]; return [Math.max(lo, a - d), Math.min(hi, b + d)]; }
   function tick(v) {
     switch (M.k.format) {
@@ -381,7 +382,7 @@
     }
   }
   function axis(s, a, b, y, x1, x2, n = 5) {
-    const raw = (b - a) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw);
+    const st = Site.tickStep((b - a) / n, M.k.format);
     const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) { el('line', { x1, x2, y1: y(v), y2: y(v) }, g); text(ax, x1 - 8, y(v) + 4, tick(v), '', 'end'); }
   }
@@ -397,7 +398,7 @@
     const vals = src.flatMap((p) => p.l ? [p.v, p.l.lcl, p.l.ucl] : [p.v]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih;
     const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: small ? 'img' : 'group', 'aria-label': `${M.k.name}, ${r.name}, ${grainWord()}, ${range(r.w.s, r.w.e)}. ${r.lim ? `${r.out.length} outside the limits, ${r.run.length} run-rule signals.` : 'No limits.'} Use View as table for values.` }, host);
     if (S.base !== 'self' && r.be > t0) el('rect', { class: 'c-base', x: m.l, y: m.t, width: Math.max(0, x(r.w.s) - m.l), height: ih }, s);
-    axis(s, a, b, y, m.l, m.l + iw, small ? 3 : 5);
+    axis(s, a, b, y, m.l, m.l + iw, small ? 4 : 5);
     // month labels, thinned so they never collide
     const ax = el('g', { class: 'ax' }, s); let lastX = -99;
     const d = new Date(t0); for (let c = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + (d.getUTCDate() > 1 ? 1 : 0), 1), first = true; c <= t1; c = addMonths(c, 1)) {
@@ -425,11 +426,13 @@
         at.forEach((q2) => text(s, m.l + iw + 8, q2.y, q2.t, 'c-lab'));
       }
     }
-    el('path', { class: 'c-line', d: shown.map((p, i) => `${i ? 'L' : 'M'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join('') }, s);
+    el('path', { class: 'c-line', d: Site.linePath(shown.map((p) => ({ k: p.t / DAY / (isWeek() ? 7 : 1), x: x(p.t), y: y(p.v) }))) }, s);
+    r.beyond = pts.some((p) => p.v > b || p.v < a);
     const gap = iw / Math.max(1, pts.length), f = small ? .72 : 1;
     pts.forEach((p) => {
       const c = p.low ? 'c-low' : p.sig.includes('outside') ? 'c-out' : p.sig.length ? 'c-run' : 'c-pt';
-      if (c === 'c-out') el('path', { class: c, d: diamond(x(p.t), y(p.v), f * 7) }, s);
+      if (p.v > b || p.v < a) { const py = y(p.v), q = (p.v > b ? 1 : -1) * 4; el('path', { class: 'c-low c-off', d: `M${x(p.t) - 4},${py + q}h8l-4,${-1.6 * q}Z` }, s); }
+      else if (c === 'c-out') el('path', { class: c, d: diamond(x(p.t), y(p.v), f * 7) }, s);
       else el('circle', { class: c, cx: x(p.t), cy: y(p.v), r: f * (c === 'c-run' ? 4 : c === 'c-low' ? 2.6 : gap > 10 ? 4 : 2) }, s);
     });
     // hover and keyboard: nearest point
@@ -448,6 +451,7 @@
       const show = (ev) => { const bx = g.getBoundingClientRect(); showTip(`<b>${k.num}. ${esc(k.e.name)}</b><br>${k.e.start === k.e.end ? fmt.date(k.e.start) : range(ts(k.e.start), ts(k.e.end))}<br><span class="muted">${esc(k.e.description)}</span>`, ev.clientX ?? bx.left, ev.clientY ?? bx.top); };
       g.addEventListener('mouseenter', show); g.addEventListener('focus', show); g.addEventListener('mouseleave', hideTip); g.addEventListener('blur', hideTip);
     }
+    if (!small) Site.eventKey(host, marks.map((k) => ({ n: k.num, e: k.e })));
   }
 
   // ---------- Controls ----------

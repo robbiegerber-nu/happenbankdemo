@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -243,7 +243,7 @@
     const st = small ? 'none' : statusOf(k, t.R1), q = ch ? (ch.flat ? 'flat' : good(ch.delta)) : 'neutral';
     const bf = cur.byF, mix = bf ? bf.rows.reduce((s, r) => s + r.mix, 0) : null, rate = bf ? bf.rows.reduce((s, r) => s + r.rate, 0) : null;
     $('kpi').innerHTML = `<span class="v">${V(t.R1)}</span>${k.target == null ? '' : `<span class="status ${st}">${small ? 'Too few to rate' : STATUS_WORD[st]}</span>`}
-      <span class="chg ${small ? 'neutral' : q}">${!ch ? 'No earlier month to compare' : ch.flat ? 'No change vs ' + cmpName() : Site.changeMark(small ? '' : q, `${ch.delta > 0 ? '▲' : '▼'} ${ch.text} vs ${cmpName()}`)}</span>
+      <span class="chg ${small ? 'neutral' : q}">${!ch ? 'No earlier month to compare' : ch.flat ? 'No change vs ' + cmpName() : Site.changeMark(small ? '' : q, `${ch.delta > 0 ? '▲' : '▼'} ${ch.text} vs ${cmpName()}${k.format === 'count' && cur.c && Site.perDay(t.R1, Site.monthDays(cur.m), t.R0, Site.monthDays(cur.c)) ? ` (${Site.perDay(t.R1, Site.monthDays(cur.m), t.R0, Site.monthDays(cur.c))})` : ''}`)}</span>
       ${cur.hasCmp && P().scale != null && bf && bf.change != null ? `<span class="p">By ${esc(S.by.toLowerCase())}: mix ${C(mix)} · rate ${C(rate)}</span>` : ''}`;
     $('so').innerHTML = soWhat(small);
   }
@@ -306,7 +306,7 @@
   function tick(v) {
     switch (unit()) { case 'pct': return +v.toFixed(1) + '%'; case 'nps': return sign(v) + Math.abs(+v.toFixed(1)); case 'wait': case 'duration': return V(v); case 'count': return fmt.shortNum(v); default: return String(+v.toFixed(1)); }
   }
-  function ticks(a, b, n) { const raw = (b - a) / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const ticks = Site.ticks;
   function tipOn(node, html, click) {
     const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.right, ev.clientY ?? b.top); };
     node.addEventListener('mousemove', show); node.addEventListener('focus', show); node.addEventListener('mouseleave', hideTip); node.addEventListener('blur', hideTip);
@@ -318,12 +318,12 @@
     $('tb-trend').textContent = tblTrend ? 'View as chart' : 'View as table'; $('tb-trend').setAttribute('aria-pressed', tblTrend);
     if (tblTrend) { $('tbl-trend').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.short)}</th><th scope="col">Sample (n)</th></tr></thead><tbody>${pts.slice().reverse().map((p) => `<tr><td>${fmt.month(p.m)}</td><td class="${p.n < k.minN ? 'low' : ''}">${V(p.v, true)}</td><td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; const W = host.clientWidth || 800, narrow = W < 560, H = 260, m = { t: 44, r: narrow ? 10 : 92, b: 26, l: 58 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / pts.length;
-    const ok = pts.filter((p) => p.v != null); if (!ok.length) { host.textContent = 'No data for these filters.'; return; }
+    const tot = k.format === 'count', pv = (p) => (tot ? p.v / Site.monthDays(p.m) : p.v), ok = pts.filter((p) => p.v != null); if (!ok.length) { host.textContent = 'No data for these filters.'; return; }
     const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch);
-    let a = Math.min(...ok.map((p) => p.v), ...tg, ...wb), b = Math.max(...ok.map((p) => p.v), ...tg, ...wb); const pad = (b - a || 1) * .1; a -= pad; b += pad;
+    const [a, b] = Site.zeroAxis([...ok.map(pv), ...tg, ...wb], k.format);
     const x = (i) => m.l + step * (i + .5), y = (v) => m.t + (b - v) / (b - a) * ih;
     const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(cur.m)}. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-    for (const t of ticks(a, b, 4)) { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, g); text(ax, m.l - 8, y(t) + 4, tick(t), '', 'end'); }
+    for (const t of ticks(a, b, 4, unit())) { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, g); text(ax, m.l - 8, y(t) + 4, tick(t), '', 'end'); }
     let last = Infinity; for (let i = pts.length - 1; i >= 0; i--) { const lab = i === 0 || pts[i].m.endsWith('-01') ? fmt.month(pts[i].m).replace(' 20', " '") : fmt.monthShort(pts[i].m); if (last - x(i) < 34 + (lab.length > 3 ? 16 : 0)) continue; text(ax, x(i), H - 6, lab, '', 'middle'); last = x(i); }
     const xd = (iso) => { const i = pts.findIndex((p) => p.m === iso.slice(0, 7)); const dd = +iso.slice(8), [yy, mo] = iso.split('-').map(Number); return i < 0 ? (iso < pts[0].m ? m.l : m.l + iw) : m.l + step * (i + (dd - 1) / new Date(Date.UTC(yy, mo, 0)).getUTCDate()); };
     const marks = [];
@@ -331,16 +331,17 @@
     if (tg.length) (k.better === 'range' ? [[k.watch[0], k.target[0]], [k.target[1], k.watch[1]]] : [[k.watch, k.target]]).forEach(([p, q]) => el('rect', { class: 'd-watch', x: m.l, width: iw, y: y(Math.max(p, q)), height: Math.abs(y(p) - y(q)) }, s));
     for (const t of tg) { el('line', { class: 'd-target', x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, s); if (!narrow) text(s, m.l + iw + 8, y(t) + 4, 'Target ' + tick(t), 't'); }
     el('rect', { class: 'd-sel', x: m.l + step * (pts.length - 1), y: m.t, width: step, height: ih }, s);
-    let d = '', pen = false; pts.forEach((p, i) => { if (p.v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(p.v).toFixed(1); pen = true; }); el('path', { class: 'd-line', d }, s);
+    let d = '', pen = false; pts.forEach((p, i) => { if (p.v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(pv(p)).toFixed(1); pen = true; }); el('path', { class: 'd-line', d }, s);
     pts.forEach((p, i) => {
-      if (p.v != null) el('circle', { class: p.n < k.minN ? 'd-low' : p.m === cur.c ? 'd-cmp' : 'd-pt', cx: x(i), cy: y(p.v), r: p.m === cur.m ? 6 : p.m === cur.c ? 5 : 4 }, s);
+      if (p.v != null) el('circle', { class: p.n < k.minN ? 'd-low' : p.m === cur.c ? 'd-cmp' : 'd-pt', cx: x(i), cy: y(pv(p)), r: p.m === cur.m ? 6 : p.m === cur.c ? 5 : 4 }, s);
       const can = IDX.months.indexOf(p.m) > 0;
       const h = el('rect', { class: 'hit', x: m.l + step * i, y: m.t, width: step, height: ih, tabindex: 0, 'data-k': 't|' + p.m, role: 'button', 'aria-label': `${fmt.month(p.m)}: ${V(p.v)}. Show this month` }, s);
-      tipOn(h, () => `<b>${fmt.month(p.m)}</b>${p.m === cur.c ? ' · comparison' : ''}<br>${esc(k.short)}: <b>${V(p.v, true)}</b><br>n = ${fmt.count(p.n)}${p.n < k.minN ? ', below ' + k.minN : ''}${eventsIn(p.m).length ? `<br><span class="muted">Events: ${eventsIn(p.m).map((e) => esc(e.name)).join(', ')}</span>` : ''}`, can ? () => { S.month = p.m; carried(p.m); go(); } : null);
+      tipOn(h, () => `<b>${fmt.month(p.m)}</b>${p.m === cur.c ? ' · comparison' : ''}<br>${esc(k.short)}: <b>${V(p.v, true)}</b>${tot ? `<br>Average per day: <b>${V(pv(p), true)}</b>` : ''}<br>n = ${fmt.count(p.n)}${p.n < k.minN ? ', below ' + k.minN : ''}${eventsIn(p.m).length ? `<br><span class="muted">Events: ${eventsIn(p.m).map((e) => esc(e.name)).join(', ')}</span>` : ''}`, can ? () => { S.month = p.m; carried(p.m); go(); } : null);
     });
     for (const [e, num, ex, ey] of marks) { const q = el('g', { class: 'd-ev', transform: `translate(${ex},${ey})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, num); tipOn(q, () => `<b>${num}. ${esc(e.name)}</b><br>${e.start === e.end ? fmt.date(e.start) : fmt.date(e.start) + ' – ' + fmt.date(e.end)}<br><span class="muted">${esc(e.description)}</span>`); }
+    Site.eventKey(host, marks.map(([e, num]) => ({ n: num, e })));
     const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`;
-    $('lg-trend').innerHTML = [[`<line class="d-line" x2="20" y1="7" y2="7"/>`, k.short], ['<circle class="d-pt" cx="10" cy="7" r="6"/>', fmt.month(cur.m)], ...(pts.some((p) => p.m === cur.c) ? [['<circle class="d-cmp" cx="10" cy="7" r="5"/>', 'Comparison']] : []), ...(tg.length ? [['<line class="d-target" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="d-watch" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : [])].map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
+    $('lg-trend').innerHTML = [[`<line class="d-line" x2="20" y1="7" y2="7"/>`, tot ? `${k.short}, average per day` : k.short], ['<circle class="d-pt" cx="10" cy="7" r="6"/>', fmt.month(cur.m)], ...(pts.some((p) => p.m === cur.c) ? [['<circle class="d-cmp" cx="10" cy="7" r="5"/>', 'Comparison']] : []), ...(tg.length ? [['<line class="d-target" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="d-watch" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : [])].map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
   }
 
   function renderWater() {
@@ -352,12 +353,15 @@
     const steps = top.map((r) => ({ name: r.key, v: r.total, r }));
     if (rest.length) steps.push({ name: `Other ${PL[S.by]} (${rest.length})`, v: rest.reduce((s, r) => s + r.total, 0) });
     if (small.length) steps.push({ name: 'Other (small samples)', v: small.reduce((s, r) => s + r.total, 0) });
-    const W = host.clientWidth || 800, narrow = W < 560, rowH = 30, n = steps.length + 2, H = n * rowH + 8, lw = narrow ? 120 : 250, vw = narrow ? 84 : 130, iw = W - lw - vw;
+    const W = host.clientWidth || 800, narrow = W < 560, rowH = 30, n = steps.length + 2, H = n * rowH + 46, lw = narrow ? 120 : 250, vw = narrow ? 84 : 130, iw = W - lw - vw;
     let acc = d.R0, lo = Math.min(d.R0, d.R1), hi = Math.max(d.R0, d.R1); for (const q of steps) { q.a = acc; acc += q.v; q.b = acc; lo = Math.min(lo, acc); hi = Math.max(hi, acc); }
     const pad = (hi - lo || 1) * .06; lo -= pad; hi += pad; const x = (v) => lw + (v - lo) / (hi - lo) * iw;
     const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `From ${V(d.R0)} to ${V(d.R1)}. The breakdown table below lists each part.` }, host);
     const label = (name, i) => text(s, lw - 10, 4 + i * rowH + 19, name.length > (narrow ? 17 : 36) ? name.slice(0, narrow ? 16 : 35) + '…' : name, 't', 'end');
-    // the two totals are points on the axis, not bars: a bar that doesn't start at zero would mislead
+    // the axis is the change since the comparison month, so it has a true zero; the two results are points, with their values at the right
+    const axY = 4 + n * rowH, g0 = el('g', { class: 'g' }, s), ax0 = el('g', { class: 'ax' }, s);
+    for (const t of ticks(lo - d.R0, hi - d.R0, narrow ? 3 : 6, unit())) { const zero = Math.abs(t) < 1e-9; el('line', { x1: x(d.R0 + t), x2: x(d.R0 + t), y1: 4, y2: axY, ...(zero ? { style: 'stroke:var(--text-muted);stroke-width:1.5' } : {}) }, g0); text(ax0, x(d.R0 + t), axY + 16, zero ? '0' : C(t), '', 'middle'); }
+    text(ax0, lw + iw / 2, axY + 34, narrow ? 'Change' : `Change since ${fmt.month(cur.c)}`, '', 'middle');
     const end = (name, v, i) => { label(name, i); el('circle', { class: 'w-end', cx: x(v), cy: 4 + i * rowH + 15, r: 6 }, s); text(s, W - vw + 10, 4 + i * rowH + 19, V(v), 't s'); };
     end(fmt.month(cur.c), d.R0, 0);
     steps.forEach((q, j) => {
@@ -371,7 +375,8 @@
       tipOn(h, () => q.r ? rowTip(q.r) : `<b>${esc(q.name)}</b><br>Contribution: <b>${C(q.v)}</b>`, q.r ? (e) => toggle(S.by, q.name, e.ctrlKey || e.metaKey) : null);
     });
     end(fmt.month(cur.m), d.R1, n - 1); el('line', { class: 'w-link', x1: x(d.R1), x2: x(d.R1), y1: 4 + (n - 1) * rowH - 8, y2: 4 + (n - 1) * rowH + 9 }, s);
-    $('lg-water').innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><rect class="w-up" y="2" width="20" height="10"/></svg>Raised the result (+)</span><span><svg width="20" height="14" aria-hidden="true"><rect class="w-down" y="2" width="20" height="10"/></svg>Lowered the result (−)</span><span><svg width="20" height="14" aria-hidden="true"><circle class="w-end" cx="10" cy="7" r="6"/></svg>Result for the month</span><span>Scale starts at ${V(lo)}</span>`;
+    $('lg-water').innerHTML = `<span><svg width="20" height="14" aria-hidden="true"><rect class="w-up" y="2" width="20" height="10"/></svg>Raised the result (+)</span><span><svg width="20" height="14" aria-hidden="true"><rect class="w-down" y="2" width="20" height="10"/></svg>Lowered the result (−)</span><span><svg width="20" height="14" aria-hidden="true"><circle class="w-end" cx="10" cy="7" r="6"/></svg>Result for the month</span>`;
+    if (k.format === 'count' && Site.monthDays(cur.m) !== Site.monthDays(cur.c)) $('l-water').textContent = `${fmt.month(cur.m)} has ${Site.monthDays(cur.m)} days and ${fmt.month(cur.c)} has ${Site.monthDays(cur.c)}, so part of this change is the length of the month.`;
     if (S.f[S.by]) $('l-water').textContent = `Showing every ${S.by.toLowerCase()} so the selection can be compared; the headline above is filtered.`;
   }
   function waterTitle(d) {
@@ -403,18 +408,18 @@
 
   function renderMinis() {
     const ag = cur.ag, want = ['Queue', 'Reason group', 'Team', 'Persona', 'Segment', 'Channel', 'Age band'].filter((d) => d !== S.by && allowed(d) && !(ag && CUST.includes(d)) && !(d === 'Channel' && P().ch && P().ch.length < 2)).slice(0, 4), k = K();
-    $('s-minis').textContent = `${k.short}, ${fmt.month(cur.m)}${cur.hasCmp ? `; the tick marks ${cmpName()}` : ''}. Largest by contacts first. Click a bar to filter.`;
+    $('s-minis').textContent = `${k.short}, ${fmt.month(cur.m)}${cur.hasCmp ? `; the tick marks ${cmpName()}` : ''}. Largest by contacts first, on one scale. Click a bar to filter.`;
     const host = $('minis'); host.innerHTML = '';
     const boxes = want.map(() => { const b = document.createElement('div'); b.className = 'mini'; host.append(b); return b; });   // all placed first, so widths are final
+    const sets = want.map((dim) => { const now = split(cur.now, dim, dim), was = cur.was ? split(cur.was, dim, dim) : new Map(); return [...now].map(([key, p]) => ({ key, p, v: D.value(p, P().scale), w: D.value(was.get(key), P().scale), low: p.n < k.minN })).filter((r) => r.v != null).sort((a, b) => b.p.n - a.p.n).slice(0, 8); }), every = sets.flat().flatMap((r) => [r.v, r.w ?? r.v]), lo = Math.min(0, ...every), hi = Math.max(0, ...every) || 1;
     want.forEach((dim, w) => {
-      const now = split(cur.now, dim, dim), was = cur.was ? split(cur.was, dim, dim) : new Map();
-      const rows = [...now].map(([key, p]) => ({ key, p, v: D.value(p, P().scale), w: D.value(was.get(key), P().scale), low: p.n < k.minN })).filter((r) => r.v != null).sort((a, b) => b.p.n - a.p.n).slice(0, 8);
+      const rows = sets[w];
       const box = boxes[w]; box.innerHTML = `<h3>${esc(k.short)} by ${dim.toLowerCase()}</h3><div class="chart"></div>`;
       if (!rows.length) { box.lastChild.textContent = 'No data for these filters.'; return; }
-      const ch = box.lastChild, W = ch.clientWidth, rowH = 26, H = rows.length * rowH + 4, lw = Math.min(150, W * .4), vw = 74, vals = rows.flatMap((r) => [r.v, r.w ?? r.v]), lo = Math.min(0, ...vals), hi = Math.max(0, ...vals) || 1, x = (v) => lw + (v - lo) / (hi - lo || 1) * (W - lw - vw);
+      const ch = box.lastChild, W = ch.clientWidth, rowH = 26, H = rows.length * rowH + 4, lw = Math.min(W * .52, Math.max(...sets.flat().map((r) => r.key.length)) * 6.4 + 14), vw = 74, cut = Math.floor((lw - 10) / 6.2), x = (v) => lw + (v - lo) / (hi - lo || 1) * (W - lw - vw);
       const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.short} by ${dim}` }, ch), sel = S.f[dim];
       rows.forEach((r, i) => {
-        const yy = 2 + i * rowH, g = el('g', sel && !sel.includes(r.key) ? { class: 'row-f' } : {}, s), nm = r.key.length > 22 ? r.key.slice(0, 21) + '…' : r.key;
+        const yy = 2 + i * rowH, g = el('g', sel && !sel.includes(r.key) ? { class: 'row-f' } : {}, s), nm = r.key.length > cut ? r.key.slice(0, cut - 1) + '…' : r.key;
         text(g, lw - 8, yy + 17, nm, 't', 'end'); el('rect', { class: 'bar' + (r.low ? ' low' : ''), x: Math.min(x(0), x(r.v)), y: yy + 6, width: Math.max(1, Math.abs(x(r.v) - x(0))), height: rowH - 12, rx: 2 }, g);
         if (r.w != null) el('line', { class: 'tick0', x1: x(r.w), x2: x(r.w), y1: yy + 3, y2: yy + rowH - 3 }, g);
         text(g, W - vw + 8, yy + 17, r.low ? 'n<' + k.minN : V(r.v), r.low ? 't m' : 't s');

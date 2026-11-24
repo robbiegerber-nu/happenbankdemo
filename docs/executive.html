@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -232,7 +232,7 @@
     defaults = { view: 'm', month: lastM, quarter: quarterFor(lastM), cmp: 'prior', kpi: null };
     Site.setDataThrough(DATA.data_through);
     document.getElementById('footer-generated').textContent =
-      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.2`;
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.4`;
   }
   const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
   const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
@@ -433,7 +433,7 @@
     const t = document.createElement('div');
     t.className = 'tile ' + st + (state.kpi === kpi.id ? ' selected' : '');
     const arrow = !chg ? '' : chg.flat ? '–' : chg.delta > 0 ? '▲' : '▼';
-    const chgText = !chg ? 'No comparison' : chg.flat ? `No change vs ${cmpLabel(m)}` : `${arrow} ${chg.text} vs ${cmpLabel(m)}`;
+    const chgText = !chg ? 'No comparison' : chg.flat ? `No change vs ${cmpLabel(m)}` : `${arrow} ${chg.text} vs ${cmpLabel(m)}${isTotal(kpi) && Site.perDay(v, pDays(m), p, pDays(pm)) ? ` (${Site.perDay(v, pDays(m), p, pDays(pm))})` : ''}`;
     const sw = soWhat(kpi, m);
     t.innerHTML = `
       <div class="tile-top"><button class="tile-select" type="button" data-k="${kpi.id}" aria-pressed="${state.kpi === kpi.id}">${esc(kpi.name)}</button></div>
@@ -458,21 +458,10 @@
     if (parent) parent.append(e);
     return e;
   }
+  // totals are drawn per calendar day, because months and quarters differ in length
+  const isTotal = (kpi) => kpi.format === 'count', plotted = (kpi, m) => { const v = val(kpi.id, m); return isTotal(kpi) && v != null ? v / pDays(m) : v; };
   function domain(kpi, vals) {
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (kpi.target != null) {
-      const t = [].concat(kpi.target, kpi.watch);
-      lo = Math.min(lo, ...t); hi = Math.max(hi, ...t);
-    }
-    const pad = (hi - lo || Math.abs(hi) || 1) * 0.12;
-    return [lo - pad, hi + pad];
-  }
-  function niceTicks(lo, hi, count) {
-    const span = hi - lo, step0 = span / count, mag = Math.pow(10, Math.floor(Math.log10(step0)));
-    const step = [1, 2, 2.5, 5, 10].map((s) => s * mag).find((s) => span / s <= count) || mag * 10;
-    const out = [];
-    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(+v.toFixed(10));
-    return out;
+    return Site.zeroAxis(kpi.target == null ? vals : [...vals].concat(kpi.target, kpi.watch), kpi.format);
   }
   function watchRanges(kpi) {   // [from, to] value ranges to shade as the watch band
     if (kpi.target == null) return [];
@@ -485,7 +474,7 @@
   function sparkline(svg, kpi, ms) {
     const W = svg.clientWidth || 220, H = 44, pad = 4;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-    const pts = ms.map((m) => ({ m, v: val(kpi.id, m) })).filter((p) => p.v != null);
+    const pts = ms.map((m) => ({ m, v: plotted(kpi, m) })).filter((p) => p.v != null);
     if (pts.length < 2) return;
     const [lo, hi] = domain(kpi, pts.map((p) => p.v));
     const x = (i) => pad + (i / (ms.length - 1)) * (W - pad * 2 - 4);
@@ -503,7 +492,7 @@
     const f = finding(kpi, m);
     document.getElementById('detail-title').textContent = `${kpi.name}: ${f.charAt(0).toLowerCase() + f.slice(1)}, at ${fmt.value(v, kpi.format)} in ${pName(m)}`;
     document.getElementById('detail-sub').textContent = `${kpi.short}, ${unit()}ly, ${pName(ms[0])} – ${pName(ms[ms.length - 1])}` +
-      (kpi.target == null ? ' · no target' : ` · target ${kpi.targetLabel}`);
+      (kpi.target == null ? ' · no target' : ` · target ${kpi.targetLabel}`) + (isTotal(kpi) ? ' · average per day, because periods differ in length' : '');
     document.getElementById('t-events').checked = state.events;
     const tb = document.getElementById('t-table');
     tb.setAttribute('aria-pressed', state.table); tb.textContent = state.table ? 'View as chart' : 'View as table';
@@ -520,7 +509,7 @@
     const W = host.clientWidth || 800, phone = W < 560, H = phone ? 260 : 320;
     const M = { t: 46, r: phone ? 12 : 92, b: 28, l: 52 };
     const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group' }, host);
-    const pts = ms.map((m) => ({ m, v: val(kpi.id, m), n: nOf(kpi.id, m) }));
+    const pts = ms.map((m) => ({ m, v: plotted(kpi, m), n: nOf(kpi.id, m) }));
     const vals = pts.filter((p) => p.v != null).map((p) => p.v);
     const [lo, hi] = domain(kpi, vals);
     const iw = W - M.l - M.r, ih = H - M.t - M.b, step = iw / ms.length;
@@ -531,10 +520,10 @@
       if (i < 0) return iso < pStart(ms[0]) ? M.l : iso > pEnd(ms[ms.length - 1]) ? M.l + iw : null;
       return M.l + step * (i + (Date.parse(iso) - Date.parse(pStart(ms[i]))) / 864e5 / pDays(ms[i]));
     };
-    svg.setAttribute('aria-label', `${kpi.name}, ${unit()}ly from ${pName(ms[0])} to ${pName(ms[ms.length - 1])}. Latest ${fmt.value(val(kpi.id, ms[ms.length - 1]), kpi.format)}. Use View as table for exact values.`);
+    svg.setAttribute('aria-label', `${kpi.name}, ${unit()}ly from ${pName(ms[0])} to ${pName(ms[ms.length - 1])}. Latest ${fmt.value(plotted(kpi, ms[ms.length - 1]), kpi.format)}${isTotal(kpi) ? ' a day' : ''}. Use View as table for exact values.`);
 
     // grid + y axis
-    const ticks = niceTicks(lo, hi, phone ? 4 : 5);
+    const ticks = Site.ticks(lo, hi, phone ? 4 : 5, kpi.format);
     const g = svgEl('g', { class: 'grid' }, svg), ax = svgEl('g', { class: 'ax' }, svg);
     for (const t of ticks) {
       svgEl('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g);
@@ -604,7 +593,7 @@
     });
     if (!phone) {
       const lp = pts[pts.length - 1];
-      if (lp.v != null && !targetLines(kpi).length) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(lp.v) + 4 }, svg); l.textContent = fmt.value(lp.v, kpi.format); }
+      if (lp.v != null && !targetLines(kpi).length) { const l = svgEl('text', { class: 'm-target-label', x: M.l + iw + 8, y: y(lp.v) + 4 }, svg); l.textContent = fmt.value(lp.v, kpi.format) + (isTotal(kpi) ? ' a day' : ''); }
     }
 
     // hover layer: crosshair + tooltip per period, and event markers
@@ -617,7 +606,7 @@
       if (p.v == null) { showTip(`<b>${pName(p.m)}</b><br>No data`, clientX, clientY); return; }
       const st = statusOf(kpi, p.v), low = p.n != null && p.n < kpi.minN;
       const evNames = eventsIn(p.m).map((e) => esc(e.name));
-      showTip(`<b>${pName(p.m)}</b><br>${esc(kpi.short)}: <b>${fmt.value(p.v, kpi.format, true)}</b>` +
+      showTip(`<b>${pName(p.m)}</b><br>${esc(kpi.short)}: <b>${fmt.value(p.v, kpi.format, true)}</b>${isTotal(kpi) ? ` a day<br>Total: ${fmt.value(val(kpi.id, p.m), kpi.format, true)}` : ''}` +
         (kpi.target != null ? `<br><span class="status ${low ? 'none' : st}">${low ? 'Too few to rate' : STATUS_WORD[st]}</span> target ${esc(kpi.targetLabel)}` : '') +
         (p.n != null && kpi.minN ? `<br>n = ${fmt.count(p.n)}${low ? ', below ' + kpi.minN : ''}` : '') +
         (evNames.length ? `<br><span class="muted">Events: ${evNames.join(', ')}</span>` : ''), clientX, clientY);
@@ -634,7 +623,7 @@
       at = Math.max(0, Math.min(ms.length - 1, n));
       const r = svg.getBoundingClientRect(), p = pts[at];
       onMove(x(at), 0, r.left + x(at) * r.width / W, r.top + (p.v == null ? M.t : y(p.v)) * r.height / H);
-      live.textContent = `${pName(p.m)}: ${fmt.value(p.v, kpi.format, true)}${kpi.target == null ? '' : ', ' + STATUS_WORD[statusOf(kpi, p.v)]}`;
+      live.textContent = `${pName(p.m)}: ${fmt.value(p.v, kpi.format, true)}${isTotal(kpi) ? ' a day' : ''}${kpi.target == null ? '' : ', ' + STATUS_WORD[statusOf(kpi, p.v)]}`;
     });
     hit.addEventListener('blur', () => { cross.setAttribute('visibility', 'hidden'); hideTip(); });
     for (const it of evs) {
@@ -648,8 +637,8 @@
     // legend
     const legend = [`<span><i class="l-line"></i>${esc(kpi.short)}</span>`];
     if (kpi.target != null) legend.push(`<span><i class="l-target"></i>Target</span>`, `<span><i class="l-watch"></i>Watch range</span>`);
-    if (state.events && evs.length) legend.push(`<span><i class="l-event"></i>Events: numbered markers, hover for details</span>`);
-    document.getElementById('trend-legend').innerHTML = legend.join('');
+    document.getElementById('trend-legend').innerHTML = legend.length > 1 ? legend.join('') : '';
+    Site.eventKey(host, evs.map((it) => ({ n: it.num, e: it.e })));
   }
   function tickLabel(kpi, v, exact) {
     switch (kpi.format) {
@@ -710,8 +699,8 @@
       return { m, v, n, st: low ? 'none' : statusOf(kpi, v), low };
     });
     host.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn" id="csv-btn" type="button">Download CSV</button></div>
-      <div class="tbl-wrap" tabindex="0" role="region" aria-label="Values by ${unit()}"><table><thead><tr><th scope="col">${state.view === 'q' ? 'Quarter' : 'Month'}</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
-      ${rows.map((r) => `<tr><td>${pName(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
+      <div class="tbl-wrap" tabindex="0" role="region" aria-label="Values by ${unit()}"><table><thead><tr><th scope="col">${state.view === 'q' ? 'Quarter' : 'Month'}</th><th scope="col">${esc(kpi.short)}</th>${kpi.target != null ? '<th scope="col">Status</th>' : ''}${isTotal(kpi) ? '<th scope="col">Average per day</th>' : ''}<th scope="col">Sample (n)</th></tr></thead><tbody>
+      ${rows.map((r) => `<tr><td>${pName(r.m)}</td><td class="${r.low ? 'low' : ''}">${fmt.value(r.v, kpi.format, true)}</td>${isTotal(kpi) ? `<td>${fmt.value(r.v == null ? null : r.v / pDays(r.m), kpi.format, true)}</td>` : ''}${kpi.target != null ? `<td><span class="status ${r.st}">${r.low ? 'Too few' : STATUS_WORD[r.st]}</span></td>` : ''}<td>${r.n != null ? fmt.count(r.n) : '–'}</td></tr>`).join('')}
       </tbody></table></div>`;
     host.querySelector('#csv-btn').addEventListener('click', () => {
       const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';

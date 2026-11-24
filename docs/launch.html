@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <script src="assets/launch.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -183,7 +183,7 @@
   // ---------- Chart helpers ----------
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
-  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const ticks = Site.ticks;
   const tick = (m, v) => (F(m) === 'pct' ? +v.toFixed(1) + '%' : F(m) === 'duration' ? fmt.value(v, 'duration') : fmt.shortNum(v));
   function tip(node, html, click) {
     const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); };
@@ -203,22 +203,22 @@
     if (table) { $('tbl-ser').innerHTML = `<table><thead><tr><th scope="col">Week</th><th scope="col">${esc(k.short)}</th><th scope="col">Expected</th><th scope="col">Normal range</th><th scope="col">Reading</th>${oc ? '<th scope="col">Other reasons</th>' : ''}<th scope="col">n</th></tr></thead><tbody>${pts.map((p) => `<tr><td>${wName(l, p.w)}</td><td class="${p.low ? 'low' : ''}">${V(m, p.v)}</td><td>${V(m, p.e)}</td><td>${V(m, Math.max(0, p.lo))} – ${V(m, p.hi)}</td><td>${p.low ? 'too few' : p.out ? (p.v > p.hi ? 'above range' : 'below range') : 'in range'}${p.base ? ' (baseline)' : ''}</td>${oc ? `<td>${V(m, p.other)}</td>` : ''}<td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-ser').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for this launch.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 300, G = { t: 42, r: 14, b: 44, l: 60 }, iw = w - G.l - G.r, ih = H - G.t - G.b, w0 = pts[0].w, nW = pts[pts.length - 1].w - w0 + 1, step = iw / nW, x = (q) => G.l + (q - w0 + .5) * step;
-    const vs = pts.flatMap((p) => [p.v, p.lo, p.hi, ...(p.other != null ? [p.other] : [])]); let a = m === 'volume' ? 0 : Math.min(...vs), b = Math.max(...vs); const pad = (b - a || 1) * .08; if (m !== 'volume') a -= pad; b += pad; const y = (v) => G.t + (b - v) / (b - a) * ih;
+    const vs = pts.flatMap((p) => [p.v, p.lo, p.hi, ...(p.other != null ? [p.other] : [])]); const [a, b] = Site.zeroAxis(vs, k.format); const y = (v) => G.t + (b - v) / (b - a) * ih;
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by week. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-    for (const t of ticks(a, b, 5)) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     pts.forEach((p) => { if (!narrow || p.w % 4 === 0) text(ax, x(p.w), H - 26, wk(p.w), '', 'middle'); }); text(ax, G.l + iw / 2, H - 6, 'Weeks from launch', '', 'middle');
     el('path', { class: 'rng', d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.w)},${y(Math.max(a, p.hi))}`).join('') + [...pts].reverse().map((p) => `L${x(p.w)},${y(Math.max(a, p.lo))}`).join('') + 'Z' }, s);
     const lx = x(0) - step / 2; el('line', { class: 'launch', x1: lx, x2: lx, y1: G.t - 6, y2: G.t + ih }, s); text(s, lx + (narrow ? 0 : 6), G.t - 12, 'Launch', 'lab', narrow ? 'middle' : 'start');
-    const xt = (t) => x(0) - step / 2 + (t - ts(l.date)) / (7 * DAY) * step; let n = 0, lastX = -99;
+    const xt = (t) => x(0) - step / 2 + (t - ts(l.date)) / (7 * DAY) * step; let n = 0, lastX = -99; const key = [];
     for (const e of EV) { if (e.name === l.name) continue; const p = Math.max(ts(e.start), ts(l.date) + w0 * 7 * DAY), q = Math.min(ts(e.end), ts(l.date) + (w0 + nW) * 7 * DAY - DAY); if (q < p) continue; n++; const ea = xt(p), eb = xt(q + DAY); if (e.span === 'Period') el('rect', { class: 'evb', x: ea, y: G.t, width: Math.max(2, eb - ea), height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s);
-      const mx = Math.max(ea, lastX + 17), i = n; lastX = mx; const c = el('g', { class: 'ev', transform: `translate(${mx},${G.t + 12})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, c); el('circle', { r: 8 }, c); text(c, 0, 3.5, i); tip(c, () => `<b>${i}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
-    const path = (f) => pts.filter((p) => f(p) != null).map((p, i) => `${i ? 'L' : 'M'}${x(p.w)},${y(f(p))}`).join('');
+      const mx = Math.max(ea, lastX + 17), i = n; lastX = mx; key.push({ n, e }); const c = el('g', { class: 'ev', transform: `translate(${mx},${G.t + 12})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, c); el('circle', { r: 8 }, c); text(c, 0, 3.5, i); tip(c, () => `<b>${i}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
+    const path = (f) => Site.linePath(pts.filter((p) => f(p) != null).map((p) => ({ k: p.w, x: x(p.w), y: y(f(p)) })));
     if (oc) el('path', { class: 'l3', d: path((p) => p.other) }, s); el('path', { class: 'l2', d: path((p) => p.e) }, s); el('path', { class: 'l1', d: path((p) => (p.low ? null : p.v)) }, s);
     const evs = [...s.querySelectorAll('.ev')];
     pts.forEach((p) => { if (p.out && !p.low) el('path', { class: 'ptx', d: `M${x(p.w)},${y(p.v) - 6}l6,6l-6,6l-6,-6Z` }, s); else el('circle', { class: 'pt' + (p.low ? ' low' : ''), cx: x(p.w), cy: y(p.v), r: 4 }, s);
       const h = el('rect', { class: 'hit', x: x(p.w) - step / 2, y: G.t, width: step, height: ih, tabindex: p.w === 0 ? 0 : -1, role: 'img', 'aria-label': `${wName(l, p.w)}: ${V(m, p.v)}, expected ${V(m, p.e)}${p.low ? ', too few' : p.out ? ', outside the normal range' : ''}` }, s);
       tip(h, () => `<b>${wName(l, p.w)}</b><br>${esc(k.name)}: <b>${V(m, p.v)}</b><br>Expected: ${V(m, p.e)} (${V(m, Math.max(0, p.lo))} – ${V(m, p.hi)})${oc ? `<br>Other reasons: ${V(m, p.other)}` : `<br>${sg(p.v - p.e)} (${sg((p.v / p.e - 1) * 100, 1)}%)`}<br><span class="muted">${p.base ? 'Baseline week' : p.out ? 'Outside the normal range' : 'In the normal range'}${p.low ? ` · n = ${fmt.count(p.n)}, below ${k.minN}` : ''}</span>`); });
-    evs.forEach((e) => s.append(e)); arrows(s);
+    evs.forEach((e) => s.append(e)); arrows(s); Site.eventKey(host, key);
     if (pts.every((p) => p.w !== 0)) s.querySelector('.hit').setAttribute('tabindex', 0);
     $('lg-ser').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Affected reasons'], ['<line class="l2" x2="20" y1="7" y2="7"/>', 'Expected'], ['<rect class="rng" width="20" height="14"/>', 'Normal range'], ['<path class="ptx" d="M10,1l6,6l-6,6l-6,-6Z"/>', 'Outside the range'], ...(oc ? [['<line class="l3" x2="20" y1="7" y2="7"/>', 'Other reasons']] : [])]);
   }

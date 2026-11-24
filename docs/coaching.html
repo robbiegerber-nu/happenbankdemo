@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <script src="assets/coaching.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -80,6 +80,7 @@
   #t-agent:focus { outline: none; } #sec-agent { scroll-margin-top: 80px; }
   input[type=search] { font: inherit; font-size: 14px; min-height: 40px; border: 1px solid var(--control); border-radius: 8px; padding: 6px 10px; background: var(--surface); color: var(--text-primary); width: 160px; }
   @media (max-width: 767px) { .how summary, input[type=search], .card .btn { min-height: 44px; } }
+  .far { fill: var(--text-primary); font-size: 16px; font-weight: 700; font-family: var(--font); }
 </style>
 </head>
 <body>
@@ -255,7 +256,7 @@
   // ---------- Chart helpers ----------
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
-  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const ticks = Site.ticks;
   const tick = (m, v) => (f(m) === 'duration' ? secs(v) : f(m) === 'pct' ? +v.toFixed(1) + '%' : String(+v.toFixed(1))), secs = (v) => fmt.value(v, 'duration');
   const gtick = (m, v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) + (f(m) === 'duration' ? ' s' : '');
   function tip(node, html, click) {
@@ -287,11 +288,11 @@
       const box = boxes[METRICS.indexOf(m)]; box.innerHTML = `<div class="sm-h">${esc(kpi(m).name)}${m === 'quality' ? ' (3 months)' : ''}</div>`;
       const w = box.clientWidth || 340, H = 130, M = { l: 54, r: 12, t: 8, b: 22 }, pts = tr.map((t, i) => ({ t, i, p: part(m, t), v: C.value(m, part(m, t)), e: C.expected(m, part(m, t)) })).filter((q) => q.v != null);
       if (!pts.length) { box.insertAdjacentHTML('beforeend', '<p class="note">No data.</p>'); continue; }
-      let lo = Math.min(...pts.flatMap((q) => [q.v, q.e])), hi = Math.max(...pts.flatMap((q) => [q.v, q.e])); const pad = (hi - lo || 2) * .15; lo -= pad; hi += pad;
+      const [lo, hi] = Site.zeroAxis(pts.flatMap((q) => [q.v, q.e]), kpi(m).format);
       const x = (i) => M.l + (i + .5) / tr.length * (w - M.l - M.r), y = (v) => M.t + (hi - v) / (hi - lo) * (H - M.t - M.b), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'img', 'aria-label': `${kpi(m).name}: ${pts.map((q) => `${fmt.month(q.t.m)} ${V(m, q.v)}, group ${V(m, q.e)}`).join('; ')}` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-      for (const t of ticks(lo, hi, 3)) { el('line', { x1: M.l, x2: w - M.r, y1: y(t), y2: y(t) }, g); text(ax, M.l - 6, y(t) + 4, tick(m, t), '', 'end'); }
+      for (const t of ticks(lo, hi, 3, kpi(m).format)) { el('line', { x1: M.l, x2: w - M.r, y1: y(t), y2: y(t) }, g); text(ax, M.l - 6, y(t) + 4, tick(m, t), '', 'end'); }
       tr.forEach((t, i) => text(ax, x(i), H - 6, fmt.monthShort(t.m), '', 'middle'));
-      el('path', { class: 'l2', d: pts.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.e)}`).join('') }, s); el('path', { class: 'l1', d: pts.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.v)}`).join('') }, s);
+      el('path', { class: 'l2', d: Site.linePath(pts.map((q) => ({ k: q.i, x: x(q.i), y: y(q.e) }))) }, s); el('path', { class: 'l1', d: Site.linePath(pts.map((q) => ({ k: q.i, x: x(q.i), y: y(q.v) }))) }, s);
       pts.forEach((q) => { el('circle', { class: 'pt' + (few(m, q.p) ? ' low' : ''), cx: x(q.i), cy: y(q.v), r: 4 }, s); tip(el('rect', { class: 'hit0', x: x(q.i) - 20, y: 0, width: 40, height: H - M.b }, s), () => `<b>${fmt.month(q.t.m)}</b><br>${esc(kpi(m).name)}: <b>${V(m, q.v)}</b><br>Group: ${V(m, q.e)}<br>${mark(m, sig(m, q.p))}<br><span class="muted">n = ${fmt.count(C.n(m, q.p))}</span>`); });
     } }
     $('lg-agent').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Agent'], ['<line class="l2" x2="20" y1="7" y2="7"/>', 'Group, for the same contacts (adherence and quality: whole group)'], ['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']]);
@@ -339,15 +340,17 @@
     host.innerHTML = ''; $('lg-strip').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, rh = narrow ? 64 : 50, L = narrow ? 12 : 220, R = 20, T = 8, H = T + tm.length * rh + 26, src = pts.filter((q) => q.x.s[m] !== 'few'), mx = Math.max(...(src.length ? src : pts).map((q) => Math.abs(q.d))) * 1.08 || 1, x = (v) => L + (Math.max(-mx, Math.min(mx, v)) + mx) / (2 * mx) * (w - L - R);
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} gaps by team. Use View as table for values; arrow keys move between agents.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-    for (const t of ticks(-mx, mx, narrow ? 4 : 8)) { el('line', { x1: x(t), x2: x(t), y1: T, y2: H - 26 }, g); text(ax, x(t), H - 8, gtick(m, t), '', 'middle'); }
+    for (const t of ticks(-mx, mx, narrow ? 4 : 8, kpi(m).format)) { el('line', { x1: x(t), x2: x(t), y1: T, y2: H - 26 }, g); text(ax, x(t), H - 8, gtick(m, t), '', 'middle'); }
     el('line', { class: 'zero', x1: x(0), x2: x(0), y1: T, y2: H - 26 }, s);
     const hits = []; tm.forEach((t, r) => {
       const y0 = T + r * rh + (narrow ? 40 : rh / 2); if (r) el('line', { class: 'sep', x1: 0, x2: w, y1: T + r * rh, y2: T + r * rh }, s);
       if (narrow) text(s, 4, T + r * rh + 16, t.name, 'lab'); else text(s, L - 14, y0 + 4, t.name, 'lab', 'end');
       const used = []; pts.filter((q) => q.x.a.t === t.id).sort((a, b) => a.d - b.d).forEach((q) => { const px = x(q.d); let o = 0; for (const c of [0, -8, 8, -16, 16]) { o = c; if (!used.some((u) => Math.abs(u[0] - px) < 9 && u[1] === c)) break; } used.push([px, o]); hits.push([q, px, y0 + o]); });
     });
+    const far = hits.filter(([q]) => Math.abs(q.d) > mx);
+    far.forEach(([q, px, py]) => text(s, px + (q.d > 0 ? 8 : -8), py + 4, q.d > 0 ? '›' : '‹', 'far', q.d > 0 ? 'start' : 'end'));
     hits.forEach(([q, px, py], i) => { const h = dot(s, m, q.x, px, py, q.x.s[m], 'strip'); if (!i) h.setAttribute('tabindex', 0); h.setAttribute('aria-label', `${q.x.a.name}, ${tName(q.x.a.t)}: gap ${GT(m, q.x.part(m))}, ${q.x.ramp ? 'ramping up' : mark(m, q.x.s[m]).replace(/[◆▲] /, '')}`); tip(h, () => describe(m, q.x), () => pick(q.x.a.id)); });
-    arrows(s); $('lg-strip').innerHTML = LEG();
+    arrows(s); $('lg-strip').innerHTML = LEG() + (far.length ? `<span><b aria-hidden="true">‹ ›</b>Too few to rate, and beyond the scale: ${far.length}</span>` : '');
   }
   function tblSwap(k, ids) { ids.forEach((i) => ($(i).hidden = tbl[k])); $('tbl-' + k).hidden = !tbl[k]; $('tb-' + k).textContent = tbl[k] ? 'View as chart' : 'View as table'; $('tb-' + k).setAttribute('aria-pressed', tbl[k]); }
   // ---------- Handle time against resolution ----------

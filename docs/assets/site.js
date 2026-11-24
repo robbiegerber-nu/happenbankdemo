@@ -327,5 +327,31 @@
     else done('Copy failed');
   }
 
-  window.Site = { setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  // Every value axis starts at zero (Style Guide), so a small change never looks large. Measures that can go below zero
+  // (NPS, forecast error) extend below it, and zero stays on the axis. Percentages stop at 100.
+  function zeroAxis(vals, format) {
+    const v = vals.filter((q) => q != null && Number.isFinite(q)), signed = format === 'nps' || format === 'signedpct', lo = signed ? Math.min(0, ...v) : 0, hi = Math.max(0, ...v), pad = (hi - lo || 1) * .08;
+    return [lo < 0 ? lo - pad : 0, hi > 0 || lo === 0 ? (format === 'pct' ? Math.max(hi, Math.min(100, hi + pad)) : hi + pad) : 0];
+  }
+
+  // Axis steps: round numbers, and whole minutes or seconds for times
+  function tickStep(raw, format) {
+    if (!(raw > 0)) return 1;
+    if ((format === 'duration' || format === 'wait') && raw >= 1) return [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 14400].find((q) => q >= raw) || 86400;
+    const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    return (mag >= 10 ? [1, 2, 2.5, 5, 10] : [1, 2, 5, 10]).map((q) => q * mag).find((q) => q >= raw * .9999);
+  }
+  function ticks(a, b, n, format) { const st = tickStep((b - a) / n, format), o = []; for (let v = Math.ceil(a / st - 1e-9) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8) || 0); return o; }
+  // Line path that breaks wherever a period is missing, so a gap never looks measured. pts: { k: whole period number, x, y }
+  function linePath(pts) { return pts.map((p, i) => `${i && Math.round(p.k - pts[i - 1].k) === 1 ? 'L' : 'M'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(''); }
+  // Change in a total per calendar day, for periods of different length. Null when the lengths match.
+  function perDay(v, days, was, wasDays) { if (v == null || !was || !days || !wasDays || days === wasDays) return null; const d = round((v / days / (was / wasDays) - 1) * 100, 1); return (d > 0 ? '+' : d < 0 ? MINUS : '') + Math.abs(d).toFixed(1) + '% a day'; }
+  const monthDays = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+  // Key to the numbered event markers, shown under the chart. list: [{ n, e }]
+  function eventKey(host, list) {
+    if (!list.length) return;
+    const p = el('p', { class: 'evkey' }); p.innerHTML = '<b>Events</b> ' + list.map(({ n, e }) => `<span><i>${n}</i> ${esc(e.name)}, ${fmt.dateShort(e.start)}</span>`).join(' '); host.append(p);
+  }
+
+  window.Site = { ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

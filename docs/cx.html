@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.4">
-<script src="assets/site.js?v=2.7"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.5">
+<script src="assets/site.js?v=2.9"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -76,6 +76,7 @@
   .d0 { fill: var(--brand-blue); } .d1 { fill: var(--control); fill-opacity: .55; } .sep2 { stroke: var(--control); } .bb { fill: var(--brand-blue); } .bw { fill: var(--brand-purple); }
   td div { font-size: 12.5px; } td svg { vertical-align: middle; } .tools .filter { color: var(--text-secondary); }
   @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .card .btn, .tools .filter select { min-height: 44px; } .tools .filter { flex: none; } }
+  .mini-h { font-size: 16px; margin: 20px 0 8px; }
 </style>
 </head>
 <body>
@@ -115,6 +116,7 @@
     <section class="card" aria-labelledby="t-dist">
       <div class="head"><div><h2 id="t-dist"></h2><div class="sub" id="s-dist"></div></div><div class="tools"><button class="btn" id="csv-dist" type="button">Download CSV</button><button class="btn" id="tb-dist" type="button">View as table</button></div></div>
       <div class="chart" id="c-dist"></div><div class="legend" id="lg-dist"></div><div class="tbl" id="tbl-dist" tabindex="0" role="region" aria-label="Score mix by month" hidden></div>
+      <h3 class="mini-h" id="t-dc"></h3><div class="tbl" id="tbl-dc" tabindex="0" role="region" aria-labelledby="t-dc"></div>
     </section>
     <section class="card" aria-labelledby="t-th">
       <div class="head"><div><h2 id="t-th">What customers said</h2><div class="sub" id="s-th"></div></div><div class="tools"><button class="btn" id="csv-th" type="button">Download CSV</button></div></div>
@@ -210,7 +212,7 @@
   // ---------- Chart helpers ----------
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
-  function ticks(a, b, n) { const raw = (b - a) / n || 1, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 5, 10].map((q) => q * mag).find((q) => q >= raw), o = []; for (let v = Math.ceil(a / st) * st; v <= b + 1e-9; v += st) o.push(+v.toFixed(8)); return o; }
+  const ticks = Site.ticks;
   const tick = (m, v) => (F(m) === 'pct' ? +v.toFixed(1) + '%' : F(m) === 'nps' ? (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(+v.toFixed(1)) : String(+v.toFixed(2)));
   function tip(node, html, click) {
     const show = (ev) => { const b = node.getBoundingClientRect(); showTip(html(), ev.clientX ?? b.left + b.width / 2, ev.clientY ?? b.top + b.height / 3); };
@@ -228,21 +230,22 @@
     swap('tr', ['c-tr', 'lg-tr']);
     if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">n</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${fmt.month(x.m)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v)}${x.low ? ' (too few)' : ''}</td>${k.target == null ? '' : `<td>${x.low ? '–' : STATUS_WORD[statusOf(k, x.v)]}</td>`}<td>${fmt.count(x.t[m].n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-tr').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
-    const w = host.clientWidth || 800, narrow = w < 560, H = 270, G = { t: 40, r: narrow ? 10 : 92, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, tg = k.target == null ? [] : [k.target], vs = [...src.map((x) => x.v), ...tg, ...(tg.length ? [k.watch] : [])];
-    let a = Math.min(...vs), b = Math.max(...vs); const pad = (b - a || 1) * .12; a -= pad; b += pad;
-    const step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih, t0 = ts(TR[0].m + '-01'), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return G.l + (i + (d.getUTCDate() - .5) / len) * step; };
+    const w = host.clientWidth || 800, narrow = w < 560, H = 270, G = { t: 40, r: narrow ? 10 : 92, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, tg = k.target == null ? [] : [k.target], vs = [...pts.map((x) => x.v), ...tg, ...(tg.length ? [k.watch] : [])];
+    const [a, b] = Site.zeroAxis(vs, k.format);
+    const step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih, t0 = ts(TR[0].m + '-01'), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return G.l + (i + (d.getUTCDate() - .5) / len) * step; };
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-    for (const t of ticks(a, b, 5)) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     TR.forEach((q, i) => { if (!narrow || (TR.length - 1 - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), '', 'middle'); });
     const tEnd = ts(lastDay(S.m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
     if (tg.length) { el('rect', { class: 'wb', x: G.l, width: iw, y: y(Math.max(k.watch, k.target)), height: Math.abs(y(k.watch) - y(k.target)) }, s); el('line', { class: 'tg', x1: G.l, x2: G.l + iw, y1: y(k.target), y2: y(k.target) }, s); if (!narrow) text(s, G.l + iw + 8, y(k.target) + 4, 'Target ' + tick(m, k.target), 'lab'); }
-    el('path', { class: 'l1', d: src.map((q, i) => `${i ? 'L' : 'M'}${x(q.i)},${y(q.v)}`).join('') }, s);
+    el('path', { class: 'l1', d: Site.linePath(src.map((q) => ({ k: q.i, x: x(q.i), y: y(q.v) }))) }, s);
     pts.forEach((q) => { const on = q.m === S.m; el('circle', { class: 'pt' + (q.low ? ' low' : '') + (on ? ' day' : ''), cx: x(q.i), cy: y(q.v), r: on ? 6 : 4 }, s);
       const h = el('rect', { class: 'hit', x: x(q.i) - step / 2, y: G.t, width: step, height: ih, tabindex: on ? 0 : -1, 'data-k': 'tr|' + q.m, role: 'button', 'aria-pressed': on, 'aria-label': `${fmt.month(q.m)}: ${V(m, q.v)}${k.target == null || q.low ? '' : ', ' + STATUS_WORD[statusOf(k, q.v)]}. Show this month` }, s);
       tip(h, () => `<b>${fmt.month(q.m)}</b><br>${esc(k.name)}: <b>${V(m, q.v)}</b>${k.target == null || q.low ? '' : ' · ' + STATUS_WORD[statusOf(k, q.v)]}<br><span class="muted">n = ${fmt.count(q.t[m].n)}${q.low ? ', below ' + k.minN : ''}</span>${EV.filter((e) => e.start.slice(0, 7) <= q.m && e.end.slice(0, 7) >= q.m).map((e) => `<br><span class="muted">Event: ${esc(e.name)}</span>`).join('')}`, () => { S.m = q.m; carried(q.m); go(); }); });
     arrows(s);
     let last = -99; for (const [e, n, ex] of marks) { const mx = Math.max(ex, last + 17); last = mx; const q = el('g', { class: 'ev', transform: `translate(${mx},${G.t - 14})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, n); tip(q, () => `<b>${n}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
-    $('lg-tr').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : []), ...(pts.some((q) => q.low) ? [['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']] : [])]);
+    Site.eventKey(host, marks.map(([e, n]) => ({ n, e })));
+    $('lg-tr').innerHTML = !tg.length && !pts.some((q) => q.low) ? '' : leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : []), ...(pts.some((q) => q.low) ? [['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']] : [])]);
   }
   const lastDay = (m) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); };
   // ---------- By group ----------
@@ -267,15 +270,21 @@
   }
   // ---------- Score mix ----------
   const BANDS = { csat: [['Satisfied (4–5)', (v, j) => v.cs[j] >= 4], ['Neutral (3)', (v, j) => v.cs[j] === 3], ['Dissatisfied (1–2)', (v, j) => v.cs[j] <= 2]], nps: [['Promoters (9–10)', (v, j) => v.np[j] >= 9], ['Passives (7–8)', (v, j) => v.np[j] === 7 || v.np[j] === 8], ['Detractors (0–6)', (v, j) => v.np[j] <= 6]], ces: [['Easy (5–7)', (v, j) => v.ce[j] >= 5], ['Neutral (4)', (v, j) => v.ce[j] === 4], ['Hard (1–3)', (v, j) => v.ce[j] <= 3]] };
+  // Each part's change, because only the bottom part of a stacked bar has a steady baseline
+  function distChange(rows, B) {
+    const a = rows[rows.length - 1], b = WAS && rows.find((r) => r.m === WAS.m), show = !!(a && b && a.t >= 30 && b.t >= 30); $('t-dc').hidden = $('tbl-dc').hidden = !show; if (!show) return;
+    $('t-dc').textContent = `What changed from ${fmt.month(b.m)} to ${fmt.month(a.m)}`;
+    $('tbl-dc').innerHTML = `<table><thead><tr><th scope="col">Answer</th><th scope="col">Change in share</th><th scope="col">Share, ${fmt.month(b.m)}</th><th scope="col">Share, ${fmt.month(a.m)}</th><th scope="col">Surveys, ${fmt.month(b.m)}</th><th scope="col">Surveys, ${fmt.month(a.m)}</th></tr></thead><tbody>${B.map((q, j) => { const c = fmt.change(a.p[j], b.p[j], 'pct'); return `<tr><td>${esc(q[0])}</td><td><b>${c.flat ? '0' : c.text}</b></td><td>${b.p[j].toFixed(1)}%</td><td>${a.p[j].toFixed(1)}%</td><td>${fmt.count(b.n[j])}</td><td>${fmt.count(a.n[j])}</td></tr>`; }).join('')}</tbody></table>`;
+  }
   function renderDist() {
-    const m = SV(), B = BANDS[m], host = $('c-dist'), rows = TR.map((x) => { const n = [0, 0, 0]; each(x.d.v, (j) => n[B.findIndex((b) => b[1](x.d.v, j))]++); const t = n[0] + n[1] + n[2]; return { m: x.m, n, t, p: n.map((v) => (t ? v / t * 100 : 0)) }; }); cur.dist = rows;
+    const m = SV(), B = BANDS[m], host = $('c-dist'), rows = TR.map((x) => { const n = [0, 0, 0]; each(x.d.v, (j) => n[B.findIndex((b) => b[1](x.d.v, j))]++); const t = n[0] + n[1] + n[2]; return { m: x.m, n, t, p: n.map((v) => (t ? v / t * 100 : 0)) }; }); cur.dist = rows; distChange(rows, B);
     $('t-dist').textContent = `${kpi(m).name}: mix of answers`; $('s-dist').textContent = `Share of surveys, monthly, ${span()}`; swap('dist', ['c-dist', 'lg-dist']);
     if (tbl.dist) { $('tbl-dist').innerHTML = `<table><thead><tr><th scope="col">Month</th>${B.map((b) => `<th scope="col">${b[0]}</th>`).join('')}<th scope="col">Surveys</th></tr></thead><tbody>${rows.slice().reverse().map((r) => `<tr><td>${fmt.month(r.m)}</td>${r.p.map((v) => `<td class="${r.t < 30 ? 'low' : ''}">${r.t ? v.toFixed(1) + '%' : '–'}</td>`).join('')}<td>${fmt.count(r.t)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; const w = host.clientWidth || 800, H = 220, L = 44, ih = H - 34, step = (w - L - 8) / rows.length, bw = Math.min(44, step * .7), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Mix of answers by month. Use View as table for values.' }, host), y = (v) => 6 + (100 - v) / 100 * ih;
     const df = el('defs', {}, s), pt = el('pattern', { id: 'hx', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: 'fill:var(--brand-purple)' }, pt);
     const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const t of [0, 25, 50, 75, 100]) { el('line', { x1: L, x2: w - 8, y1: y(t), y2: y(t) }, g); text(ax, L - 6, y(t) + 4, t + '%', '', 'end'); }
     rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { if (r.t) el('rect', { class: ['d0', 'd1', 'd2'][j], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)), ...(j === 2 ? { fill: 'url(#hx)' } : {}) }, s); base += v; });
-      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m), '', 'middle');
+      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), '', 'middle');
       const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${B.map((b, j) => `${b[0]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${B.map((b, j) => `${b[0]}: <b>${r.p[j].toFixed(1)}%</b>`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} surveys${r.t < 30 ? ', too few' : ''}</span>`); });
     arrows(s); $('lg-dist').innerHTML = leg([['<rect class="d0" width="20" height="14"/>', B[0][0]], ['<rect class="d1" width="20" height="14"/>', B[1][0]], ['<rect fill="url(#hx)" width="20" height="14" style="stroke:var(--brand-purple)"/>', B[2][0]]]);
   }
