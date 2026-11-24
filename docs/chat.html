@@ -22,8 +22,9 @@
   .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
   .card { margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; box-shadow: var(--shadow); }
   .log { display: grid; gap: 14px; margin-top: 18px; }
-  .log:empty { display: none; }
-  .me { justify-self: end; max-width: 85%; background: var(--brand-blue); color: var(--on-ink); border-radius: 12px 12px 2px 12px; padding: 10px 14px; overflow-wrap: anywhere; }
+  .ask input::placeholder, .gate input::placeholder { color: var(--text-muted); opacity: 1; }
+  html { scroll-padding-bottom: 170px; }   /* keep focused items clear of the question box */
+  .me { justify-self: end; max-width: 85%; background: var(--brand-blue); color: var(--on-ink); border-radius: 12px 12px 2px 12px; padding: 10px 14px; overflow-wrap: anywhere; border: 1px solid transparent; }
   .it { justify-self: start; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px 12px 12px 2px; padding: 14px 16px; box-shadow: var(--shadow); }
   .it p { margin: 0 0 8px; } .it ul { margin: 0 0 8px; padding-left: 20px; } .it li { margin: 2px 0; }
   .tag { display: inline-block; font-size: 12px; font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; color: var(--text-secondary); margin-bottom: 8px; }
@@ -40,6 +41,7 @@
   .gate { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; } .gate input { font: inherit; min-height: 44px; padding: 8px 12px; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); color: var(--text-primary); flex: 1 1 200px; min-width: 0; } .gate .btn { min-height: 44px; }
   .err { color: var(--off-ink); font-size: 14px; margin: 8px 0 0; } .err:empty { display: none; } .ask .link-btn { font-size: 13px; padding: 0 4px; min-height: 24px; }
   @media (max-width: 767px) { .ask .link-btn { min-height: 44px; } }
+  @media (max-height: 560px) { html { scroll-padding-bottom: 0; } .ask { position: static; } }   /* zoomed in: the box scrolls with the page */
 </style>
 </head>
 <body>
@@ -48,8 +50,9 @@
   <p class="sub">Ask about service, satisfaction, staffing, customers, launches or self-service. Every number comes from the dashboards' own calculations, with a link to check it.</p>
   <section class="card" aria-labelledby="t-try"><h2 id="t-try">Try one of these</h2><div class="chips" id="try"></div></section>
   <section class="card" id="gate" aria-labelledby="t-gate" hidden><h2 id="t-gate">Ask your own question</h2><p class="sub">With an access code you can ask anything about the data. Your questions and the figures needed to answer them are sent to an AI service (Claude) through this site's server, which deletes the conversation after 30 minutes without use. Please don't type personal information.</p>
-    <form class="gate" id="gate-form"><label class="sr-only" for="code">Access code</label><input id="code" type="password" autocomplete="off" maxlength="200" placeholder="Access code"><button class="btn" type="submit">Continue</button></form><p class="err" id="gate-err" role="alert"></p></section>
+    <form class="gate" id="gate-form"><label class="sr-only" for="code">Access code</label><input id="code" type="password" autocomplete="off" maxlength="200" aria-describedby="gate-err" placeholder="Access code"><button class="btn" type="submit">Continue</button></form><p class="err" id="gate-err" role="alert"></p></section>
   <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+  <div class="sr-only" id="say" role="status"></div>
   <div class="ask"><form id="form"><label class="sr-only" for="q">Your question</label><input id="q" autocomplete="off" maxlength="300" aria-describedby="mode" placeholder="Ask a question"><button class="btn" type="submit">Ask</button></form>
     <p class="note"><span id="mode">Sample mode: only the prepared questions can be answered. Nothing you type leaves this page.</span> <button type="button" class="link-btn" id="fresh" hidden>Start a new conversation</button></p></div>
 </main>
@@ -76,13 +79,14 @@
   ];
   const SHOW = [0, 1, 4, 5, 6, 7, 8, 11], words = (s) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !['the', 'was', 'what', 'did', 'for', 'and', 'are', 'how', 'our', 'your', 'get'].includes(w)));
   function match(text) { const a = words(text); let best = null, score = 0; PREPARED.forEach((p) => { const w = words(p.q), hit = [...w].filter((x) => a.has(x)).length, s = hit / Math.max(w.size, a.size || 1); if (s > score) { score = s; best = p; } }); return score >= 0.6 ? best : null; }
-  function bubble(cls, html) { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; $('log').append(d); return d; }
+  const say = (t) => { $('say').textContent = ''; setTimeout(() => { $('say').textContent = t; }, 50); };
+  function bubble(cls, html) { const d = document.createElement('div'); d.className = cls; d.innerHTML = (cls === 'me' ? '<span class="sr-only">You asked: </span>' : '') + html; $('log').append(d); return d; }
   const chips = (list) => `<div class="chips">${list.map((i) => `<button type="button" class="chip" data-i="${i}">${esc(PREPARED[i].q)}</button>`).join('')}</div>`;
   const source = (s, r) => `<div class="src">Source: <a href="${esc(s.link)}">${esc(s.dashboard)}</a> · ${esc(s.kpi)} · ${esc(s.period)}${s.filters.length ? ' · ' + esc(s.filters.join(', ')) : ''}${r && r.n != null ? ` · ${Site.fmt.count(r.n)} ${esc(r.counted)}` : ''}</div>`;
   async function answer(p) {
     const d = bubble('it', '<p>Looking it up…</p>'), rs = []; for (const [n, i] of p.calls || []) rs.push(await T(n, i)); const bad = rs.find((r) => r.error);
-    if (bad) { d.innerHTML = `<span class="tag">Can’t answer</span><p>${esc(bad.error)}</p>`; return; }
-    d.innerHTML = `<span class="tag">${esc(p.kind || 'Dashboard figure')}</span>${p.say(rs)}${rs.map((r) => source(r.source, r)).join('')}${p.link ? `<div class="src">See: <a href="${p.link[1]}">${esc(p.link[0])}</a></div>` : ''}${p.next ? chips(p.next) : ''}`;
+    if (bad) { d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">Can’t answer</span><p>${esc(bad.error)}</p>`; return; }
+    d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">${esc(p.kind || 'Dashboard figure')}</span>${p.say(rs)}${rs.map((r) => source(r.source, r)).join('')}${p.link ? `<div class="src">See: <a href="${p.link[1]}">${esc(p.link[0])}</a></div>` : ''}${p.next ? chips(p.next) : ''}`;
     const q = d.previousElementSibling; if (q) q.scrollIntoView({ block: 'start' });
   }
   // ---------- The AI, through the server (only with an access code) ----------
@@ -117,20 +121,20 @@
     busy = false;
     if (r.error) {
       if (r.error === 'pass') { pass = null; store(null); conversation = null; } if (['gone', 'full'].includes(r.error)) conversation = null;
-      d.innerHTML = `<span class="tag">Not answered</span><p>${esc(r.message)}</p>${['spend', 'day', 'visitor', 'offline'].includes(r.error) ? '<p>These prepared questions still work:</p>' + chips([0, 4, 6]) : ''}`; showMode(); if (r.error === 'pass') $('code').focus(); return;
+      d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">Not answered</span><p>${esc(r.message)}</p>${['spend', 'day', 'visitor', 'offline'].includes(r.error) ? '<p>These prepared questions still work:</p>' + chips([0, 4, 6]) : ''}`; showMode(); if (r.error === 'pass') { $('gate-err').textContent = r.message; $('code').focus(); } return;
     }
     conversation = r.conversation || conversation; const odd = unchecked(r.text, seenText), nums = telling(r.text);
     // figures repeated from earlier in the conversation keep their source
     const before = used.length ? [] : earlier.filter((u) => { const have = new Set(figures(JSON.stringify({ ...u, source: 0 }))); return nums.some((x) => have.has(x)); }), src = [...new Map([...used, ...before].map((u) => [u.source.link + u.source.period + u.source.kpi + u.source.filters.join(), u])).values()];
-    d.innerHTML = `<span class="tag">${odd.length ? 'Check the figures' : used.length ? 'Dashboard figures' : before.length ? 'Dashboard figures from earlier' : 'No figures used'}</span>${format(r.text)}${odd.length ? `<div class="src">Not found in the dashboard results: ${esc(odd.join(', '))}. The AI may have worked ${odd.length === 1 ? 'it' : 'them'} out; check the source.</div>` : ''}${src.map((u) => source(u.source, u)).join('')}`;
+    d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">${odd.length ? 'Check the figures' : used.length ? 'Dashboard figures' : before.length ? 'Dashboard figures from earlier' : 'No figures used'}</span>${format(r.text)}${odd.length ? `<div class="src">Not found in the dashboard results: ${esc(odd.join(', '))}. The AI may have worked ${odd.length === 1 ? 'it' : 'them'} out; check the source.</div>` : ''}${src.map((u) => source(u.source, u)).join('')}`;
     showMode(); const q = d.previousElementSibling; if (q) q.scrollIntoView({ block: 'start' });
   }
-  $('gate-form').addEventListener('submit', async (e) => { e.preventDefault(); const code = $('code').value.trim(); if (!code) return; $('gate-err').textContent = ''; const r = await post('/login', { code }); $('code').value = ''; if (r.error) { $('gate-err').textContent = r.message; $('code').focus(); return; } pass = r.pass; store(pass); showMode(); $('q').focus(); });
-  $('fresh').addEventListener('click', () => { if (busy) return; conversation = null; seenText = ''; earlier = []; $('log').innerHTML = ''; showMode(); $('q').focus(); });
-  function ask(text, prepared) { if (busy) return; bubble('me', esc(text)); if (SERVER && pass && !prepared) return askAI(text); const p = match(text); if (p) return answer(p); bubble('it', `<span class="tag">Sample mode</span><p>I can't answer that one yet, because only the prepared questions work without an access code. Here are some I can answer:</p>${chips([0, 4, 6])}`); }
+  $('gate-form').addEventListener('submit', async (e) => { e.preventDefault(); const code = $('code').value.trim(); if (!code) return; $('gate-err').textContent = ''; $('code').removeAttribute('aria-invalid'); const r = await post('/login', { code }); $('code').value = ''; if (r.error) { $('gate-err').textContent = r.message; if (r.error === 'code') $('code').setAttribute('aria-invalid', 'true'); $('code').focus(); return; } pass = r.pass; store(pass); showMode(); $('q').focus(); });
+  $('fresh').addEventListener('click', () => { if (busy) return; conversation = null; seenText = ''; earlier = []; $('log').innerHTML = ''; showMode(); $('q').focus(); say('New conversation started.'); });
+  function ask(text, prepared) { if (busy) return say('Still working on the last question.'); bubble('me', esc(text)); if (SERVER && pass && !prepared) return askAI(text); const p = match(text); if (p) return answer(p); bubble('it', `<span class="sr-only">Answer. </span><span class="tag">Sample mode</span><p>I can't answer that one yet, because only the prepared questions work without an access code. Here are some I can answer:</p>${chips([0, 4, 6])}`); }
   $('try').innerHTML = SHOW.map((i) => `<button type="button" class="chip" data-i="${i}">${esc(PREPARED[i].q)}</button>`).join('');
   $('main').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) ask(PREPARED[+c.dataset.i].q, true); });
-  $('form').addEventListener('submit', (e) => { e.preventDefault(); const t = $('q').value.trim(); if (!t || busy) return; $('q').value = ''; ask(t); $('q').focus(); });
+  $('form').addEventListener('submit', (e) => { e.preventDefault(); const t = $('q').value.trim(); if (!t) return; if (busy) return say('Still working on the last question.'); $('q').value = ''; ask(t); $('q').focus(); });
   showMode();
   ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => Site.setDataThrough(x.data_through)); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data, preview`; });
 })();
