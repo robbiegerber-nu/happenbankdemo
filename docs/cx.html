@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.5">
+<link rel="stylesheet" href="assets/site.css?v=1.6">
 <script src="assets/site.js?v=3.0"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <style>
@@ -77,7 +77,7 @@
   td div { font-size: 12.5px; } td svg { vertical-align: middle; } .tools .filter { color: var(--text-secondary); }
   @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .card .btn, .tools .filter select { min-height: 44px; } .tools .filter { flex: none; } }
   .mini-h { font-size: 16px; margin: 20px 0 8px; }
-  .mband { fill: var(--brand-blue); fill-opacity: .07; } .ax text.now { fill: var(--text-primary); font-weight: 700; }
+  .mband { fill: var(--brand-blue); fill-opacity: var(--sel-op, .07); } .ax text.now { fill: var(--text-primary); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -135,7 +135,7 @@
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), M = CX.METRICS;
   Site.renderChrome('cx');
   const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason' }, S = { ...DEF };
-  let IDX, KPI, EV, TR, NOW, WAS, QCH, RG, req = 0, events = true, cur = {}; const tbl = { tr: false, dist: false }, files = {};
+  let base = '', IDX, KPI, EV, TR, NOW, WAS, QCH, RG, req = 0, events = true, cur = {}; const tbl = { tr: false, dist: false }, files = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/cx/${m}.json.gz`);
@@ -160,13 +160,13 @@
     opt('f-ch', i.channels); opt('f-rg', [...new Set(i.reasons.map((x) => x[2]))].sort().map((x) => [x, x])); opt('f-s', Object.entries(i.names.segment)); opt('f-p', i.personas);
     $('f-dim').innerHTML = Object.entries(DIMS).map(([id, d]) => `<option value="${id}">${d.name}</option>`).join('');
     const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v);
-    if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried();
+    if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried(); base = S.m;
     for (const key of ['cmp', 'ch', 'rg', 's', 'p', 'dim']) if (one('f-' + key, p.get(key))) S[key] = p.get(key);
     if (i.queues.some((x) => String(x[0]) === p.get('q'))) S.q = p.get('q');
     if (i.reasons.some((x) => String(x[0]) === p.get('r'))) S.r = p.get('r');
     if (M.includes(p.get('metric'))) S.metric = p.get('metric');
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.1`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.2`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer experience data could not be loaded. ' + e.message; }
@@ -186,7 +186,10 @@
     $('loading').hidden = true; $('content').hidden = false;
     controls(); writeUrl(); renderTiles(); renderTrend(); renderGroups(); renderMoments(); renderDist(); renderThemes(); renderComplaints();
   }
-  const pickMonth = (m) => { const back = m === S.m || m === DEF.m; if (back && S.m === DEF.m) return; S.m = back ? DEF.m : m; carried(back ? null : m); go(); };
+  // base is the month from the Month list (or the latest). A month clicked in the chart is temporary: it isn't carried to other
+  // dashboards, and choosing another metric returns to base. Clicking it again undoes it; the chip or the latest month clears both.
+  const toLatest = () => { S.m = base = DEF.m; carried(null); };
+  const pickMonth = (m) => { if (m === DEF.m) { if (S.m === m) return; toLatest(); } else if (m !== S.m) S.m = m; else if (S.m !== base) S.m = base; else toLatest(); go(); };
   const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); };
   const cmpName = () => (S.cmp === 'year' ? 'same month last year' : 'prior month');
   function controls() {
@@ -208,7 +211,7 @@
       const k = kpi(m), t = NOW.t, v = CX.value(m, t), lo = low(m, t), x = WAS && chg(m, t, WAS.t), st = k.target == null ? '' : `<span class="status ${lo ? 'none' : statusOf(k, v)}">${lo ? 'Too few' : STATUS_WORD[statusOf(k, v)]}</span>`;
       const d = document.createElement('div'); d.className = 'tile' + (S.metric === m ? ' sel' : '');
       d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${V(m, v)}</div>${st}<div class="m">${k.target == null ? 'No target' : 'Target ' + esc(k.targetLabel)}${lo ? ` · n = ${fmt.count(t[m].n)}, below ${k.minN}` : ''}</div>${x ? `<span class="chg ${x.q}">${Site.changeMark(lo ? '' : x.q, `${arrow(x)} vs ${cmpName()}`)}</span>${x.c.flat || lo ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
-      d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d);
+      d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; S.m = base; go(); } }); host.append(d);
     }
   }
   // ---------- Chart helpers ----------
@@ -237,7 +240,7 @@
     const step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih, t0 = ts(TR[0].m + '-01'), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return G.l + (i + (d.getUTCDate() - .5) / len) * step; };
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
-    TR.forEach((q, i) => { if (!narrow || (TR.length - 1 - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), '', 'middle'); });
+    TR.forEach((q, i) => { if (!narrow || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), q.m === S.m ? 'now' : '', 'middle'); });
     el('rect', { class: 'mband', x: x(TR.findIndex((q) => q.m === S.m)) - step / 2, y: G.t, width: step, height: ih }, s); const tEnd = ts(lastDay(TR[TR.length - 1].m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
     if (tg.length) { el('rect', { class: 'wb', x: G.l, width: iw, y: y(Math.max(k.watch, k.target)), height: Math.abs(y(k.watch) - y(k.target)) }, s); el('line', { class: 'tg', x1: G.l, x2: G.l + iw, y1: y(k.target), y2: y(k.target) }, s); if (!narrow) text(s, G.l + iw + 8, y(k.target) + 4, 'Target ' + tick(m, k.target), 'lab'); }
     el('path', { class: 'l1', d: Site.linePath(src.map((q) => ({ k: q.i, x: x(q.i), y: y(q.v) }))) }, s);
@@ -286,7 +289,7 @@
     const df = el('defs', {}, s), pt = el('pattern', { id: 'hx', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: 'fill:var(--brand-purple)' }, pt);
     const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const t of [0, 25, 50, 75, 100]) { el('line', { x1: L, x2: w - 8, y1: y(t), y2: y(t) }, g); text(ax, L - 6, y(t) + 4, t + '%', '', 'end'); }
     rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { if (r.t) el('rect', { class: ['d0', 'd1', 'd2'][j], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)), ...(j === 2 ? { fill: 'url(#hx)' } : {}) }, s); base += v; });
-      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), r.m === S.m ? 'now' : '', 'middle');
+      if (w >= 560 || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), r.m === S.m ? 'now' : '', 'middle');
       const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${B.map((b, j) => `${b[0]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${B.map((b, j) => `${b[0]}: <b>${r.p[j].toFixed(1)}%</b>`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} surveys${r.t < 30 ? ', too few' : ''}</span>`); });
     arrows(s); $('lg-dist').innerHTML = leg([['<rect class="d0" width="20" height="14"/>', B[0][0]], ['<rect class="d1" width="20" height="14"/>', B[1][0]], ['<rect fill="url(#hx)" width="20" height="14" style="stroke:var(--brand-purple)"/>', B[2][0]]]);
   }
@@ -309,11 +312,11 @@
     $('n-cp').textContent = `Open and closed are as of ${fmt.date(IDX.data_through)}. Median days to close counts closed complaints only, so it can read low for a recent month with complaints still open. Closed within 7 days counts every complaint. Regulatory is the share flagged as a regulatory matter. Grey percentages come from fewer than 30 complaints.`;
   }
   // ---------- Events ----------
-  for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') carried(S.m === DEF.m ? null : S.m); if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
+  for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') { base = S.m; carried(S.m === DEF.m ? null : S.m); } if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
   $('f-dim').addEventListener('change', (e) => { S.dim = e.target.value; writeUrl(); renderGroups(); }); $('f-cdim').addEventListener('change', renderComplaints);
-  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') pickMonth(S.m); else { S[b.dataset.q] = ''; go(); } });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') { toLatest(); go(); } else { S[b.dataset.q] = ''; go(); } });
   $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const k = DIMS[S.dim].f, v = b.dataset.v; S[k] = S[k] === v ? '' : v; go(); });
-  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carried(null); events = $('t-events').checked = true; $('f-cdim').value = 'cat'; go(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); base = DEF.m; carried(null); events = $('t-events').checked = true; $('f-cdim').value = 'cat'; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
   $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });

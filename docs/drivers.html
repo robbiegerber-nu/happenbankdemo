@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.5">
+<link rel="stylesheet" href="assets/site.css?v=1.6">
 <script src="assets/site.js?v=3.0"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
@@ -76,7 +76,7 @@
   .d-evband { fill: var(--event); fill-opacity: .12; } .d-evline { stroke: var(--event); stroke-opacity: .6; }
   .d-ev circle { fill: var(--surface); stroke: var(--event); } .d-ev text { fill: var(--text-muted); font-size: 10px; font-weight: 700; text-anchor: middle; font-family: var(--font); }
   .d-cmp { fill: var(--surface); stroke: var(--text-primary); stroke-width: 2; }
-  .d-sel { fill: var(--brand-blue); fill-opacity: .06; }
+  .d-sel { fill: var(--brand-blue); fill-opacity: var(--sel-op, .06); }
   .w-end { fill: var(--text-muted); } .w-up { fill: var(--brand-blue); } .w-down { fill: url(#hatch); stroke: var(--brand-purple); stroke-width: 1.5; } .hatch-l { stroke: var(--brand-purple); stroke-width: 2.5; } .w-link { stroke: var(--text-muted); stroke-dasharray: 2 2; }
   .w-zero { stroke: var(--text-muted); }
   .t { fill: var(--text-secondary); font-size: 12.5px; font-family: var(--font); } .t.s { fill: var(--text-primary); font-weight: 600; } .t.m { fill: var(--text-muted); }
@@ -84,7 +84,7 @@
   .hit { fill: transparent; cursor: pointer; } .hit:focus-visible { outline: 2px solid var(--brand-blue); }
   .row-f rect, .row-f line { opacity: .3; } .row-f .t { fill: var(--text-muted); font-weight: 400; }
   @media (max-width: 767px) {
-    .filter-bar .ctl, .more, #f-reset, #c-break, #c-minis, .card .tools, .crumbs, .chips, .how { display: none !important; }
+    .filter-bar .ctl, .more, #f-reset, #c-break, #c-minis, .card .tools, .crumbs, .chip:not([data-month]), .how { display: none !important; } .chip { min-height: 44px; }
     .phone-note { display: block; } .card { padding: 14px; }
   }
 </style>
@@ -158,12 +158,13 @@
     $('f-metric').innerHTML = SECTIONS.map((s) => { const o = KPIS.filter((q) => q.section === s.id); return o.length ? `<optgroup label="${esc(s.name)}">${o.map((q) => `<option value="${q.id}">${esc(q.name)}</option>`).join('')}</optgroup>` : ''; }).join('');
     const p = new URLSearchParams(location.search), months = i.months.slice(1);
     S.month = [p.get('m'), carried(), months[months.length - 1]].find((m) => months.includes(m));
+    base = S.month;
     if (p.get('cmp') === 'year') S.cmp = 'year';
     if (D.PARTS[p.get('metric')]) S.metric = p.get('metric');
     if (DIMS.includes(p.get('by'))) S.by = p.get('by');
     for (const d of DIMS) if (p.getAll(d).length) S.f[d] = p.getAll(d);
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.1`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.2`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The explorer data could not be loaded. ' + e.message; }
@@ -214,8 +215,12 @@
     cur.trend = list.map((x, i) => { const p = D.sum(split(cols[i], null)); return { m: x, v: D.value(p, P().scale), n: p.n }; });
     $('trend').removeAttribute('aria-busy'); renderTrend();
   }
+  let base = '';
   const latest = () => IDX.months[IDX.months.length - 1];
-  const pickMonth = (m) => { const back = m === S.month || m === latest(); if (back && S.month === latest()) return; S.month = back ? latest() : m; carried(back ? null : m); go(); };
+  // base is the month from the Month list (or the latest). A month clicked in the chart is temporary: it isn't carried to other
+  // dashboards, and choosing another metric returns to base. Clicking it again undoes it; the chip or the latest month clears both.
+  const toLatest = () => { S.month = base = latest(); carried(null); };
+  const pickMonth = (m) => { if (m === latest()) { if (S.month === m) return; toLatest(); } else if (m !== S.month) S.month = m; else if (S.month !== base) S.month = base; else toLatest(); go(); };
   const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#crumbs button')).catch(fail); };
 
   // ---------- Text ----------
@@ -432,12 +437,12 @@
   }
 
   // ---------- Events ----------
-  $('f-month').addEventListener('change', (e) => { S.month = e.target.value; carried(S.month === latest() ? null : S.month); go(); });
+  $('f-month').addEventListener('change', (e) => { S.month = base = e.target.value; carried(S.month === latest() ? null : S.month); go(); });
   $('f-cmp').addEventListener('change', (e) => { S.cmp = e.target.value; go(); });
-  $('f-metric').addEventListener('change', (e) => { S.metric = e.target.value; go(); });
+  $('f-metric').addEventListener('change', (e) => { S.metric = e.target.value; S.month = base; go(); });
   $('f-by').addEventListener('change', (e) => { S.by = e.target.value; go(); });
   $('f-dims').addEventListener('change', (e) => { const d = e.target.dataset.d, v = e.target.value; if (v === '*') return; if (v) S.f[d] = [v]; else delete S.f[d]; go(); });
-  $('chips').addEventListener('click', (e) => { if (e.target.closest('[data-month]')) { pickMonth(S.month); return; } const b = e.target.closest('[data-v]'); if (!b) return; const l = S.f[b.dataset.d].filter((x) => x !== b.dataset.v); if (l.length) S.f[b.dataset.d] = l; else delete S.f[b.dataset.d]; go(); });
+  $('chips').addEventListener('click', (e) => { if (e.target.closest('[data-month]')) { toLatest(); go(); return; } const b = e.target.closest('[data-v]'); if (!b) return; const l = S.f[b.dataset.d].filter((x) => x !== b.dataset.v); if (l.length) S.f[b.dataset.d] = l; else delete S.f[b.dataset.d]; go(); });
   $('crumbs').addEventListener('click', (e) => {   // going up clears the levels below and breaks down by the next one
     const b = e.target.closest('[data-up]'); if (!b) return;
     const path = PATHS.find((p) => p.includes(S.by)), i = path.indexOf(b.dataset.up);
@@ -446,7 +451,7 @@
     go();
   });
   $('tbl-break').addEventListener('click', (e) => { const n = e.target.closest('[data-i]'), dr = e.target.closest('[data-drill]'); if (n) toggle(S.by, cur.rows[+n.dataset.i].key, e.ctrlKey || e.metaKey); if (dr) drill(S.by, cur.rows[+dr.dataset.drill].key); });
-  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} }); carried(null); events = $('t-events').checked = true; go(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', f: {} }); base = S.month; carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
   $('tb-trend').addEventListener('click', () => { tblTrend = !tblTrend; if (cur && cur.trend) renderTrend(); });

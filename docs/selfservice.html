@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.5">
+<link rel="stylesheet" href="assets/site.css?v=1.6">
 <script src="assets/site.js?v=3.0"></script>
 <script src="assets/selfservice.js?v=1.0"></script>
 <style>
@@ -76,7 +76,7 @@
   .mini-h { font-size: 16px; margin: 20px 0 8px; } #why-mc p { margin: 12px 0 0; max-width: 90ch; } .phone-note { display: none; } td div { font-size: 12.5px; } .tools .filter { color: var(--text-secondary); } .split { margin: 10px 0 0; } .l3 { fill: none; stroke: var(--text-muted); stroke-width: 1.5; }
   .cmenu { fill: var(--text-primary); } .c1 { fill: var(--brand-blue); } .c4 { fill: url(#h4); stroke: var(--brand-blue); stroke-width: .5; } .c2 { fill: var(--brand-purple); } .c3 { fill: var(--control); } .c5 { fill: url(#h5); stroke: var(--brand-purple); stroke-width: .5; } .inm { fill: var(--surface); } .inb { fill: var(--on-ink); } .inb, .inm { font-size: 12px; font-weight: 700; font-family: var(--font); pointer-events: none; }
   @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .phone-note { display: block; } .wide-only { display: none; } .card .btn { min-height: 44px; } }
-  .mband { fill: var(--brand-blue); fill-opacity: .07; } .ax text.now { fill: var(--text-primary); font-weight: 700; }
+  .mband { fill: var(--brand-blue); fill-opacity: var(--sel-op, .07); } .ax text.now { fill: var(--text-primary); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -136,7 +136,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, changeQuality } = Site, $ = (id) => document.getElementById(id), Q = SelfService;
   Site.renderChrome('selfservice');
-  const DEF = { m: '', cmp: 'year', p: '', metric: 'contain', c: '1', by: 'r' }, S = { ...DEF }, files = {}; let IDX, K, EV, IVR, TASKS, req = 0, cur = {}, TR, NOW, WAS, events = true; const tbl = { tr: false, mix: false };
+  const DEF = { m: '', cmp: 'year', p: '', metric: 'contain', c: '1', by: 'r' }, S = { ...DEF }, files = {}; let base = '', IDX, K, EV, IVR, TASKS, req = 0, cur = {}, TR, NOW, WAS, events = true; const tbl = { tr: false, mix: false };
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/selfservice/${m}.json.gz`);
@@ -150,8 +150,8 @@
     TASKS = i.tasks; IVR = new Map(); for (const r of i.ivr) { const o = Object.fromEntries(i.ivr_keys.map((c, j) => [c, r[j]])); (IVR.get(o.m) || (IVR.set(o.m, []), IVR.get(o.m))).push(o); }
     const full = i.months.filter((m) => lastDay(m) <= i.data_through); DEF.m = S.m = full[full.length - 1]; $('f-m').innerHTML = [...full].reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
     $('f-p').innerHTML = '<option value="">All</option>' + i.personas.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); $('f-c').innerHTML = i.channels.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
-    const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v); if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried(); for (const key of ['cmp', 'p', 'c', 'by']) if (one('f-' + key, p.get(key))) S[key] = p.get(key); if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
-    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Self-service & channel shift v1.3`;
+    const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v); if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried(); base = S.m; for (const key of ['cmp', 'p', 'c', 'by']) if (one('f-' + key, p.get(key))) S[key] = p.get(key); if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Self-service & channel shift v1.4`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The self-service data could not be loaded. ' + e.message; }
@@ -172,7 +172,10 @@
     TR = ms.map((m, i) => snap(m, ds[i])); NOW = TR.find((x) => x.m === S.m); WAS = old ? snap(cm, od) : TR.find((x) => x.m === cm) || null;
     $('loading').hidden = true; $('content').hidden = false; controls(); writeUrl(); renderTiles(); renderTrend(); renderMix(); renderShift(); renderTasks(); renderOpen(); renderChannels(); renderPersonas();
   }
-  const pickMonth = (m) => { const back = m === S.m || m === DEF.m; if (back && S.m === DEF.m) return; S.m = back ? DEF.m : m; carried(back ? null : m); go(); };
+  // base is the month from the Month list (or the latest). A month clicked in the chart is temporary: it isn't carried to other
+  // dashboards, and choosing another metric returns to base. Clicking it again undoes it; the chip or the latest month clears both.
+  const toLatest = () => { S.m = base = DEF.m; carried(null); };
+  const pickMonth = (m) => { if (m === DEF.m) { if (S.m === m) return; toLatest(); } else if (m !== S.m) S.m = m; else if (S.m !== base) S.m = base; else toLatest(); go(); };
   const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); }, cmpName = () => (S.cmp === 'year' ? 'same month last year' : 'prior month');
   function controls() {
     for (const k of ['m', 'cmp', 'p', 'c', 'by']) $('f-' + k).value = S[k];
@@ -189,7 +192,7 @@
     const host = $('tiles'); host.innerHTML = '';
     for (const m of METRICS) { const k = K[m], x = change(m, NOW, WAS), d = document.createElement('div'); d.className = 'tile' + (S.metric === m ? ' sel' : ''); const before = m === 'stuck' && NOW.done.k ? `${fmt.value(NOW.done.b7 / NOW.done.k * 100, 'pct')} contacted in the 7 days before` : 'No target';
       d.innerHTML = `<div class="tile-top"><button type="button" class="t" data-k="tile-${m}" aria-pressed="${S.metric === m}">${esc(k.name)}</button></div><div class="v">${fmt.value(NOW.val[m], k.format)}</div><div class="m">${before}</div>${x ? `<span class="chg ${x.q}">${Site.changeMark(x.q, `${arrow(x)} vs ${cmpName()}${k.format === 'count' && Site.perDay(NOW.val[m], Site.monthDays(NOW.m), WAS.val[m], Site.monthDays(WAS.m)) ? ` (${Site.perDay(NOW.val[m], Site.monthDays(NOW.m), WAS.val[m], Site.monthDays(WAS.m))})` : ''}`)}</span>${x.c.flat || !NOW.X[m] ? '' : `<div class="m">${x.real ? 'Beyond chance' : 'Within chance'}</div>`}` : ''}`;
-      if (k.format === 'count') d.querySelector('.v').title = fmt.count(NOW.val[m]); d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; go(); } }); host.append(d); }
+      if (k.format === 'count') d.querySelector('.v').title = fmt.count(NOW.val[m]); d.querySelector('.tile-top').append(Site.infoButton(k)); d.addEventListener('click', (e) => { if (!e.target.closest('.info-btn') && S.metric !== m) { S.metric = m; S.m = base; go(); } }); host.append(d); }
   }
   // ---------- Chart helpers ----------
   function el(tag, at, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in at) e.setAttribute(k, at[k]); if (parent) parent.append(e); return e; }
@@ -208,7 +211,7 @@
     const host = $('c-tr'); host.innerHTML = ''; if (!rows.length) { host.textContent = 'No data for these filters.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 260, G = { t: 40, r: 12, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, vs = rows.flatMap((r) => [r.v, ...(r.b == null ? [] : [r.b])]); const [a, b] = Site.zeroAxis(vs, k.format), step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih;
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-    for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); } TR.forEach((q, i) => { if (!narrow || (TR.length - 1 - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), '', 'middle'); });
+    for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); } TR.forEach((q, i) => { if (!narrow || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), q.m === S.m ? 'now' : '', 'middle'); });
     el('rect', { class: 'mband', x: x(TR.findIndex((q) => q.m === S.m)) - step / 2, y: G.t, width: step, height: ih }, s); 
     const t0 = ts(TR[0].m + '-01'), tE = ts(lastDay(TR[TR.length - 1].m)), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = +lastDay(d.toISOString().slice(0, 7)).slice(8); return G.l + (i + (d.getUTCDate() - .5) / len) * step; }, marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tE); if (q < p) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
     const path = (f) => Site.linePath(rows.filter((r) => f(r) != null).map((r) => ({ k: r.i, x: x(r.i), y: y(f(r)) }))); if (st) el('path', { class: 'l3', d: path((r) => r.b) }, s); el('path', { class: 'l1', d: path((r) => r.v) }, s);
@@ -225,7 +228,7 @@
     if (tbl.mix) { $('tbl-mix').innerHTML = `<table><thead><tr><th scope="col">Month</th>${PARTS.map((p) => `<th scope="col">${p[1]}</th>`).join('')}<th scope="col">Requests</th></tr></thead><tbody>${rows.slice().reverse().map((r) => `<tr><td>${fmt.month(r.m)}</td>${r.p.map((v) => `<td>${v.toFixed(1)}%</td>`).join('')}<td>${fmt.count(r.t)}</td></tr>`).join('')}</tbody></table>`; return; }
     const host = $('c-mix'); host.innerHTML = ''; const w = host.clientWidth || 800, H = 240, L = 44, ih = H - 34, step = (w - L - 8) / rows.length, bw = Math.min(52, step * .78), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Share of requests by how they were handled. Use View as table for values.' }, host), y = (v) => 6 + (100 - v) / 100 * ih;
     const df = el('defs', {}, s); for (const [id, v, a] of [['h4', '--brand-blue', 45], ['h5', '--brand-purple', -45]]) { const pt = el('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: `rotate(${a})` }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: `fill:var(${v})` }, pt); } const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const t of [0, 25, 50, 75, 100]) { el('line', { x1: L, x2: w - 8, y1: y(t), y2: y(t) }, g); text(ax, L - 6, y(t) + 4, t + '%', '', 'end'); }
-    rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { el('rect', { class: 'c' + PARTS[j][0], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)) }, s); if (bw > 34 && ['menu', 1, 2].includes(PARTS[j][0]) && v > 8) text(s, cx, (y(base) + y(base + v)) / 2 + 4, Math.round(v) + '%', j ? 'inb' : 'inm', 'middle'); base += v; }); if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), r.m === S.m ? 'now' : '', 'middle'); const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${PARTS.map((p, j) => `${p[1]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${PARTS.map((p, j) => `${p[1]}: <b>${r.p[j].toFixed(1)}%</b> (${fmt.count(r.n[j])})`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} requests</span>`); });
+    rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { el('rect', { class: 'c' + PARTS[j][0], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)) }, s); if (bw > 34 && ['menu', 1, 2].includes(PARTS[j][0]) && v > 8) text(s, cx, (y(base) + y(base + v)) / 2 + 4, Math.round(v) + '%', j ? 'inb' : 'inm', 'middle'); base += v; }); if (w >= 560 || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), r.m === S.m ? 'now' : '', 'middle'); const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${PARTS.map((p, j) => `${p[1]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${PARTS.map((p, j) => `${p[1]}: <b>${r.p[j].toFixed(1)}%</b> (${fmt.count(r.n[j])})`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} requests</span>`); });
     arrows(s); $('lg-mix').innerHTML = leg(PARTS.map((p) => [`<rect class="c${p[0]}" width="20" height="14"/>`, p[1]]));
   }
   // How each part of the mix moved, and how the containment change reaches the mix (containment x menu calls' share of requests)
@@ -285,10 +288,10 @@
     $('tbl-pe').innerHTML = `<table><thead><tr><th scope="col">Persona</th><th scope="col">Contacts</th><th scope="col">Menu containment</th><th scope="col">No agent needed</th><th scope="col">Digital share of contacts</th></tr></thead><tbody>${cur.pe.map((r) => `<tr class="${S.p ? (S.p === String(r.id) ? 'sel' : 'faded') : ''}"><td><button type="button" class="name" data-k="pe|${r.id}" data-p="${r.id}" aria-pressed="${S.p === String(r.id)}">${esc(r.name)}</button></td><td>${fmt.count(r.a.digital[1])}</td>${['contain', 'no_agent', 'digital'].map((m) => cell(r, m)).join('')}</tr>`).join('')}</tbody></table>`;
   }
   // ---------- Events ----------
-  for (const k of ['m', 'cmp', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') carried(S.m === DEF.m ? null : S.m); go(); });
+  for (const k of ['m', 'cmp', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') { base = S.m; carried(S.m === DEF.m ? null : S.m); } go(); });
   for (const k of ['c', 'by']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; writeUrl(); renderShift(); });
-  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') pickMonth(S.m); else { S.p = ''; go(); } }); $('tbl-pe').addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) { S.p = S.p === b.dataset.p ? '' : b.dataset.p; go(); } });
-  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carried(null); tbl.tr = tbl.mix = false; events = $('t-events').checked = true; go(); }); $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') { toLatest(); go(); } else { S.p = ''; go(); } }); $('tbl-pe').addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) { S.p = S.p === b.dataset.p ? '' : b.dataset.p; go(); } });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); base = DEF.m; carried(null); tbl.tr = tbl.mix = false; events = $('t-events').checked = true; go(); }); $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('phone-f').addEventListener('click', (e) => { const o = $('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); }); $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
   $('tb-tr').addEventListener('click', () => { tbl.tr = !tbl.tr; renderTrend(); }); $('tb-mix').addEventListener('click', () => { tbl.mix = !tbl.mix; renderMix(); });
   const csv = (n, w, h, r) => Site.downloadCsv(`selfservice_${n}`, IDX.data_through, `Self-service and channel shift · ${w} · ${S.m} · filters: ${S.p ? 'persona=' + pName(S.p) : 'none'} · data through ${IDX.data_through}`, h, r);

@@ -29,7 +29,7 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not([data-theme="light"]) { --sel-op: .2;
     --page: #141313; --surface: #1E1D1D; --surface-warm: #2A2828;
     --text-primary: #F7F1ED; --text-secondary: #D6D0CC; --text-muted: #9E9A97;
     --border: rgba(247, 241, 237, 0.12); --grid: rgba(247, 241, 237, 0.08);
@@ -43,7 +43,7 @@
     color-scheme: dark;
   }
 }
-:root[data-theme="dark"] {
+:root[data-theme="dark"] { --sel-op: .2;
   --page: #141313; --surface: #1E1D1D; --surface-warm: #2A2828;
   --text-primary: #F7F1ED; --text-secondary: #D6D0CC; --text-muted: #9E9A97;
   --border: rgba(247, 241, 237, 0.12); --grid: rgba(247, 241, 237, 0.08);
