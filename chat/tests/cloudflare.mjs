@@ -1,0 +1,19 @@
+// Tests a published TEST server (pretend AI) on Cloudflare: sets random secrets, calls it, reports errors and times.
+//   node chat/tests/cloudflare.mjs https://happen-demo-chat-test.<subdomain>.workers.dev
+// The secrets are made here, piped to Cloudflare, and never printed or saved.
+import { spawn } from 'node:child_process'; import crypto from 'node:crypto'; import path from 'node:path'; import os from 'node:os';
+const url = process.argv[2], dir = process.env.HAPPEN_CHAT || path.join(os.homedir(), 'happen-chat'), O = 'https://robbiegerber-nu.github.io', name = 'happen-demo-chat-test';
+if (!/^https:\/\/happen-demo-chat-test\.[\w-]+\.workers\.dev$/.test(url || '')) throw new Error('Give the test server address.');
+const code = crypto.randomBytes(24).toString('base64url'), put = (k, v) => new Promise((ok, no) => { const p = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'put', k, '--name', name], { cwd: dir, env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } }); p.stdin.end(v + '\n'); p.on('exit', (c) => (c ? no(new Error('secret ' + k)) : ok())); });
+await put('SESSION_SECRET', crypto.randomBytes(32).toString('base64url')); await put('ACCESS_CODE', code); await new Promise((r) => setTimeout(r, 8000));
+let ok = 0, bad = 0; const times = [], errs = {}, t = (n, p, i = '') => { p ? ok++ : bad++; console.log(`${p ? 'pass' : 'FAIL'}  ${n}${p ? '' : '  ' + JSON.stringify(i).slice(0, 300)}`); };
+const post = async (u, b, h = {}) => { const s = performance.now(), r = await fetch(url + u, { method: 'POST', headers: { origin: O, 'content-type': 'application/json', ...h }, body: JSON.stringify(b) }), x = await r.text(); times.push(performance.now() - s); let j = null; try { j = JSON.parse(x); } catch { const m = /error code: (\d+)/i.exec(x); errs[m ? m[1] : r.status] = (errs[m ? m[1] : r.status] || 0) + 1; } return { s: r.status, b: j }; };
+let r = await post('/login', { code: 'wrong' }); t('a wrong code is refused', r.s === 401, r); r = await post('/login', { code }, { origin: 'https://example.com' }); t('another site is refused', r.s === 403, r);
+r = await post('/login', { code }); t('the right code works', r.s === 200, r); const A = { authorization: 'Bearer ' + (r.b && r.b.pass) };
+r = await post('/ask', { question: 'What was phone service level?' }, A); t('a question asks for a tool', r.b && r.b.type === 'tools', r);
+let c = r.b && r.b.conversation; if (c) { r = await post('/tools', { conversation: c, results: r.b.calls.map((x) => ({ id: x.id, content: JSON.stringify({ value: '81.9%', note: 'x'.repeat(9000) }) })) }, A); t('the tool result becomes the answer', r.b && r.b.type === 'answer', r); }
+// longest conversation: ten questions, each with a large tool result, which is the most work one request can do
+r = await post('/ask', { question: 'service level' }, A); c = r.b && r.b.conversation; let good = 0; for (let i = 0; c && i < 10; i++) { if (i) r = await post('/ask', { question: 'service level ' + i, conversation: c }, A); if (r.b && r.b.type === 'tools') { r = await post('/tools', { conversation: c, results: r.b.calls.map((x) => ({ id: x.id, content: JSON.stringify({ value: '81.9%', note: 'x'.repeat(13000) }) })) }, A); if (r.b && r.b.type === 'answer') good++; } }
+t('a full conversation of ten large questions', good === 10, { good, r }); r = await post('/ask', { question: 'more', conversation: c }, A); t('the eleventh is refused', r.s === 409, r);
+for (let i = 0; i < 9; i++) r = await post('/ask', { question: 'plain' }, A); t('questions up to the visitor limit work', r.s === 200, r); r = await post('/ask', { question: 'plain' }, A); t('the visitor limit works', r.s === 429, r);
+const s = times.sort((a, b) => a - b); console.log(`\n${ok} passed, ${bad} failed · ${times.length} requests · middle ${Math.round(s[s.length >> 1])} ms, slowest ${Math.round(s[s.length - 1])} ms · Cloudflare errors: ${JSON.stringify(errs)}`);

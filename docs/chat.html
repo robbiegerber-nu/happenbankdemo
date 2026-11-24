@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask the data · Happen Bank Contact Center (demo)</title>
+<meta name="description" content="Ask questions about simulated contact center data, for demonstration only.">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css?v=1.3">
+<script src="assets/site.js?v=2.3"></script>
+<script src="assets/cx.js?v=1.0"></script>
+<script src="assets/drivers.js?v=1.0"></script>
+<script src="assets/workforce.js?v=1.0"></script>
+<script src="assets/selfservice.js?v=1.0"></script>
+<script src="assets/launch.js?v=1.0"></script>
+<script src="assets/chat-tools.js?v=1.0"></script>
+<style>
+  main.wrap { padding-top: 28px; max-width: 880px; }
+  .sub { margin: 6px 0 0; color: var(--text-muted); font-size: 14px; }
+  .card { margin-top: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; box-shadow: var(--shadow); }
+  .log { display: grid; gap: 14px; margin-top: 18px; }
+  .log:empty { display: none; }
+  .me { justify-self: end; max-width: 85%; background: var(--brand-blue); color: var(--on-ink); border-radius: 12px 12px 2px 12px; padding: 10px 14px; overflow-wrap: anywhere; }
+  .it { justify-self: start; width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 12px 12px 12px 2px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .it p { margin: 0 0 8px; } .it ul { margin: 0 0 8px; padding-left: 20px; } .it li { margin: 2px 0; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: 1px 9px; color: var(--text-secondary); margin-bottom: 8px; }
+  .src { border-top: 1px solid var(--border); padding-top: 8px; font-size: 13px; color: var(--text-muted); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { border: 1px solid var(--control); border-radius: 999px; background: var(--surface); padding: 8px 14px; font-size: 14px; min-height: 44px; cursor: pointer; text-align: left; }
+  .chip:hover { border-color: var(--brand-blue); color: var(--brand-blue); }
+  .ask { position: sticky; bottom: 0; background: var(--page); padding: 12px 0 14px; margin-top: 18px; }
+  .ask form { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; font: inherit; min-height: 48px; padding: 8px 14px; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); color: var(--text-primary); }
+  .ask .btn { min-height: 48px; background: var(--brand-blue); color: var(--on-ink); border-color: var(--brand-blue); }
+  .ask .note { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; }
+  .me { scroll-margin-top: 16px; } .log { padding-bottom: 8px; }
+  .gate { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; } .gate input { font: inherit; min-height: 44px; padding: 8px 12px; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); color: var(--text-primary); flex: 1 1 200px; min-width: 0; } .gate .btn { min-height: 44px; }
+  .err { color: var(--off-ink); font-size: 14px; margin: 8px 0 0; } .err:empty { display: none; } .ask .link-btn { font-size: 13px; padding: 0 4px; min-height: 24px; }
+  @media (max-width: 767px) { .ask .link-btn { min-height: 44px; } }
+</style>
+</head>
+<body>
+<main class="wrap" id="main">
+  <h1>Ask the data</h1>
+  <p class="sub">Ask about service, satisfaction, staffing, customers, launches or self-service. Every number comes from the dashboards' own calculations, with a link to check it.</p>
+  <section class="card" aria-labelledby="t-try"><h2 id="t-try">Try one of these</h2><div class="chips" id="try"></div></section>
+  <section class="card" id="gate" aria-labelledby="t-gate" hidden><h2 id="t-gate">Ask your own question</h2><p class="sub">With an access code you can ask anything about the data. Your questions and the figures needed to answer them are sent to an AI service (Claude) through this site's server, which deletes the conversation after 30 minutes without use. Please don't type personal information.</p>
+    <form class="gate" id="gate-form"><label class="sr-only" for="code">Access code</label><input id="code" type="password" autocomplete="off" maxlength="200" placeholder="Access code"><button class="btn" type="submit">Continue</button></form><p class="err" id="gate-err" role="alert"></p></section>
+  <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
+  <div class="ask"><form id="form"><label class="sr-only" for="q">Your question</label><input id="q" autocomplete="off" maxlength="300" aria-describedby="mode" placeholder="Ask a question"><button class="btn" type="submit">Ask</button></form>
+    <p class="note"><span id="mode">Sample mode: only the prepared questions can be answered. Nothing you type leaves this page.</span> <button type="button" class="link-btn" id="fresh" hidden>Start a new conversation</button></p></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  Site.renderChrome('chat'); const { esc } = Site, $ = (id) => document.getElementById(id), T = ChatTools.run, b = (s) => `<b>${esc(s)}</b>`;
+  const few = (r) => `That is ${b(r.value)}, but it rests on only ${b(Site.fmt.count(r.n) + ' ' + r.counted)}, too few to rely on (at least ${r.minimum_n} are needed).`;
+  const status = (r) => (r.status ? ` The target is ${esc(r.target)}: ${b(r.status.toLowerCase())}.` : '');
+  // prepared questions: the tool call(s) and the sentence built from the result
+  const PREPARED = [
+    { q: 'What was phone service level in October 2026?', calls: [['get_metric', { metric: 'sl_phone', from: '2026-10', compare_from: '2025-10' }]], say: ([r]) => `<p>Phone service level was ${b(r.value)} in October 2026.${status(r)}</p><p>A year earlier it was ${b(r.comparison.value)}, a change of ${esc(r.comparison.change)} (${esc(r.comparison.reading)}).</p>`, next: [2, 3] },
+    { q: 'Did satisfaction really drop from September to October 2026?', calls: [['get_metric', { metric: 'csat', from: '2026-10', compare_from: '2026-09' }]], say: ([r]) => `<p>It went from ${b(r.comparison.value)} to ${b(r.value)} (${esc(r.comparison.change)}), but that is ${b(r.comparison.reading)}.${status(r)}</p>`, next: [4, 5] },
+    { q: 'Why was phone service level so low in August 2025?', calls: [['get_metric', { metric: 'sl_phone', from: '2025-08' }], ['get_metric', { metric: 'staffing', from: '2025-08' }]], say: ([r, s]) => `<p>It was ${b(r.value)} in August 2025.${status(r)}</p><p>Staffing for phone and chat was ${b(s.value)} against what was required, during the ${esc((r.events_in_period || [''])[0])}. The timing fits, but the data shows that they happened together, not proof of the cause.</p>`, next: [0, 6] },
+    { q: 'Which channels get the most contacts?', calls: [['breakdown', { metric: 'volume', by: 'channel', from: '2026-10' }]], say: ([r]) => `<p>In October 2026, ${b(r.rows[0].name)} had the most contacts: ${b(r.rows[0].share)} of them.</p><ul>${r.rows.map((x) => `<li>${esc(x.name)}: ${esc(x.value)} (${esc(x.share)})</li>`).join('')}</ul>`, next: [0, 7] },
+    { q: 'What goes with higher satisfaction?', calls: [['score_by_outcome', { from: '2026-10' }]], say: ([r]) => `<p>Resolving the issue on the first contact stands out: ${b(r.rows[0].when_it_did.value)} of those customers were satisfied, against ${b(r.rows[0].when_it_did_not.value)} when it wasn't.</p><p>${esc(r.note)}</p>`, next: [1, 5] },
+    { q: 'Which customer group is least satisfied?', calls: [['breakdown', { metric: 'csat', by: 'persona', from: '2026-07', to: '2026-09', order: 'lowest', limit: 3 }]], say: ([r]) => `<p>In the third quarter of 2026, ${b(r.rows[0].name)} customers: ${b(r.rows[0].value)} satisfied.</p><ul>${r.rows.map((x) => `<li>${esc(x.name)}: ${esc(x.value)} (${Site.fmt.count(x.n)} surveys)</li>`).join('')}</ul>`, next: [4, 6] },
+    { q: 'What did the mobile app re-platform do?', calls: [['launch_impact', { launch: 'Mobile App Re-platform' }]], say: ([r]) => `<p>In its first ${r.contacts.weeks_counted} weeks there were ${b(r.contacts.extra_first_weeks)} contacts against expected (${esc(r.contacts.against_expected)}), peaking at ${b(r.contacts.peak)}.</p><p>Satisfaction for the affected reasons went from ${b(r.changes.csat.baseline)} to ${b(r.changes.csat.value)} (${esc(r.changes.csat.reading)}); other reasons moved ${esc(r.changes.csat.other_reasons_changed)}.</p><p>${esc(r.note)}</p>`, next: [1, 5] },
+    { q: 'Are customers using self-service more?', calls: [['get_metric', { metric: 'ivr_containment', from: '2026-10', compare_from: '2025-10' }], ['get_metric', { metric: 'no_agent', from: '2026-10', compare_from: '2025-10' }]], say: ([r, n]) => `<p>Yes. ${b(r.value)} of phone menu sessions were finished without an agent, against ${b(r.comparison.value)} a year earlier (${esc(r.comparison.reading)}).</p><p>Counting every channel, ${b(n.value)} of requests needed no agent (${esc(n.comparison.change)}), so most demand still does.</p>`, next: [3, 8] },
+    { q: 'Where in the phone menu do callers give up?', kind: 'Not in the data', say: () => `<p>The data doesn't record that: it only shows whether a menu session was finished or went to an agent.</p><p>The closest I can show is which tasks customers finish in the menu, and which phone reasons have no menu task. Both are on the Self-service &amp; channel shift dashboard.</p>`, link: ['Self-service & channel shift', 'selfservice.html'], next: [7] },
+    { q: 'What was callback satisfaction for Private segment customers in October 2026?', calls: [['get_metric', { metric: 'csat', from: '2026-10', filters: { channel: 'Callback', segment: 'Private' } }], ['get_metric', { metric: 'csat', from: '2026-10', filters: { segment: 'Private' } }]], say: ([r, a]) => `<p>${few(r)}</p><p>Across all channels, Private segment satisfaction was ${b(a.value)} from ${Site.fmt.count(a.n)} surveys.</p>`, next: [5] },
+    { q: 'Will customer satisfaction go up next month?', kind: 'Can’t answer', say: () => `<p>I can't forecast. The data shows what happened, not what will.</p><p>I can show the trend and what moved it.</p>`, next: [1, 4] },
+    { q: 'Who is your worst agent?', kind: 'Can’t answer', say: () => `<p>I don't answer questions about individual agents, and nothing here ranks people.</p><p>The coaching dashboard compares agents fairly, with their own group and the same kinds of contacts.</p>`, link: ['Agent & team coaching', 'coaching.html'], next: [4] }
+  ];
+  const SHOW = [0, 1, 4, 5, 6, 7, 8, 11], words = (s) => new Set(s.toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((w) => w.length > 2 && !['the', 'was', 'what', 'did', 'for', 'and', 'are', 'how', 'our', 'your', 'get'].includes(w)));
+  function match(text) { const a = words(text); let best = null, score = 0; PREPARED.forEach((p) => { const w = words(p.q), hit = [...w].filter((x) => a.has(x)).length, s = hit / Math.max(w.size, a.size || 1); if (s > score) { score = s; best = p; } }); return score >= 0.6 ? best : null; }
+  function bubble(cls, html) { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; $('log').append(d); return d; }
+  const chips = (list) => `<div class="chips">${list.map((i) => `<button type="button" class="chip" data-i="${i}">${esc(PREPARED[i].q)}</button>`).join('')}</div>`;
+  const source = (s, r) => `<div class="src">Source: <a href="${esc(s.link)}">${esc(s.dashboard)}</a> · ${esc(s.kpi)} · ${esc(s.period)}${s.filters.length ? ' · ' + esc(s.filters.join(', ')) : ''}${r && r.n != null ? ` · ${Site.fmt.count(r.n)} ${esc(r.counted)}` : ''}</div>`;
+  async function answer(p) {
+    const d = bubble('it', '<p>Looking it up…</p>'), rs = []; for (const [n, i] of p.calls || []) rs.push(await T(n, i)); const bad = rs.find((r) => r.error);
+    if (bad) { d.innerHTML = `<span class="tag">Can’t answer</span><p>${esc(bad.error)}</p>`; return; }
+    d.innerHTML = `<span class="tag">${esc(p.kind || 'Dashboard figure')}</span>${p.say(rs)}${rs.map((r) => source(r.source, r)).join('')}${p.link ? `<div class="src">See: <a href="${p.link[1]}">${esc(p.link[0])}</a></div>` : ''}${p.next ? chips(p.next) : ''}`;
+    const q = d.previousElementSibling; if (q) q.scrollIntoView({ block: 'start' });
+  }
+  // ---------- The AI, through the server (only with an access code) ----------
+  // Empty means sample mode. On localhost, ?server=http://127.0.0.1:8787 connects to a server being tested.
+  const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname), test = LOCAL && new URLSearchParams(location.search).get('server');
+  const SERVER = test && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(test) ? test : '';
+  const store = (v) => { try { if (v === null) sessionStorage.removeItem('happen-demo-chat'); else if (v) sessionStorage.setItem('happen-demo-chat', v); return sessionStorage.getItem('happen-demo-chat'); } catch (e) { return v || null; } };
+  let pass = SERVER ? store() : null, conversation = null, busy = false;
+  async function post(path, body) {
+    let r; try { r = await fetch(SERVER + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(pass ? { authorization: 'Bearer ' + pass } : {}) }, body: JSON.stringify(body) }); } catch (e) { return { error: 'offline', message: 'The chat server can’t be reached just now. The prepared questions still work.' }; }
+    const b = await r.json().catch(() => null); return r.ok && b ? b : { error: (b && b.error) || 'server', message: (b && b.message) || 'Something went wrong. Please try again.' };
+  }
+  function showMode() {
+    $('gate').hidden = !SERVER || !!pass; $('fresh').hidden = !conversation;
+    $('mode').textContent = !SERVER || !pass ? 'Sample mode: only the prepared questions can be answered. Nothing you type leaves this page.' : 'Your questions are sent to an AI service. Please don’t type personal information.';
+  }
+  // the AI's text is shown as text: only **bold** and lists are turned into formatting
+  function format(t) { const bold = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); return t.split(/\n{2,}/).map((p) => { const L = p.split('\n'), li = L.filter((x) => /^\s*[-•*] /.test(x)); return li.length && li.length === L.length ? `<ul>${li.map((x) => `<li>${bold(x.replace(/^\s*[-•*] /, ''))}</li>`).join('')}</ul>` : L.map((x) => (/^\s*[-•*] /.test(x) ? `<ul><li>${bold(x.replace(/^\s*[-•*] /, ''))}</li></ul>` : `<p>${bold(x)}</p>`)).join(''); }).join(''); }
+  // every figure in the answer should be in something a tool returned (or in the question)
+  const figures = (t) => (t.replace(/[,\u202f]/g, '').match(/\d+(?:\.\d+)?/g) || []).map((x) => String(parseFloat(x)));
+  function unchecked(text, seen) { const have = new Set(figures(seen)); return [...new Set(figures(text))].filter((x) => !have.has(x) && !(Number.isInteger(+x) && (+x <= 12 || (+x >= 2024 && +x <= 2026)))); }
+  let seenText = '';
+  async function askAI(text) {
+    busy = true; const d = bubble('it', '<p>Thinking…</p>'), used = []; let r = await post('/ask', { question: text, ...(conversation ? { conversation } : {}) }); seenText += ' ' + text;
+    for (let i = 0; r.type === 'tools' && i < 10; i++) {
+      d.innerHTML = '<p>Looking up the figures…</p>'; conversation = r.conversation; const results = [];
+      for (const c of r.calls) { const out = await T(c.name, c.input); let content = JSON.stringify(out); if (content.length > 14000) content = JSON.stringify({ error: 'That result is too long. Ask for less at once.' }); results.push({ id: c.id, content, ...(out.error ? { error: true } : {}) }); seenText += ' ' + content; if (!out.error && out.source) used.push(out); }
+      r = await post('/tools', { conversation, results });
+    }
+    busy = false;
+    if (r.error) {
+      if (r.error === 'pass') { pass = null; store(null); conversation = null; } if (['gone', 'full'].includes(r.error)) conversation = null;
+      d.innerHTML = `<span class="tag">Not answered</span><p>${esc(r.message)}</p>${['spend', 'day', 'visitor', 'offline'].includes(r.error) ? '<p>These prepared questions still work:</p>' + chips([0, 4, 6]) : ''}`; showMode(); if (r.error === 'pass') $('code').focus(); return;
+    }
+    conversation = r.conversation || conversation; const odd = unchecked(r.text, seenText), src = [...new Map(used.map((u) => [u.source.link + u.source.period + u.source.kpi + u.source.filters.join(), u])).values()];
+    d.innerHTML = `<span class="tag">${odd.length ? 'Check the figures' : used.length ? 'Dashboard figures' : 'No figures used'}</span>${format(r.text)}${odd.length ? `<div class="src">Not found in the dashboard results: ${esc(odd.join(', '))}. The AI may have worked ${odd.length === 1 ? 'it' : 'them'} out; check the source.</div>` : ''}${src.map((u) => source(u.source, u)).join('')}`;
+    showMode(); const q = d.previousElementSibling; if (q) q.scrollIntoView({ block: 'start' });
+  }
+  $('gate-form').addEventListener('submit', async (e) => { e.preventDefault(); const code = $('code').value.trim(); if (!code) return; $('gate-err').textContent = ''; const r = await post('/login', { code }); $('code').value = ''; if (r.error) { $('gate-err').textContent = r.message; $('code').focus(); return; } pass = r.pass; store(pass); showMode(); $('q').focus(); });
+  $('fresh').addEventListener('click', () => { if (busy) return; conversation = null; seenText = ''; $('log').innerHTML = ''; showMode(); $('q').focus(); });
+  function ask(text, prepared) { if (busy) return; bubble('me', esc(text)); if (SERVER && pass && !prepared) return askAI(text); const p = match(text); if (p) return answer(p); bubble('it', `<span class="tag">Sample mode</span><p>I can't answer that one yet, because only the prepared questions work without an access code. Here are some I can answer:</p>${chips([0, 4, 6])}`); }
+  $('try').innerHTML = SHOW.map((i) => `<button type="button" class="chip" data-i="${i}">${esc(PREPARED[i].q)}</button>`).join('');
+  $('main').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) ask(PREPARED[+c.dataset.i].q, true); });
+  $('form').addEventListener('submit', (e) => { e.preventDefault(); const t = $('q').value.trim(); if (!t || busy) return; $('q').value = ''; ask(t); $('q').focus(); });
+  showMode();
+  ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => Site.setDataThrough(x.data_through)); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data, preview`; });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Scores the chat tools on the test questions, without any AI. Serve the project folder and open /chat/tests/tools.html -->
+<html lang="en"><head><meta charset="utf-8"><title>Chat tool tests</title><base href="../../docs/">
+<script src="assets/site.js"></script><script src="assets/cx.js"></script><script src="assets/drivers.js"></script><script src="assets/workforce.js"></script><script src="assets/selfservice.js"></script><script src="assets/launch.js"></script><script src="assets/chat-tools.js"></script>
+<style>body{font:14px system-ui;margin:24px}td,th{padding:4px 10px;text-align:left;border-bottom:1px solid #ccc}.bad{background:#fdd}</style></head><body>
+<h1>Chat tool tests</h1><p id="s">Running…</p><table id="t"></table>
+<script>
+(async () => {
+  const j = async (u) => (await fetch(new URL(u, location.href), { cache: 'no-cache' })).json(), qs = await j('questions.json'), calls = await j('tool_calls.json'), rows = []; let ok = 0, n = 0;
+  const at = (o, p) => p.split('.').reduce((x, k) => (x == null ? x : x[k]), o), num = (v) => (typeof v === 'number' ? v : parseFloat(String(v).replace('−', '-').replace(/[^0-9.-]/g, '')));
+  for (const q of qs) {
+    const c = calls[q.id]; if (!c) continue; n++; const r = await ChatTools.run(c[0], c[1]); let pass, why = '';
+    if (c[2] === 'error') { pass = !!r.error; why = r.error || 'should have refused'; }
+    else if (r.error) { pass = false; why = r.error; }
+    else {
+      pass = true;
+      c[2].forEach((p, i) => { const got = at(r, p), e = q.expected[i].value, g = typeof e === 'number' ? num(got) : got, good = typeof e === 'number' ? Math.abs(g - e) <= q.tolerance + 1e-9 : g === e; if (!good) pass = false; why += `${p}: ${typeof g === 'number' ? +g.toFixed(3) : g} (expected ${e}) `; });
+      for (const [p, e] of Object.entries(c[3] || {})) { const g = at(r, p), good = typeof e === 'string' ? String(g).startsWith(e) : g === e; if (!good) { pass = false; why += `${p}: ${g} (expected ${e}) `; } }
+    }
+    ok += pass; rows.push(`<tr class="${pass ? '' : 'bad'}"><td>${q.id}</td><td>${q.question}</td><td>${pass ? 'pass' : 'FAIL'}</td><td>${why}</td></tr>`);
+  }
+  document.getElementById('s').textContent = `${ok} of ${n} passed`; document.getElementById('t').innerHTML = rows.join('');
+})();
+</script></body></html>

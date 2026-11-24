@@ -1,0 +1,23 @@
+{
+  "name": "happen-demo-chat",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "send_metrics": false,
+  "durable_objects": { "bindings": [{ "name": "CONVERSATION", "class_name": "Conversation" }, { "name": "LEDGER", "class_name": "Ledger" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Conversation", "Ledger"] }],
+  "observability": { "enabled": false },
+  // Limits. Changing one here and publishing again is all it takes.
+  "vars": {
+    "ALLOWED_ORIGINS": "https://robbiegerber-nu.github.io",
+    "QUESTION_CHARS": "300",
+    "QUESTIONS_PER_CONVERSATION": "10",
+    "VISITOR_QUESTIONS_PER_DAY": "20",
+    "QUESTIONS_PER_DAY": "30",
+    "MONTHLY_USD": "15",
+    "TOOL_ROUNDS": "6",
+    "KEEP_MINUTES": "30",
+    "PASS_HOURS": "12",
+    "LOGIN_TRIES_PER_HOUR": "10"
+  }
+  // Secrets, set with "wrangler secret put" and never kept in a file here: ANTHROPIC_API_KEY, ACCESS_CODE, SESSION_SECRET
+}
