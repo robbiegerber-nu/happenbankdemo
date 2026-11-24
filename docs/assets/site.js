@@ -169,7 +169,7 @@
           <a class="fresh-badge" id="fresh-badge" href="index.html">Checking data…</a>
           <button class="icon-btn" id="theme-btn" type="button"></button>
         </div></div>`;
-    const disc = el('div', { class: 'disclaimer', role: 'note' }, `<div class="wrap"><b>Demonstration only.</b> ${esc(DISCLAIMER.replace('Demonstration only. ', ''))}</div>`);
+    const disc = el('div', { class: 'disclaimer', role: 'region', 'aria-label': 'Demonstration notice' }, `<div class="wrap"><b>Demonstration only.</b> ${esc(DISCLAIMER.replace('Demonstration only. ', ''))}</div>`);
     const strip = el('div', { class: 'gradient-strip', 'aria-hidden': 'true' });
     const skip = el('a', { class: 'skip', href: '#main' }, 'Skip to content');
     document.body.prepend(skip, header, disc, strip);
@@ -195,6 +195,28 @@
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dets.forEach((d) => { if (d.open) { const inside = d.contains(document.activeElement); d.open = false; if (inside) d.querySelector('summary').focus(); } }); });
 
     loadFreshness();
+    watchScrollers();
+  }
+
+  // Tables that scroll can be reached with the keyboard and have a name; tables that fit are left out of the tab order.
+  // Areas with their own tabindex in the page are not touched, and charts with focusable points do not need it.
+  function watchScrollers() {
+    const sel = '.tbl, .tbl-wrap, .scroll, .x', main = document.getElementById('main'); if (!main) return;
+    const name = (e) => {
+      const sec = e.closest('section'), h = sec && sec.querySelector('h2, h3'), cap = e.querySelector('caption'), th = e.querySelector('th');
+      const first = (n) => [...n.childNodes].map((x) => (x.nodeType === 3 ? x.textContent : x.nodeType === 1 && !x.matches('button, .info') ? x.textContent : '')).join('').trim();
+      const base = cap ? cap.textContent.trim() : h ? first(h) : '', col = th ? first(th) : '';
+      return [base || 'Table', col].filter(Boolean).join(': by ');
+    };
+    const check = () => main.querySelectorAll(sel).forEach((e) => {
+      if (e.hasAttribute('tabindex') && !e.dataset.scroller) return;
+      const on = (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) && (!e.matches('.x') || !e.querySelector('a[href], button, [tabindex]'));
+      if (on) { e.dataset.scroller = '1'; e.tabIndex = 0; e.setAttribute('role', 'region'); e.setAttribute('aria-label', name(e)); }
+      else if (e.dataset.scroller && e !== document.activeElement) { delete e.dataset.scroller; ['tabindex', 'role', 'aria-label'].forEach((a) => e.removeAttribute(a)); }
+    });
+    let due = 0; const soon = () => { clearTimeout(due); due = setTimeout(check, 150); };
+    new MutationObserver(soon).observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden', 'open', 'class'] });
+    window.addEventListener('resize', soon); soon();
   }
 
   // Data-freshness badge: this page's own data date, with the Data Quality Dashboard's latest result.

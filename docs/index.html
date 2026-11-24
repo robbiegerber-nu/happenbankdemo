@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.4"></script>
+<script src="assets/site.js?v=2.5"></script>
 <style>
   /* Colors, type, header and buttons come from assets/site.css. These aliases map this page's names onto the shared tokens. */
   :root {
@@ -176,6 +176,7 @@
   details.sql > summary { min-height: 24px; }
   .has-tip:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
   .checks th .has-tip, .heat th .has-tip { white-space: nowrap; }
+  .info::before { content: "i"; }
   .info { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 6px; border-radius: 50%;
           border: 1px solid var(--text-muted); color: var(--text-muted); font-size: 10px; font-weight: 700; font-style: normal;
           vertical-align: 1px; line-height: 1; }
@@ -603,13 +604,13 @@ function renderTiles() {
     delta = `<span class="delta ${cls}"><span aria-hidden="true">${arrow}</span> ${cls === 'flat' ? 'No change' : signed(d)} vs run #${prev.run_id}</span>`;
   }
   $('tiles').innerHTML = `
-    <div class="card tile hero"><div class="label has-tip" data-ktip="score">Overall health score<i class="info" aria-hidden="true">i</i></div>
-      <div class="value has-tip" data-ktip="score" tabindex="0" role="button" aria-describedby="tip" aria-label="Overall health score ${Number(o.score).toFixed(1)} out of 100. How is this calculated?">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
+    <div class="card tile hero"><div class="label has-tip" data-ktip="score">Overall health score<i class="info" aria-hidden="true"></i></div>
+      <div class="value has-tip" data-ktip="score" tabindex="0" role="button" aria-describedby="tip" aria-label="${Number(o.score).toFixed(1)} / 100, overall health score. How is this calculated?">${Number(o.score).toFixed(1)}<span style="font-size:1rem;color:var(--text-muted);font-weight:500"> / 100</span></div>
       <div class="note">${badge(o.status)} ${delta}</div></div>
     <div class="card tile"><div class="label">Checks run</div><div class="value">${fmtInt(o.checks)}</div>
       <div class="counts"><span>${badge('Pass')} ${fmtInt(o.passed)}</span>
-        <span class="has-tip" data-ktip="Warn" tabindex="0" role="button" aria-describedby="tip" aria-label="${o.warned} warnings. Show which checks">${badge('Warn')} ${fmtInt(o.warned)}</span>
-        <span class="has-tip" data-ktip="Fail" tabindex="0" role="button" aria-describedby="tip" aria-label="${o.failed} failures. Show which checks">${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
+        <span class="has-tip" data-ktip="Warn" tabindex="0" role="button" aria-describedby="tip" aria-label="Warn ${fmtInt(o.warned)}. Show which checks">${badge('Warn')} ${fmtInt(o.warned)}</span>
+        <span class="has-tip" data-ktip="Fail" tabindex="0" role="button" aria-describedby="tip" aria-label="Fail ${fmtInt(o.failed)}. Show which checks">${badge('Fail')} ${fmtInt(o.failed)}</span></div></div>
     <div class="card tile"><div class="label">Tables monitored</div><div class="value">${fmtInt(s.tables_monitored)}</div>
       <div class="note">${fmtInt(s.columns_profiled)} columns profiled</div></div>
     <div class="card tile"><div class="label">Rows monitored</div><div class="value">${(s.rows_monitored / 1e6).toFixed(1)}M</div>
@@ -942,12 +943,12 @@ function renderHeat() {
     if (!r) return `<div class="cell None"><span aria-hidden="true">—</span><span class="sr-only">No checks</span></div>`;
     const label = `${table === '' ? 'All tables' : table} · ${dim === '' ? 'all dimensions' : dim}`;
     return `<button type="button" class="cell ${r.status}" data-table="${esc(table)}" data-dim="${esc(dim)}"
-      data-tip='${esc(JSON.stringify({ t: label, table, ...r }))}' aria-label="${esc(label)}: ${r.status}, score ${Number(r.score).toFixed(0)}. Show checks.">
-      ${badge(r.status)}<span class="score">${Number(r.score).toFixed(0)}</span></button>`;
+      data-tip='${esc(JSON.stringify({ t: label, table, ...r }))}' aria-label="${esc(label)}: ${r.status} ${Number(r.score).toFixed(0)}. Show checks.">
+      ${badge(r.status)} <span class="score">${Number(r.score).toFixed(0)}</span></button>`;
   };
   const colHead = (key, label, cls = '') =>
     `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-htip="${key}" tabindex="0" role="button" aria-describedby="tip"
-      aria-label="${label}: what does this check?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
+      aria-label="${label}: what does this check?">${label}<i class="info" aria-hidden="true"></i></span></th>`;
   let h = `<thead><tr><th scope="col">Table</th>${DIMS.map(d => colHead(d, d)).join('')}${colHead('Table score', 'Table score', 'total')}</tr></thead><tbody>`;
   for (const t of tables) {
     const tot = byTable[t]['(all dimensions)'];
@@ -1014,7 +1015,7 @@ function drawChecks() {
   const checks = S.data.checks, rows = filteredChecks();
   $('f-count').textContent = `${rows.length} of ${checks.length} checks`;
   const hd = (label, cls = '') => `<th scope="col"${cls ? ` class="${cls}"` : ''}><span class="has-tip" data-chtip="${label}" tabindex="0" role="button" aria-describedby="tip"
-      aria-label="${label}: what is in this column?">${label}<i class="info" aria-hidden="true">i</i></span></th>`;
+      aria-label="${label}: what is in this column?">${label}<i class="info" aria-hidden="true"></i></span></th>`;
   $('checks').innerHTML = `<thead><tr>${hd('Status')}${hd('Rule')}${hd('Check')}${hd('Table · column')}
     ${hd('Dimension')}${hd('Severity')}${hd('Measured', 'num')}${hd('Warn / fail above', 'num')}</tr></thead><tbody>` +
     (rows.length ? rows.map(c => `<tr>

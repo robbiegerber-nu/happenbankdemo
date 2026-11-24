@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.3">
-<script src="assets/site.js?v=2.4"></script>
+<script src="assets/site.js?v=2.5"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -104,7 +104,7 @@
   <h1>Performance driver explorer</h1>
   <p class="sub">What changed, and which parts of the business drove it? Click anything to filter, and drill down through the breakdown table.</p>
   <p class="note phone-note">Open on a larger screen to drill down and compare.</p>
-  <div class="crumbs" id="crumbs" aria-label="Drill-down path"></div><div class="chips" id="chips"></div>
+  <div class="crumbs" id="crumbs" role="group" aria-label="Drill-down path"></div><div class="chips" id="chips"></div>
   <p class="note" id="note" role="status"></p>
   <p class="note" id="loading">Loading the explorer…</p>
   <div id="content" hidden>
