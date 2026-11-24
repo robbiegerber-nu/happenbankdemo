@@ -8,6 +8,8 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 
 ## Dashboards
 
+**[Open the dashboards home page](https://robbiegerber-nu.github.io/happenbankdemo/)**, or go straight to one:
+
 | Dashboard | Question it answers |
 |---|---|
 | [Executive scorecard](https://robbiegerber-nu.github.io/happenbankdemo/executive.html) | Are we meeting our targets? |
@@ -20,7 +22,7 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 | [Self-service & channel shift](https://robbiegerber-nu.github.io/happenbankdemo/selfservice.html) | Are phone menus and digital channels absorbing demand? |
 | [Performance driver explorer](https://robbiegerber-nu.github.io/happenbankdemo/drivers.html) | What changed, and what drove it? |
 | [Process stability monitor](https://robbiegerber-nu.github.io/happenbankdemo/stability.html) | Is this a real change or normal variation? |
-| [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/) | Can we trust the data? |
+| [Data quality](https://robbiegerber-nu.github.io/happenbankdemo/quality.html) | Can we trust the data? |
 | [Ask the data](https://robbiegerber-nu.github.io/happenbankdemo/chat.html) (AI chat) | Can I ask in my own words? Prepared questions for everyone, open questions with an access code |
 
 ## 📖 Documentation lives in the wiki

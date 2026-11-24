@@ -15,7 +15,7 @@
     { group: 'Customers', items: [
       { name: 'Customer experience', href: 'cx.html', id: 'cx' }, { name: 'Customer & persona insights', href: 'personas.html', id: 'personas' },
       { name: 'Product launch impact', href: 'launch.html', id: 'launch' }, { name: 'Self-service & channel shift', href: 'selfservice.html', id: 'selfservice' }] },
-    { group: 'Data', items: [{ name: 'Data quality', href: 'index.html', id: 'quality' }] }
+    { group: 'Data', items: [{ name: 'Data quality', href: 'quality.html', id: 'quality' }] }
   ];
 
   // ---------- Theme ----------
@@ -162,11 +162,11 @@
       return `<details><summary${cur ? ' class="current"' : ''}>${esc(g.group)}</summary><div class="menu">${items}</div></details>`;
     }).join('');
     header.innerHTML = `<div class="wrap">
-        <a class="wordmark" href="executive.html"><b>Happen Bank Contact Center</b><span class="demo-tag">Demo</span></a>
+        <a class="wordmark" href="index.html"><b>Happen Bank Contact Center</b><span class="demo-tag">Demo</span></a>
         <button class="icon-btn menu-btn" id="menu-btn" aria-expanded="false" aria-controls="site-nav" aria-label="Menu">☰</button>
         <nav class="site-nav" id="site-nav" aria-label="Dashboards">${nav}</nav>
         <div class="header-tools">
-          <a class="fresh-badge" id="fresh-badge" href="index.html">Checking data…</a>
+          <a class="fresh-badge" id="fresh-badge" href="quality.html">Checking data…</a>
           <button class="icon-btn" id="theme-btn" type="button"></button>
         </div></div>`;
     const disc = el('div', { class: 'disclaimer', role: 'region', 'aria-label': 'Demonstration notice' }, `<div class="wrap"><b>Demonstration only.</b> ${esc(DISCLAIMER.replace('Demonstration only. ', ''))}</div>`);

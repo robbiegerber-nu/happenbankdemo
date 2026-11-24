@@ -195,7 +195,7 @@ CREATE OR REPLACE FUNCTION discovery.issue_text(p_incident int, p_kind text, p_r
           FROM jsonb_object_keys(i.checks) k)
       || coalesce(E'\n\n**Example:** ' || (SELECT p.detail FROM discovery.problem_days(p_run) p WHERE p.rule_id = i.rule_id AND p.day = i.business_date LIMIT 1), '')
       || E'\n\nThis issue gets a comment after every daily run and closes automatically when a run confirms the fix.'
-      || E'\n[Open run #' || p_run || ' in the Data Quality Dashboard](https://robbiegerber-nu.github.io/happenbankdemo/?run=' || p_run || '&tab=incidents)'
+      || E'\n[Open run #' || p_run || ' in the Data Quality Dashboard](https://robbiegerber-nu.github.io/happenbankdemo/quality.html?run=' || p_run || '&tab=incidents)'
     WHEN 'update' THEN
       '**Run #' || p_run || ':** ' || (SELECT note FROM discovery.dq_incident_update WHERE incident_id = p_incident AND run_id = p_run)
     ELSE
