@@ -353,5 +353,12 @@
     const p = el('p', { class: 'evkey' }); p.innerHTML = '<b>Events</b> ' + list.map(({ n, e }) => `<span><i>${n}</i> ${esc(e.name)}, ${fmt.dateShort(e.start)}</span>`).join(' '); host.append(p);
   }
 
-  window.Site = { ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  // The months a 13-month trend shows. It ends at the latest month whenever the chosen month is in that window, so choosing
+  // a month never hides the later ones; for an older month, up to 6 later months stay in view.
+  function monthWindow(chosen, latest, months) {
+    const at = months.indexOf(chosen), top = months.indexOf(latest), end = top - at <= 12 ? top : Math.min(top, Math.max(at + 6, 12));
+    return months.slice(Math.max(0, end - 12), end + 1);
+  }
+
+  window.Site = { monthWindow, ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

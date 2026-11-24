@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.5">
-<script src="assets/site.js?v=2.9"></script>
+<script src="assets/site.js?v=3.0"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -163,7 +163,7 @@
     if (DIMS.includes(p.get('by'))) S.by = p.get('by');
     for (const d of DIMS) if (p.getAll(d).length) S.f[d] = p.getAll(d);
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.1`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The explorer data could not be loaded. ' + e.message; }
@@ -207,13 +207,15 @@
     cur.by = was ? D.decompose(split(now, S.by, S.by), split(was, S.by, S.by), P().scale) : null;
     cur.byF = !was ? null : S.f[S.by] ? D.decompose(split(now, S.by), split(was, S.by), P().scale) : cur.by;
     renderHead(); renderWater(); renderBreak(); renderMinis();
-    const end = IDX.months.indexOf(m), list = IDX.months.slice(Math.max(0, end - 12), end + 1);
+    const list = Site.monthWindow(m, latest(), IDX.months);
     $('trend').setAttribute('aria-busy', 'true');
     const cols = await Promise.all(list.map((x) => month(x, ag)));
     if (r !== req) return;
     cur.trend = list.map((x, i) => { const p = D.sum(split(cols[i], null)); return { m: x, v: D.value(p, P().scale), n: p.n }; });
     $('trend').removeAttribute('aria-busy'); renderTrend();
   }
+  const latest = () => IDX.months[IDX.months.length - 1];
+  const pickMonth = (m) => { const back = m === S.month || m === latest(); if (back && S.month === latest()) return; S.month = back ? latest() : m; carried(back ? null : m); go(); };
   const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#crumbs button')).catch(fail); };
 
   // ---------- Text ----------
@@ -238,7 +240,7 @@
     let title = `${k.name}${where ? ', ' + where : ''}: ${t.R1 == null ? 'no data' : V(t.R1) + ' in ' + fmt.month(cur.m)}`;
     if (t.R1 != null && ch && !small) title = `${k.name}${where ? ' for ' + where : ''} ${ch.flat ? 'was unchanged at' : (ch.delta > 0 ? 'rose ' : 'fell ') + ch.text.replace(/^[+−]/, '') + ' to'} ${V(t.R1)} in ${fmt.month(cur.m)}`;
     $('t-head').textContent = title;
-    $('s-head').textContent = `${k.short}, monthly · compared with ${cmpName()}${k.target == null || where ? '' : ' · target ' + k.targetLabel}${small ? ` · small sample: n = ${fmt.count(t.n1)} and ${fmt.count(t.n0)}, below ${k.minN}` : ''}`;
+    $('s-head').textContent = `${k.short}, monthly · compared with ${cmpName()} · click a month to show it, again to undo${k.target == null || where ? '' : ' · target ' + k.targetLabel}${small ? ` · small sample: n = ${fmt.count(t.n1)} and ${fmt.count(t.n0)}, below ${k.minN}` : ''}`;
     $('s-head').append(Site.infoButton(k));
     const st = small ? 'none' : statusOf(k, t.R1), q = ch ? (ch.flat ? 'flat' : good(ch.delta)) : 'neutral';
     const bf = cur.byF, mix = bf ? bf.rows.reduce((s, r) => s + r.mix, 0) : null, rate = bf ? bf.rows.reduce((s, r) => s + r.rate, 0) : null;
@@ -275,7 +277,7 @@
     const path = PATHS.find((p) => p.includes(S.by)), done = path.filter((d) => S.f[d]);
     $('crumbs').innerHTML = `<button type="button" data-up="">All contacts</button>` + done.map((d) => `<span aria-hidden="true">›</span><button type="button" data-up="${d}">${esc(S.f[d].join(' or '))}</button>`).join('') + `<span aria-hidden="true">›</span><b aria-current="location">By ${S.by.toLowerCase()}</b>`;
     const ch = Object.entries(S.f).flatMap(([d, v]) => v.map((x) => [d, x]));
-    $('chips').innerHTML = ch.map(([d, x]) => `<button type="button" class="chip" data-d="${d}" data-v="${esc(x)}" aria-label="Remove ${esc(d)} ${esc(x)}">${esc(d)}: ${esc(x)} ×</button>`).join('');
+    $('chips').innerHTML = (S.month !== latest() ? `<button type="button" class="chip" data-month aria-label="Remove Month: ${esc(fmt.month(S.month))}">Month: ${esc(fmt.month(S.month))} ×</button>` : '') + ch.map(([d, x]) => `<button type="button" class="chip" data-d="${d}" data-v="${esc(x)}" aria-label="Remove ${esc(d)} ${esc(x)}">${esc(d)}: ${esc(x)} ×</button>`).join('');
   }
   function writeUrl() {
     const p = new URLSearchParams(), last = IDX.months[IDX.months.length - 1];
@@ -322,21 +324,21 @@
     const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch);
     const [a, b] = Site.zeroAxis([...ok.map(pv), ...tg, ...wb], k.format);
     const x = (i) => m.l + step * (i + .5), y = (v) => m.t + (b - v) / (b - a) * ih;
-    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(cur.m)}. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(pts[pts.length - 1].m)}. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 4, unit())) { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, g); text(ax, m.l - 8, y(t) + 4, tick(t), '', 'end'); }
     let last = Infinity; for (let i = pts.length - 1; i >= 0; i--) { const lab = i === 0 || pts[i].m.endsWith('-01') ? fmt.month(pts[i].m).replace(' 20', " '") : fmt.monthShort(pts[i].m); if (last - x(i) < 34 + (lab.length > 3 ? 16 : 0)) continue; text(ax, x(i), H - 6, lab, '', 'middle'); last = x(i); }
     const xd = (iso) => { const i = pts.findIndex((p) => p.m === iso.slice(0, 7)); const dd = +iso.slice(8), [yy, mo] = iso.split('-').map(Number); return i < 0 ? (iso < pts[0].m ? m.l : m.l + iw) : m.l + step * (i + (dd - 1) / new Date(Date.UTC(yy, mo, 0)).getUTCDate()); };
     const marks = [];
-    if (events) { let num = 0, lx = -99, row = 0; for (const e of EV.filter((q) => q.end >= pts[0].m + '-01' && q.start <= cur.m + '-31')) { const ea = xd(e.start), eb = xd(e.end); num++; if (e.span === 'Period') el('rect', { class: 'd-evband', x: ea, y: m.t, width: Math.max(3, eb - ea), height: ih }, s); else el('line', { class: 'd-evline', x1: ea, x2: ea, y1: m.t, y2: m.t + ih }, s); row = ea - lx < 18 ? 1 - row : 0; lx = ea; marks.push([e, num, ea, m.t - 12 - row * 17]); } }
+    if (events) { let num = 0, lx = -99, row = 0; for (const e of EV.filter((q) => q.end >= pts[0].m + '-01' && q.start <= pts[pts.length - 1].m + '-31')) { const ea = xd(e.start), eb = xd(e.end); num++; if (e.span === 'Period') el('rect', { class: 'd-evband', x: ea, y: m.t, width: Math.max(3, eb - ea), height: ih }, s); else el('line', { class: 'd-evline', x1: ea, x2: ea, y1: m.t, y2: m.t + ih }, s); row = ea - lx < 18 ? 1 - row : 0; lx = ea; marks.push([e, num, ea, m.t - 12 - row * 17]); } }
     if (tg.length) (k.better === 'range' ? [[k.watch[0], k.target[0]], [k.target[1], k.watch[1]]] : [[k.watch, k.target]]).forEach(([p, q]) => el('rect', { class: 'd-watch', x: m.l, width: iw, y: y(Math.max(p, q)), height: Math.abs(y(p) - y(q)) }, s));
     for (const t of tg) { el('line', { class: 'd-target', x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, s); if (!narrow) text(s, m.l + iw + 8, y(t) + 4, 'Target ' + tick(t), 't'); }
-    el('rect', { class: 'd-sel', x: m.l + step * (pts.length - 1), y: m.t, width: step, height: ih }, s);
+    el('rect', { class: 'd-sel', x: m.l + step * pts.findIndex((p) => p.m === cur.m), y: m.t, width: step, height: ih }, s);
     let d = '', pen = false; pts.forEach((p, i) => { if (p.v == null) { pen = false; return; } d += (pen ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(pv(p)).toFixed(1); pen = true; }); el('path', { class: 'd-line', d }, s);
     pts.forEach((p, i) => {
       if (p.v != null) el('circle', { class: p.n < k.minN ? 'd-low' : p.m === cur.c ? 'd-cmp' : 'd-pt', cx: x(i), cy: y(pv(p)), r: p.m === cur.m ? 6 : p.m === cur.c ? 5 : 4 }, s);
       const can = IDX.months.indexOf(p.m) > 0;
-      const h = el('rect', { class: 'hit', x: m.l + step * i, y: m.t, width: step, height: ih, tabindex: 0, 'data-k': 't|' + p.m, role: 'button', 'aria-label': `${fmt.month(p.m)}: ${V(p.v)}. Show this month` }, s);
-      tipOn(h, () => `<b>${fmt.month(p.m)}</b>${p.m === cur.c ? ' · comparison' : ''}<br>${esc(k.short)}: <b>${V(p.v, true)}</b>${tot ? `<br>Average per day: <b>${V(pv(p), true)}</b>` : ''}<br>n = ${fmt.count(p.n)}${p.n < k.minN ? ', below ' + k.minN : ''}${eventsIn(p.m).length ? `<br><span class="muted">Events: ${eventsIn(p.m).map((e) => esc(e.name)).join(', ')}</span>` : ''}`, can ? () => { S.month = p.m; carried(p.m); go(); } : null);
+      const h = el('rect', { class: 'hit', x: m.l + step * i, y: m.t, width: step, height: ih, tabindex: 0, 'data-k': 't|' + p.m, role: 'button', 'aria-pressed': p.m === cur.m, 'aria-label': `${fmt.month(p.m)}: ${V(p.v)}. ${p.m === cur.m ? (cur.m === latest() ? 'Shown on the page' : 'Return to the latest month') : 'Show this month'}` }, s);
+      tipOn(h, () => `<b>${fmt.month(p.m)}</b>${p.m === cur.c ? ' · comparison' : ''}<br>${esc(k.short)}: <b>${V(p.v, true)}</b>${tot ? `<br>Average per day: <b>${V(pv(p), true)}</b>` : ''}<br>n = ${fmt.count(p.n)}${p.n < k.minN ? ', below ' + k.minN : ''}${eventsIn(p.m).length ? `<br><span class="muted">Events: ${eventsIn(p.m).map((e) => esc(e.name)).join(', ')}</span>` : ''}`, can ? () => pickMonth(p.m) : null);
     });
     for (const [e, num, ex, ey] of marks) { const q = el('g', { class: 'd-ev', transform: `translate(${ex},${ey})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, num); tipOn(q, () => `<b>${num}. ${esc(e.name)}</b><br>${e.start === e.end ? fmt.date(e.start) : fmt.date(e.start) + ' – ' + fmt.date(e.end)}<br><span class="muted">${esc(e.description)}</span>`); }
     Site.eventKey(host, marks.map(([e, num]) => ({ n: num, e })));
@@ -430,12 +432,12 @@
   }
 
   // ---------- Events ----------
-  $('f-month').addEventListener('change', (e) => { S.month = e.target.value; carried(S.month); go(); });
+  $('f-month').addEventListener('change', (e) => { S.month = e.target.value; carried(S.month === latest() ? null : S.month); go(); });
   $('f-cmp').addEventListener('change', (e) => { S.cmp = e.target.value; go(); });
   $('f-metric').addEventListener('change', (e) => { S.metric = e.target.value; go(); });
   $('f-by').addEventListener('change', (e) => { S.by = e.target.value; go(); });
   $('f-dims').addEventListener('change', (e) => { const d = e.target.dataset.d, v = e.target.value; if (v === '*') return; if (v) S.f[d] = [v]; else delete S.f[d]; go(); });
-  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const l = S.f[b.dataset.d].filter((x) => x !== b.dataset.v); if (l.length) S.f[b.dataset.d] = l; else delete S.f[b.dataset.d]; go(); });
+  $('chips').addEventListener('click', (e) => { if (e.target.closest('[data-month]')) { pickMonth(S.month); return; } const b = e.target.closest('[data-v]'); if (!b) return; const l = S.f[b.dataset.d].filter((x) => x !== b.dataset.v); if (l.length) S.f[b.dataset.d] = l; else delete S.f[b.dataset.d]; go(); });
   $('crumbs').addEventListener('click', (e) => {   // going up clears the levels below and breaks down by the next one
     const b = e.target.closest('[data-up]'); if (!b) return;
     const path = PATHS.find((p) => p.includes(S.by)), i = path.indexOf(b.dataset.up);

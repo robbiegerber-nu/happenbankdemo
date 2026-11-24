@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/site.css?v=1.5">
-<script src="assets/site.js?v=2.9"></script>
+<script src="assets/site.js?v=3.0"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -77,6 +77,7 @@
   td div { font-size: 12.5px; } td svg { vertical-align: middle; } .tools .filter { color: var(--text-secondary); }
   @media (max-width: 767px) { .tiles { grid-template-columns: 1fr 1fr; } .card .btn, .tools .filter select { min-height: 44px; } .tools .filter { flex: none; } }
   .mini-h { font-size: 16px; margin: 20px 0 8px; }
+  .mband { fill: var(--brand-blue); fill-opacity: .07; } .ax text.now { fill: var(--text-primary); font-weight: 700; }
 </style>
 </head>
 <body>
@@ -165,7 +166,7 @@
     if (i.reasons.some((x) => String(x[0]) === p.get('r'))) S.r = p.get('r');
     if (M.includes(p.get('metric'))) S.metric = p.get('metric');
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.1`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer experience data could not be loaded. ' + e.message; }
@@ -179,19 +180,20 @@
     return out;
   }
   async function update() {
-    const r = ++req, ms = []; for (let i = 12; i >= 0; i--) { const m = shift(S.m, -i); if (IDX.months.includes(m)) ms.push(m); }
-    const cm = shift(S.m, S.cmp === 'year' ? -12 : -1), ds = await Promise.all(ms.map(month)); if (r !== req) return;
-    TR = ms.map((m, i) => ({ m, d: ds[i], t: parts(ds[i]).get('all') })); NOW = TR[TR.length - 1]; WAS = TR.find((x) => x.m === cm) || null;
+    const r = ++req, ms = Site.monthWindow(S.m, DEF.m, IDX.months), cm = shift(S.m, S.cmp === 'year' ? -12 : -1), old = IDX.months.includes(cm) && !ms.includes(cm);
+    const [ds, od] = await Promise.all([Promise.all(ms.map(month)), old ? month(cm) : null]); if (r !== req) return;
+    TR = ms.map((m, i) => ({ m, d: ds[i], t: parts(ds[i]).get('all') })); NOW = TR.find((x) => x.m === S.m); WAS = old ? { m: cm, d: od, t: parts(od).get('all') } : TR.find((x) => x.m === cm) || null;
     $('loading').hidden = true; $('content').hidden = false;
     controls(); writeUrl(); renderTiles(); renderTrend(); renderGroups(); renderMoments(); renderDist(); renderThemes(); renderComplaints();
   }
+  const pickMonth = (m) => { const back = m === S.m || m === DEF.m; if (back && S.m === DEF.m) return; S.m = back ? DEF.m : m; carried(back ? null : m); go(); };
   const go = () => { hideTip(); const k = Site.focusKey(); update().then(() => Site.restoreFocus(k, '#tiles button')).catch(fail); };
   const cmpName = () => (S.cmp === 'year' ? 'same month last year' : 'prior month');
   function controls() {
     for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p', 'dim']) $('f-' + k).value = S[k];
     const L = { ch: ['Channel', DIMS.channel], q: ['Queue', DIMS.queue], rg: ['Reason group', DIMS.group], r: ['Reason', DIMS.reason], s: ['Segment', DIMS.segment], p: ['Persona', DIMS.persona] };
     const c = Object.keys(L).filter((k) => S[k]).map((k) => [k, `${L[k][0]}: ${L[k][1].label(S[k])}`]);
-    $('chips').innerHTML = c.map(([k, t]) => `<button type="button" class="chip" data-q="${k}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join(''); cur.filters = c.map((x) => x[1]).join('; ') || 'none';
+    $('chips').innerHTML = (S.m !== DEF.m ? `<button type="button" class="chip" data-q="m" aria-label="Remove Month: ${esc(fmt.month(S.m))}">Month: ${esc(fmt.month(S.m))} ×</button>` : '') + c.map(([k, t]) => `<button type="button" class="chip" data-q="${k}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join(''); cur.filters = c.map((x) => x[1]).join('; ') || 'none';
     const n = c.length + ['m', 'cmp'].filter((k) => S[k] !== DEF[k]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
     $('s-page').textContent = `${fmt.month(S.m)} · ${WAS ? `compared with ${fmt.month(WAS.m)}` : `no ${cmpName()} to compare`}`;
     const part = IDX.months[IDX.months.length - 1]; $('n-tiles').textContent = [part !== DEF.m ? `${fmt.month(part)} is left out until the month is complete (data through ${fmt.dateShort(IDX.data_through)}).` : '', S.ch || S.q || S.rg || S.r ? 'Complaints with no contact (branch, web form, social media, regulator) are left out while a channel, queue or reason is selected.' : '', S.s || S.p ? 'Only contacts from identified customers have a segment and persona.' : ''].filter(Boolean).join(' ');
@@ -222,11 +224,11 @@
   function arrows(svg) { svg.addEventListener('keydown', (e) => { const list = [...svg.querySelectorAll('.hit')], i = list.indexOf(document.activeElement); if (i < 0) return; const n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: list.length - 1 }[e.key]; if (n == null) return; e.preventDefault(); const t = list[Math.max(0, Math.min(list.length - 1, n))]; list.forEach((x) => x.setAttribute('tabindex', -1)); t.setAttribute('tabindex', 0); t.focus(); }); }
   const ic = (inner) => `<svg width="20" height="14" aria-hidden="true">${inner}</svg>`, leg = (a) => a.map(([p, t]) => `<span>${ic(p)}${esc(t)}</span>`).join('');
   function swap(k, ids) { ids.forEach((i) => ($(i).hidden = tbl[k])); $('tbl-' + k).hidden = !tbl[k]; $('tb-' + k).textContent = tbl[k] ? 'View as chart' : 'View as table'; $('tb-' + k).setAttribute('aria-pressed', tbl[k]); }
-  const span = () => `${fmt.month(TR[0].m)} – ${fmt.month(S.m)}`, DAY = 864e5, ts = (s) => Date.parse(s + 'T00:00:00Z');
+  const span = () => `${fmt.month(TR[0].m)} – ${fmt.month(TR[TR.length - 1].m)}`, DAY = 864e5, ts = (s) => Date.parse(s + 'T00:00:00Z');
   // ---------- Trend ----------
   function renderTrend() {
     const m = S.metric, k = kpi(m), host = $('c-tr'), pts = TR.map((x, i) => ({ ...x, i, v: CX.value(m, x.t), low: low(m, x.t) })).filter((x) => x.v != null); cur.tr = pts;
-    $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · select a month to show it`;
+    $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · click a month to show it, again to undo`;
     swap('tr', ['c-tr', 'lg-tr']);
     if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">n</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${fmt.month(x.m)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v)}${x.low ? ' (too few)' : ''}</td>${k.target == null ? '' : `<td>${x.low ? '–' : STATUS_WORD[statusOf(k, x.v)]}</td>`}<td>${fmt.count(x.t[m].n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-tr').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
@@ -236,12 +238,12 @@
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     TR.forEach((q, i) => { if (!narrow || (TR.length - 1 - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), '', 'middle'); });
-    const tEnd = ts(lastDay(S.m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
+    el('rect', { class: 'mband', x: x(TR.findIndex((q) => q.m === S.m)) - step / 2, y: G.t, width: step, height: ih }, s); const tEnd = ts(lastDay(TR[TR.length - 1].m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }
     if (tg.length) { el('rect', { class: 'wb', x: G.l, width: iw, y: y(Math.max(k.watch, k.target)), height: Math.abs(y(k.watch) - y(k.target)) }, s); el('line', { class: 'tg', x1: G.l, x2: G.l + iw, y1: y(k.target), y2: y(k.target) }, s); if (!narrow) text(s, G.l + iw + 8, y(k.target) + 4, 'Target ' + tick(m, k.target), 'lab'); }
     el('path', { class: 'l1', d: Site.linePath(src.map((q) => ({ k: q.i, x: x(q.i), y: y(q.v) }))) }, s);
     pts.forEach((q) => { const on = q.m === S.m; el('circle', { class: 'pt' + (q.low ? ' low' : '') + (on ? ' day' : ''), cx: x(q.i), cy: y(q.v), r: on ? 6 : 4 }, s);
-      const h = el('rect', { class: 'hit', x: x(q.i) - step / 2, y: G.t, width: step, height: ih, tabindex: on ? 0 : -1, 'data-k': 'tr|' + q.m, role: 'button', 'aria-pressed': on, 'aria-label': `${fmt.month(q.m)}: ${V(m, q.v)}${k.target == null || q.low ? '' : ', ' + STATUS_WORD[statusOf(k, q.v)]}. Show this month` }, s);
-      tip(h, () => `<b>${fmt.month(q.m)}</b><br>${esc(k.name)}: <b>${V(m, q.v)}</b>${k.target == null || q.low ? '' : ' · ' + STATUS_WORD[statusOf(k, q.v)]}<br><span class="muted">n = ${fmt.count(q.t[m].n)}${q.low ? ', below ' + k.minN : ''}</span>${EV.filter((e) => e.start.slice(0, 7) <= q.m && e.end.slice(0, 7) >= q.m).map((e) => `<br><span class="muted">Event: ${esc(e.name)}</span>`).join('')}`, () => { S.m = q.m; carried(q.m); go(); }); });
+      const h = el('rect', { class: 'hit', x: x(q.i) - step / 2, y: G.t, width: step, height: ih, tabindex: on ? 0 : -1, 'data-k': 'tr|' + q.m, role: 'button', 'aria-pressed': on, 'aria-label': `${fmt.month(q.m)}: ${V(m, q.v)}${k.target == null || q.low ? '' : ', ' + STATUS_WORD[statusOf(k, q.v)]}. ${on ? (S.m === DEF.m ? 'Shown on the page' : 'Return to the latest month') : 'Show this month'}` }, s);
+      tip(h, () => `<b>${fmt.month(q.m)}</b><br>${esc(k.name)}: <b>${V(m, q.v)}</b>${k.target == null || q.low ? '' : ' · ' + STATUS_WORD[statusOf(k, q.v)]}<br><span class="muted">n = ${fmt.count(q.t[m].n)}${q.low ? ', below ' + k.minN : ''}</span>${EV.filter((e) => e.start.slice(0, 7) <= q.m && e.end.slice(0, 7) >= q.m).map((e) => `<br><span class="muted">Event: ${esc(e.name)}</span>`).join('')}`, () => pickMonth(q.m)); });
     arrows(s);
     let last = -99; for (const [e, n, ex] of marks) { const mx = Math.max(ex, last + 17); last = mx; const q = el('g', { class: 'ev', transform: `translate(${mx},${G.t - 14})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, n); tip(q, () => `<b>${n}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
     Site.eventKey(host, marks.map(([e, n]) => ({ n, e })));
@@ -271,20 +273,20 @@
   // ---------- Score mix ----------
   const BANDS = { csat: [['Satisfied (4–5)', (v, j) => v.cs[j] >= 4], ['Neutral (3)', (v, j) => v.cs[j] === 3], ['Dissatisfied (1–2)', (v, j) => v.cs[j] <= 2]], nps: [['Promoters (9–10)', (v, j) => v.np[j] >= 9], ['Passives (7–8)', (v, j) => v.np[j] === 7 || v.np[j] === 8], ['Detractors (0–6)', (v, j) => v.np[j] <= 6]], ces: [['Easy (5–7)', (v, j) => v.ce[j] >= 5], ['Neutral (4)', (v, j) => v.ce[j] === 4], ['Hard (1–3)', (v, j) => v.ce[j] <= 3]] };
   // Each part's change, because only the bottom part of a stacked bar has a steady baseline
-  function distChange(rows, B) {
-    const a = rows[rows.length - 1], b = WAS && rows.find((r) => r.m === WAS.m), show = !!(a && b && a.t >= 30 && b.t >= 30); $('t-dc').hidden = $('tbl-dc').hidden = !show; if (!show) return;
+  function distChange(a, b, B) {
+    const show = !!(a && b && a.t >= 30 && b.t >= 30); $('t-dc').hidden = $('tbl-dc').hidden = !show; if (!show) return;
     $('t-dc').textContent = `What changed from ${fmt.month(b.m)} to ${fmt.month(a.m)}`;
     $('tbl-dc').innerHTML = `<table><thead><tr><th scope="col">Answer</th><th scope="col">Change in share</th><th scope="col">Share, ${fmt.month(b.m)}</th><th scope="col">Share, ${fmt.month(a.m)}</th><th scope="col">Surveys, ${fmt.month(b.m)}</th><th scope="col">Surveys, ${fmt.month(a.m)}</th></tr></thead><tbody>${B.map((q, j) => { const c = fmt.change(a.p[j], b.p[j], 'pct'); return `<tr><td>${esc(q[0])}</td><td><b>${c.flat ? '0' : c.text}</b></td><td>${b.p[j].toFixed(1)}%</td><td>${a.p[j].toFixed(1)}%</td><td>${fmt.count(b.n[j])}</td><td>${fmt.count(a.n[j])}</td></tr>`; }).join('')}</tbody></table>`;
   }
   function renderDist() {
-    const m = SV(), B = BANDS[m], host = $('c-dist'), rows = TR.map((x) => { const n = [0, 0, 0]; each(x.d.v, (j) => n[B.findIndex((b) => b[1](x.d.v, j))]++); const t = n[0] + n[1] + n[2]; return { m: x.m, n, t, p: n.map((v) => (t ? v / t * 100 : 0)) }; }); cur.dist = rows; distChange(rows, B);
+    const m = SV(), B = BANDS[m], host = $('c-dist'), mix = (x) => { const n = [0, 0, 0]; each(x.d.v, (j) => n[B.findIndex((b) => b[1](x.d.v, j))]++); const t = n[0] + n[1] + n[2]; return { m: x.m, n, t, p: n.map((v) => (t ? v / t * 100 : 0)) }; }, rows = TR.map(mix); cur.dist = rows; distChange(mix(NOW), WAS && mix(WAS), B);
     $('t-dist').textContent = `${kpi(m).name}: mix of answers`; $('s-dist').textContent = `Share of surveys, monthly, ${span()}`; swap('dist', ['c-dist', 'lg-dist']);
     if (tbl.dist) { $('tbl-dist').innerHTML = `<table><thead><tr><th scope="col">Month</th>${B.map((b) => `<th scope="col">${b[0]}</th>`).join('')}<th scope="col">Surveys</th></tr></thead><tbody>${rows.slice().reverse().map((r) => `<tr><td>${fmt.month(r.m)}</td>${r.p.map((v) => `<td class="${r.t < 30 ? 'low' : ''}">${r.t ? v.toFixed(1) + '%' : '–'}</td>`).join('')}<td>${fmt.count(r.t)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; const w = host.clientWidth || 800, H = 220, L = 44, ih = H - 34, step = (w - L - 8) / rows.length, bw = Math.min(44, step * .7), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': 'Mix of answers by month. Use View as table for values.' }, host), y = (v) => 6 + (100 - v) / 100 * ih;
     const df = el('defs', {}, s), pt = el('pattern', { id: 'hx', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, df); el('rect', { width: 6, height: 6, style: 'fill:var(--surface)' }, pt); el('rect', { width: 3, height: 6, style: 'fill:var(--brand-purple)' }, pt);
     const g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s); for (const t of [0, 25, 50, 75, 100]) { el('line', { x1: L, x2: w - 8, y1: y(t), y2: y(t) }, g); text(ax, L - 6, y(t) + 4, t + '%', '', 'end'); }
     rows.forEach((r, i) => { const cx = L + (i + .5) * step; let base = 0; r.p.forEach((v, j) => { if (r.t) el('rect', { class: ['d0', 'd1', 'd2'][j], x: cx - bw / 2, width: bw, y: y(base + v), height: Math.max(0, y(base) - y(base + v)), ...(j === 2 ? { fill: 'url(#hx)' } : {}) }, s); base += v; });
-      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), '', 'middle');
+      if (w >= 560 || (rows.length - 1 - i) % 2 === 0) text(ax, cx, H - 8, fmt.monthShort(r.m) + (r.m.endsWith('-01') || (i === 0 && w >= 560) ? ` ’${r.m.slice(2, 4)}` : ''), r.m === S.m ? 'now' : '', 'middle');
       const h = el('rect', { class: 'hit', x: cx - step / 2, y: 6, width: step, height: ih, tabindex: i === rows.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${fmt.month(r.m)}: ${B.map((b, j) => `${b[0]} ${r.p[j].toFixed(1)}%`).join(', ')}` }, s); tip(h, () => `<b>${fmt.month(r.m)}</b><br>${B.map((b, j) => `${b[0]}: <b>${r.p[j].toFixed(1)}%</b>`).join('<br>')}<br><span class="muted">${fmt.count(r.t)} surveys${r.t < 30 ? ', too few' : ''}</span>`); });
     arrows(s); $('lg-dist').innerHTML = leg([['<rect class="d0" width="20" height="14"/>', B[0][0]], ['<rect class="d1" width="20" height="14"/>', B[1][0]], ['<rect fill="url(#hx)" width="20" height="14" style="stroke:var(--brand-purple)"/>', B[2][0]]]);
   }
@@ -307,9 +309,9 @@
     $('n-cp').textContent = `Open and closed are as of ${fmt.date(IDX.data_through)}. Median days to close counts closed complaints only, so it can read low for a recent month with complaints still open. Closed within 7 days counts every complaint. Regulatory is the share flagged as a regulatory matter. Grey percentages come from fewer than 30 complaints.`;
   }
   // ---------- Events ----------
-  for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') carried(S.m); if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
+  for (const k of ['m', 'cmp', 'ch', 'rg', 's', 'p']) $('f-' + k).addEventListener('change', (e) => { S[k] = e.target.value; if (k === 'm') carried(S.m === DEF.m ? null : S.m); if (k === 'ch') S.q = ''; if (k === 'rg') S.r = ''; go(); });
   $('f-dim').addEventListener('change', (e) => { S.dim = e.target.value; writeUrl(); renderGroups(); }); $('f-cdim').addEventListener('change', renderComplaints);
-  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { S[b.dataset.q] = ''; go(); } });
+  $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; if (b.dataset.q === 'm') pickMonth(S.m); else { S[b.dataset.q] = ''; go(); } });
   $('tbl-grp').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; const k = DIMS[S.dim].f, v = b.dataset.v; S[k] = S[k] === v ? '' : v; go(); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF); carried(null); events = $('t-events').checked = true; $('f-cdim').value = 'cat'; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
