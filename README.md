@@ -32,7 +32,7 @@ This repository builds a realistic contact center database: 34 months (Jan 2024 
 | [Lookup Tables](https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary-Lookup-Tables) · [Fact & Customer Tables](https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary-Fact-Tables) | Every column with type, keys and description |
 | [KPI Definitions](https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary-KPI-Definitions) | Service level, ASA, AHT, adherence, occupancy, FCR, CSAT, NPS… |
 | [Dashboard Views](https://github.com/robbiegerber-nu/happenbankdemo/wiki/Data-Dictionary-Views) | The ready-made `v_*` views for BI tools |
-| [Building the Dataset](https://github.com/robbiegerber-nu/happenbankdemo/wiki/1-Building-the-Dataset) | How and why the data was generated, calibrated and validated |
+| [Building the Dataset](https://github.com/robbiegerber-nu/happenbankdemo/wiki/1a-Building-the-Dataset) | How and why the data was generated, calibrated and validated |
 
 ## Quick start
 
@@ -49,7 +49,7 @@ This takes about 75 minutes. It drops and recreates the `happen_demo` database, 
 | Path | Contents |
 |---|---|
 | [`sql/`](sql/) | Numbered scripts that build the database (`00`–`12`), the validation suite (`99_validate.sql`) and `run_all.ps1` |
-| [`sql/discovery/`](sql/discovery/) | Data discovery & data quality toolkit: column profiling, 101 rules stored as data, run history, JSON export ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2-Data-Discovery)) |
+| [`sql/discovery/`](sql/discovery/) | Data discovery & data quality toolkit: column profiling, 101 rules stored as data, run history, JSON export ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2a-Data-Discovery)) |
 | [`sql/pipeline/`](sql/pipeline/) | Daily loads: feed generation, loading, incidents, alerts and reset ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/2b-Data-Quality-Pipeline)) |
 | [`sql/dashboards/`](sql/dashboards/) | Exports the JSON the operational dashboards read, refreshed after each daily load with no failed check |
 | [`sql/remediation/`](sql/remediation/) | Documented, re-runnable fixes for data defects found by discovery |
