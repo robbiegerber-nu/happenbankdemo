@@ -18,14 +18,14 @@ if ([...new URLSearchParams(location.search).keys()].some((k) => /^(run|tab|rang
 <style>
   main.wrap { padding-top: 40px; padding-bottom: 8px; }
   h1 { font-size: 36px; text-wrap: balance; }
-  .lead { font-size: 17px; max-width: 62ch; margin: 10px 0 0; }
+  .lead { font-size: 17px; margin: 10px 0 0; }
   .group { margin-top: 44px; }
   .group > h2 { font-size: 22px; }
   .group > p { margin: 4px 0 16px; color: var(--text-muted); }
   .cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 20px; }
   .card { grid-column: span 2; position: relative; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow); transition: border-color .15s, box-shadow .15s; }
   .cards.two .card { grid-column: span 3; }
-  .card:hover { border-color: var(--brand-blue); box-shadow: 0 6px 20px rgba(0, 0, 0, .1); }
+  .card:not(:has(.links:hover)):hover { border-color: var(--brand-blue); box-shadow: 0 6px 20px rgba(0, 0, 0, .1); }
   .card:has(.go:focus-visible) { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
   .card .go:focus-visible { outline: none; }
   .shot { aspect-ratio: 1120 / 664; overflow: hidden; border-top: 1px solid var(--border); border-radius: 0 0 7px 7px; background: #F7F1ED; }
@@ -35,16 +35,18 @@ if ([...new URLSearchParams(location.search).keys()].some((k) => /^(run|tab|rang
   .body h3 { font-size: 19px; font-weight: 700; letter-spacing: -0.01em; }
   .go { color: var(--text-primary); text-decoration: none; }
   .go::after { content: ""; position: absolute; inset: 0; border-radius: 8px; }   /* the whole card opens the dashboard */
-  .card:hover .go { color: var(--brand-blue); }
+  .card:not(:has(.links:hover)):hover .go { color: var(--brand-blue); }
   .q { margin: 4px 0 0; font-weight: 600; color: var(--text-primary); }
   .d { margin: 8px 0 14px; }
   .inc { margin: auto 0 6px; font-size: 13px; color: var(--text-muted); }
   .links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-  .links a { position: relative; z-index: 1; display: inline-flex; align-items: center; min-height: 32px; padding: 3px 11px; font-size: 13px; color: var(--text-secondary); text-decoration: none; border: 1px solid var(--control); border-radius: 999px; background: var(--surface); }
-  .links a:hover { color: var(--brand-blue); border-color: var(--brand-blue); text-decoration: underline; }
-  .links span { display: inline-flex; align-items: center; min-height: 32px; padding: 3px 11px; font-size: 13px; border-radius: 999px; background: var(--surface-warm); }
+  .links { position: relative; z-index: 1; }   /* above the card's link: a near miss between two metrics opens nothing */
+  .links button { min-height: 32px; padding: 3px 11px; font-size: 13px; color: var(--text-secondary); border: 1px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--brand-blue) 8%, var(--surface)); cursor: help; text-decoration: underline dotted; text-decoration-color: var(--text-muted); text-underline-offset: 3px; }
+  .links button:hover, .links button.on { color: var(--text-primary); border-color: var(--brand-blue); }
+  .tip { position: absolute; z-index: 60; width: max-content; max-width: min(320px, calc(100vw - 32px)); padding: 10px 14px; font-size: 14px; line-height: 1.45; color: var(--text-secondary); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .18); }
+  .tip b { display: block; color: var(--text-primary); }
   .open { margin: 14px 0 0; font-weight: 600; font-size: 14px; color: var(--brand-blue); }
-  .card:hover .open { text-decoration: underline; }
+  .card:not(:has(.links:hover)):hover .open { text-decoration: underline; }
   @media (max-width: 1023px) {
     .card { grid-column: span 3; }
     .cards.three .card:last-child { grid-column: span 6; }
@@ -55,48 +57,118 @@ if ([...new URLSearchParams(location.search).keys()].some((k) => /^(run|tab|rang
     h1 { font-size: 28px; }
     .cards .card, .cards.two .card, .cards.three .card:last-child { grid-column: span 6; flex-direction: column; }
     .cards .shot, .cards.two .shot, .cards.three .card:last-child .shot { aspect-ratio: 2 / 1; }
-    .links a { min-height: 40px; }
+    .links button { min-height: 40px; }
   }
 </style>
 </head>
 <body>
 <main class="wrap" id="main">
   <h1>Find the dashboard you need</h1>
-  <p class="lead">Select any card to open its dashboard, or select a metric to go straight to it.</p>
+  <p class="lead">Hover over or tap a metric to see what it means, then select “Open dashboard” to see the results.</p>
   <div id="groups"></div>
+  <div class="tip" id="tip" aria-hidden="true" hidden></div>
 </main>
 <script>
 (function () {
   'use strict';
   Site.renderChrome('home');
   const esc = Site.esc, IMG = 'assets/home/';
-  // page and image name, title, question, description, label, [[link text, address ending]]
+  // page and image name, title, question, description, label, [metrics]
   const G = [
     ['Overview', 'Start here for the big picture.', 'two', [
-      ['executive', 'Executive scorecard', 'Are we meeting our targets?', 'The whole contact center on one page. See each month’s results against target, what improved, and what needs attention.', 'Metrics include', [['Phone service level', '?kpi=sl_phone'], ['Customer satisfaction', '?kpi=csat'], ['Net promoter score', '?kpi=nps'], ['First contact resolution', '?kpi=fcr'], ['Occupancy', '?kpi=occupancy'], ['Contacts offered', '?kpi=volume']]],
-      ['chat', 'Ask the data', 'Can I ask in my own words?', 'Pick a prepared question and get a plain-English answer, with a link to check every number. Open questions need an access code.', 'Ask about', [['Service'], ['Satisfaction'], ['Staffing'], ['Customers'], ['Launches'], ['Self-service']]]]],
+      ['executive', 'Executive scorecard', 'Are we meeting our targets?', 'The whole contact center on one page. See each month’s results against target, what improved, and what needs attention.', 'Metrics include', ['Phone service level', 'Customer satisfaction', 'Net promoter score', 'First contact resolution', 'Occupancy', 'Contacts offered']],
+      ['chat', 'Ask the data', 'Can I ask in my own words?', 'Pick a prepared question and get a plain-English answer, with a link to check every number. Open questions need an access code.', 'Ask about', ['Service', 'Satisfaction', 'Staffing', 'Customers', 'Launches', 'Self-service']]]],
     ['Operations', 'Run the day: wait times, staffing and coaching.', 'three', [
-      ['service', 'Service & access', 'When and where do customers wait?', 'Find the days, times and queues where customers wait longest, and whether staffing or demand was behind it.', 'Metrics include', [['Service level', '?metric=sl'], ['Average speed of answer', '?metric=asa'], ['Abandon rate', '?metric=abandon'], ['Contacts offered', '?metric=volume'], ['Forecast error', '?metric=forecast'], ['Staffing vs required', '?metric=staffing']]],
-      ['workforce', 'Workforce management', 'Do we have the right people at the right time?', 'Compare staff required, scheduled and available through the day, and see what takes people away from the queue.', 'Metrics include', [['Schedule adherence', '?metric=adherence'], ['Conformance', '?metric=conformance'], ['Shrinkage', '?metric=shrinkage'], ['Occupancy', '?metric=occupancy'], ['Staffing vs required', '?metric=staffing'], ['Forecast error', '?metric=forecast']]],
-      ['coaching', 'Agent & team coaching', 'Who could use coaching, and on what?', 'Compare agents fairly on the same kind of work, and separate a real, consistent gap from chance.', 'Metrics include', [['Schedule adherence', '?metric=adherence'], ['Average handle time', '?metric=aht'], ['First contact resolution', '?metric=fcr'], ['Transfer rate', '?metric=transfer'], ['Customer satisfaction', '?metric=csat'], ['Quality score', '?metric=quality']]]]],
+      ['service', 'Service & access', 'When and where do customers wait?', 'Find the days, times and queues where customers wait longest, and whether staffing or demand was behind it.', 'Metrics include', ['Service level', 'Average speed of answer', 'Abandon rate', 'Contacts offered', 'Forecast error', 'Staffing vs required']],
+      ['workforce', 'Workforce management', 'Do we have the right people at the right time?', 'Compare staff required, scheduled and available through the day, and see what takes people away from the queue.', 'Metrics include', ['Schedule adherence', 'Conformance', 'Shrinkage', 'Occupancy', 'Staffing vs required', 'Forecast error']],
+      ['coaching', 'Agent & team coaching', 'Who could use coaching, and on what?', 'Compare agents fairly on the same kind of work, and separate a real, consistent gap from chance.', 'Metrics include', ['Schedule adherence', 'Average handle time', 'First contact resolution', 'Transfer rate', 'Customer satisfaction', 'Quality score']]]],
     ['Analysis', 'Work out what changed, why, and whether it matters.', 'two', [
-      ['drivers', 'Performance driver explorer', 'What changed, and what drove it?', 'Break a month’s change into the queues, reasons, customers and teams behind it, then drill down as far as you need.', 'Metrics include', [['Phone service level', '?metric=sl_phone'], ['Abandon rate', '?metric=abandon'], ['Handle time', '?metric=aht_phone'], ['First contact resolution', '?metric=fcr'], ['Customer satisfaction', '?metric=csat'], ['Contacts offered', '?metric=volume']]],
-      ['stability', 'Process stability monitor', 'Is this a real change or normal variation?', 'Control charts show each metric’s normal range and flag the points and patterns that are worth investigating.', 'Metrics include', [['Phone service level', '?metric=sl_phone'], ['Abandon rate', '?metric=abandon'], ['Handle time', '?metric=aht_phone'], ['Customer satisfaction', '?metric=csat'], ['Schedule adherence', '?metric=adherence'], ['Contacts offered', '?metric=volume']]]]],
+      ['drivers', 'Performance driver explorer', 'What changed, and what drove it?', 'Break a month’s change into the queues, reasons, customers and teams behind it, then drill down as far as you need.', 'Metrics include', ['Phone service level', 'Abandon rate', 'Handle time', 'First contact resolution', 'Customer satisfaction', 'Contacts offered']],
+      ['stability', 'Process stability monitor', 'Is this a real change or normal variation?', 'Control charts show each metric’s normal range and flag the points and patterns that are worth investigating.', 'Metrics include', ['Phone service level', 'Abandon rate', 'Handle time', 'Customer satisfaction', 'Schedule adherence', 'Contacts offered']]]],
     ['Customers', 'Understand who contacts us and how it goes for them.', 'two', [
-      ['cx', 'Customer experience', 'How do customers feel, and what drives it?', 'Track satisfaction, effort, loyalty and complaints, and see which contact reasons pull the scores down.', 'Metrics include', [['Customer satisfaction', '?metric=csat'], ['Net promoter score', '?metric=nps'], ['Customer effort score', '?metric=ces'], ['First contact resolution', '?metric=fcr'], ['Repeat contact rate', '?metric=repeat'], ['Complaints', '?metric=complaints']]],
-      ['personas', 'Customer & persona insights', 'Who contacts us most, and who has the worst experience?', 'Compare customer groups by persona, segment, age and digital enrollment.', 'Metrics include', [['Contact rate', '?metric=rate'], ['Customers who contacted', '?metric=reach'], ['Digital share', '?metric=digital'], ['Customer satisfaction', '?metric=csat'], ['Net promoter score', '?metric=nps'], ['Repeat contact rate', '?metric=repeat']]],
-      ['launch', 'Product launch impact', 'What happens after a launch, and for how long?', 'See how many extra contacts each launch brought, which customers were affected, and when things returned to normal.', 'Metrics include', [['Contacts against expected', '?metric=volume'], ['Average handle time', '?metric=aht'], ['First contact resolution', '?metric=fcr'], ['Customer satisfaction', '?metric=csat'], ['Repeat contact rate', '?metric=repeat'], ['Service level', '?metric=sl']]],
-      ['selfservice', 'Self-service & channel shift', 'Are phone menus and digital channels absorbing demand?', 'Follow the move from phone calls to phone menus and digital channels, and find where customers still need an agent.', 'Metrics include', [['IVR containment', '?metric=contain'], ['Handled without an agent', '?metric=no_agent'], ['Digital share', '?metric=digital'], ['Phone contacts', '?metric=phone'], ['Agent hours avoided', '?metric=hours'], ['Contacted within 7 days', '?metric=stuck']]]]],
+      ['cx', 'Customer experience', 'How do customers feel, and what drives it?', 'Track satisfaction, effort, loyalty and complaints, and see which contact reasons pull the scores down.', 'Metrics include', ['Customer satisfaction', 'Net promoter score', 'Customer effort score', 'First contact resolution', 'Repeat contact rate', 'Complaints']],
+      ['personas', 'Customer & persona insights', 'Who contacts us most, and who has the worst experience?', 'Compare customer groups by persona, segment, age and digital enrollment.', 'Metrics include', ['Contact rate', 'Customers who contacted', 'Digital share', 'Customer satisfaction', 'Net promoter score', 'Repeat contact rate']],
+      ['launch', 'Product launch impact', 'What happens after a launch, and for how long?', 'See how many extra contacts each launch brought, which customers were affected, and when things returned to normal.', 'Metrics include', ['Contacts against expected', 'Average handle time', 'First contact resolution', 'Customer satisfaction', 'Repeat contact rate', 'Service level']],
+      ['selfservice', 'Self-service & channel shift', 'Are phone menus and digital channels absorbing demand?', 'Follow the move from phone calls to phone menus and digital channels, and find where customers still need an agent.', 'Metrics include', ['IVR containment', 'Handled without an agent', 'Digital share', 'Phone contacts', 'Agent hours avoided', 'Contacted within 7 days']]]],
     ['Data', 'Check the numbers behind every dashboard.', 'two', [
-      ['quality', 'Data quality', 'Can we trust the data?', 'Automated checks run on every daily load. See the overall health score, what changed since the last run, and any incident and how it was fixed.', 'What’s inside', [['Health score', '?tab=overview'], ['Columns', '?tab=columns'], ['Daily volume', '?tab=volume'], ['Rules', '?tab=rules'], ['Incidents', '?tab=incidents']]]]]
+      ['quality', 'Data quality', 'Can we trust the data?', 'Automated checks run on every daily load. See the overall health score, what changed since the last run, and any incident and how it was fixed.', 'What’s inside', ['Health score', 'Columns', 'Daily volume', 'Rules', 'Incidents']]]]
   ];
-  const link = (f, name) => ([t, u]) => `<li>${u ? `<a href="${f}.html${u}" aria-label="${esc(t)}, ${esc(name)}">${esc(t)}</a>` : `<span>${esc(t)}</span>`}</li>`;
+  // What each metric means, in plain words. The exact definitions are in data/dashboards/kpis.json and behind the info icons on each dashboard.
+  const MEANS = {
+    'Phone service level': 'Out of all the calls we got, how many we answered quickly enough: within 30 seconds, or 20 for fraud and disputes.',
+    'Service level': 'How many contacts we answered within the time we aim for. The aim depends on the channel, such as 30 seconds for most calls.',
+    'Customer satisfaction': 'How many customers rated us 4 or 5 out of 5 in the survey after their contact.',
+    'Net promoter score': 'How likely customers are to recommend us, on a scale from −100 to +100. Higher is better.',
+    'First contact resolution': 'How often we solved the customer’s issue the first time, with no follow-up needed.',
+    'Occupancy': 'How much of their available time agents spend helping customers. Too low wastes time; too high risks burnout.',
+    'Contacts offered': 'How many times customers contacted us, including those who left before reaching an agent.',
+    'Average speed of answer': 'How long customers wait, on average, before an agent answers.',
+    'Abandon rate': 'How many customers gave up and left before reaching an agent.',
+    'Forecast error': 'How far the number of contacts was from what we predicted. Plus means busier than expected; minus means quieter.',
+    'Staffing vs required': 'Whether we scheduled more (+) or fewer (−) staff than we needed to answer customers on time.',
+    'Schedule adherence': 'How much of their scheduled time agents spent doing what they were scheduled to do.',
+    'Conformance': 'Whether agents worked as much time as they were scheduled for, even if not at the exact hours. About 100% is expected.',
+    'Shrinkage': 'How much scheduled time agents were not available to take contacts, such as for breaks, training or absence.',
+    'Average handle time': 'How long an agent spends on one contact, on average: talking, holding and wrapping up.',
+    'Handle time': 'How long an agent spends on one phone call, on average: talking, holding and wrapping up.',
+    'Transfer rate': 'How often a customer was passed to another agent or queue.',
+    'Quality score': 'The average score when an agent’s contacts are reviewed for quality, from 50 to 100.',
+    'Customer effort score': 'How easy customers said it was to get help, from 1 to 7. A 7 means very easy.',
+    'Repeat contact rate': 'How often a customer contacted us again, for any reason, within 7 days.',
+    'Complaints': 'How many formal complaints we got for every 1,000 contacts.',
+    'Contact rate': 'How many contacts a month we get from every 100 customers.',
+    'Customers who contacted': 'What share of our customers contacted us at least once in the quarter.',
+    'Digital share': 'What share of contacts came by chat, email or secure message instead of a phone call or callback.',
+    'Contacts against expected': 'How many more (or fewer) contacts we got after a launch than we would normally expect.',
+    'IVR containment': 'How often callers finished what they needed in the automated phone menu (the IVR), without an agent.',
+    'Handled without an agent': 'Out of everything customers asked for, how much was finished in the phone menu with no agent needed.',
+    'Phone contacts': 'How many calls were sent to our agents.',
+    'Agent hours avoided': 'An estimate of the agent time saved because customers used the phone menu. The real saving may be lower, as some would not have called.',
+    'Contacted within 7 days': 'How many customers who finished a task in the phone menu still contacted an agent within 7 days, for any reason.',
+    'Service': 'Ask how quickly we answer, how long customers wait and how many give up.',
+    'Satisfaction': 'Ask how customers rate us and what goes with better or worse scores.',
+    'Staffing': 'Ask whether we had enough staff and whether schedules were followed.',
+    'Customers': 'Ask which customer groups contact us most and how they feel about it.',
+    'Launches': 'Ask how a product launch changed contacts and satisfaction.',
+    'Self-service': 'Ask how many customers get things done without an agent.',
+    'Health score': 'One score out of 100 for how well the data passes its checks.',
+    'Columns': 'A closer look at each piece of data we store: what is in it and how complete it is.',
+    'Daily volume': 'How much data arrived each day, so missing or unusual days stand out.',
+    'Rules': 'Every automatic check we run on the data, and whether it passed.',
+    'Incidents': 'Problems found in the data, what caused them and how they were fixed.'
+  };
+  const metric = (f) => (m, i) => `<li><button type="button" data-m="${esc(m)}" aria-describedby="d-${f}-${i}">${esc(m)}</button><span id="d-${f}-${i}" hidden>${esc(MEANS[m])}</span></li>`;
   const card = ([f, name, q, d, label, links]) => `<article class="card">
     <div class="body"><h3><a class="go" href="${f}.html">${esc(name)}</a></h3><p class="q">${esc(q)}</p><p class="d">${esc(d)}</p>
-      <p class="inc" id="i-${f}">${label}</p><ul class="links" aria-labelledby="i-${f}">${links.map(link(f, name)).join('')}</ul>
+      <p class="inc" id="i-${f}">${label}</p><ul class="links" aria-labelledby="i-${f}">${links.map(metric(f)).join('')}</ul>
       <p class="open" aria-hidden="true">Open ${f === 'chat' ? name : 'dashboard'} →</p></div>
     <div class="shot"><img src="${IMG}${f}.jpg" alt="" width="1120" height="664"${f === 'executive' || f === 'chat' ? '' : ' loading="lazy"'}></div></article>`;
   document.getElementById('groups').innerHTML = G.map(([g, sub, cls, items]) => `<section class="group" aria-labelledby="g-${g}"><h2 id="g-${g}">${g}</h2><p>${esc(sub)}</p><div class="cards ${cls}">${items.map(card).join('')}</div></section>`).join('');
+
+  // Explanation on hover, keyboard focus or tap. It stays while the pointer is on it; Esc closes it.
+  const tip = document.getElementById('tip'), box = document.getElementById('groups');
+  let cur = null, timer;
+  const hide = () => { clearTimeout(timer); if (cur) cur.classList.remove('on'); cur = null; tip.hidden = true; };
+  const later = () => { clearTimeout(timer); timer = setTimeout(hide, 150); };
+  const show = (b) => {
+    clearTimeout(timer); if (cur === b) return; hide(); cur = b; b.classList.add('on');
+    tip.innerHTML = `<b>${esc(b.dataset.m)}</b>${esc(MEANS[b.dataset.m])}`;
+    tip.style.left = tip.style.top = '0'; tip.hidden = false;   // measure at full width first
+    const r = b.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight, room = document.documentElement.clientWidth;
+    tip.style.left = Math.max(16, Math.min(r.left, room - w - 16)) + scrollX + 'px';
+    tip.style.top = (r.top - h - 6 >= 0 ? r.top - h - 6 : r.bottom + 6) + scrollY + 'px';
+  };
+  const btn = (e) => e.target.closest('button[data-m]');
+  box.addEventListener('pointerover', (e) => { const b = btn(e); if (b) show(b); });
+  box.addEventListener('pointerout', (e) => { if (e.pointerType === 'mouse' && btn(e)) later(); });
+  box.addEventListener('focusin', (e) => { const b = btn(e); if (b) show(b); else hide(); });
+  box.addEventListener('focusout', later);
+  box.addEventListener('click', (e) => { const b = btn(e); if (b) show(b); });
+  tip.addEventListener('pointerenter', () => clearTimeout(timer));
+  tip.addEventListener('pointerleave', later);
+  document.addEventListener('pointerdown', (e) => { if (!e.target.closest('button[data-m], #tip')) hide(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  addEventListener('resize', hide);
 })();
 </script>
 </body>
