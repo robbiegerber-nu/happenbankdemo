@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/coaching.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -115,6 +115,7 @@
     <div class="tiles" id="tiles"></div>
     <section class="card" id="sec-agent" aria-labelledby="t-agent" hidden>
       <div class="head"><div><h2 id="t-agent" tabindex="-1"></h2><div class="sub" id="s-agent"></div></div><div class="tools"><button class="btn" id="tb-agent" type="button">View as table</button><button class="btn" id="csv-agent" type="button">Download CSV</button><button class="btn" id="x-agent" type="button">Close</button></div></div>
+      <div class="axnote" id="ax-agent" hidden></div>
       <div class="sm" id="c-agent"></div><div class="legend" id="lg-agent"></div><div class="tbl" id="tbl-agent" tabindex="0" role="region" aria-label="Agent values by month" hidden></div>
       <div class="two"><div><h3>Time behind adherence</h3><div class="tbl" id="tbl-time"></div></div><div><h3>Handle time by part</h3><div class="tbl" id="tbl-parts"></div></div></div>
       <h3>Contact reasons furthest from the group</h3><p class="note" id="n-reasons"></p><div class="tbl" id="tbl-reasons"></div>
@@ -151,7 +152,7 @@
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), C = Coaching;
   Site.renderChrome('coaching');
   const GROUPS = { 1: 'Phone', 2: 'Chat', 3: 'Email' }, METRICS = C.METRICS;
-  const DEF = { per: '1', end: '', ch: '1', site: '', ten: '', metric: 'adherence', team: [], agent: null }, S = { ...DEF, team: [] };
+  const DEF = { per: '1', end: '', ch: '1', site: '', ten: '', metric: 'adherence', team: [], agent: null, scale: '' }, S = { ...DEF, team: [] };
   let IDX, KPI, ROWS, AG, BY, W, cur = {}, req = 0, NAMES = null; const tbl = { agent: false, strip: false, scat: false }, files = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
@@ -174,11 +175,11 @@
     if (one('f-end', p.get('end'))) S.end = p.get('end'); else if (one('f-end', carried())) S.end = carried();
     for (const [id, key] of [['f-per', 'per'], ['f-ch', 'ch'], ['f-ten', 'ten']]) if (one(id, p.get(key))) S[key] = p.get(key);
     if (teams().some((t) => t.site === p.get('site'))) S.site = p.get('site');
-    if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric'); if (p.get('scale') === 'zero') S.scale = 'zero';
     S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x));
     if (AG.has(+p.get('agent')) && String(AG.get(+p.get('agent')).ch) === S.ch) S.agent = +p.get('agent');
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Agent & team coaching v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Agent & team coaching v1.1`;
     update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The coaching data could not be loaded. ' + e.message; }
@@ -233,7 +234,7 @@
   }
   function writeUrl() {
     const p = new URLSearchParams(); for (const k of ['per', 'end', 'ch', 'site', 'ten', 'metric']) if (S[k] !== DEF[k] || (k === 'end' && carried())) p.set(k, S[k]);
-    S.team.forEach((x) => p.append('team', x)); if (S.agent) p.set('agent', S.agent);
+    S.team.forEach((x) => p.append('team', x)); if (S.agent) p.set('agent', S.agent); if (S.scale) p.set('scale', S.scale);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
   const few = (m, p) => C.n(m, p) < kpi(m).minN;
@@ -282,19 +283,19 @@
     $('t-agent').textContent = a.name; $('s-agent').textContent = `${tName(a.t)} · ${team(a.t).site}${team(a.t).sup ? ' · supervisor ' + team(a.t).sup : ''} · hired ${fmt.date(a.hire)}${left(a) ? ', left ' + fmt.date(a.term) : ramping(a) ? ` · ramping up, day ${days(a)}` : ''} · 6 months to ${fmt.month(S.end)}`;
     $('tb-agent').textContent = tbl.agent ? 'View as chart' : 'View as table'; $('tb-agent').setAttribute('aria-pressed', tbl.agent);
     const isA = (x) => x.id === a.id, tr = W.trend.map((m) => ({ m, p: tot([m], isA), q: tot(span(m, 3), isA) })); cur.tr = tr;
-    const part = (m, t) => (m === 'quality' ? t.q : t.p), host = $('c-agent'); host.innerHTML = ''; host.hidden = $('lg-agent').hidden = tbl.agent; $('tbl-agent').hidden = !tbl.agent;
+    const part = (m, t) => (m === 'quality' ? t.q : t.p), host = $('c-agent'); host.innerHTML = ''; $('ax-agent').hidden = true; host.hidden = $('lg-agent').hidden = tbl.agent; $('tbl-agent').hidden = !tbl.agent;
     if (tbl.agent) $('tbl-agent').innerHTML = `<table><thead><tr><th scope="col">Month</th>${METRICS.map((m) => `<th scope="col">${esc(kpi(m).short)}</th><th scope="col">Group</th>`).join('')}</tr></thead><tbody>${tr.slice().reverse().map((t) => `<tr><td>${fmt.month(t.m)}</td>${METRICS.map((m) => { const p = part(m, t); return `<td class="${few(m, p) ? 'low' : ''}">${V(m, C.value(m, p))}${C.value(m, p) != null && few(m, p) ? ' (too few)' : ''}</td><td>${V(m, C.expected(m, p))}</td>`; }).join('')}</tr>`).join('')}</tbody></table>`;
-    else { const boxes = METRICS.map(() => host.appendChild(document.createElement('div'))); for (const m of METRICS) {
+    else { let zoomed = null; const boxes = METRICS.map(() => host.appendChild(document.createElement('div'))); for (const m of METRICS) {
       const box = boxes[METRICS.indexOf(m)]; box.innerHTML = `<div class="sm-h">${esc(kpi(m).name)}${m === 'quality' ? ' (3 months)' : ''}</div>`;
       const w = box.clientWidth || 340, H = 130, M = { l: 54, r: 12, t: 8, b: 22 }, pts = tr.map((t, i) => ({ t, i, p: part(m, t), v: C.value(m, part(m, t)), e: C.expected(m, part(m, t)) })).filter((q) => q.v != null);
       if (!pts.length) { box.insertAdjacentHTML('beforeend', '<p class="note">No data.</p>'); continue; }
-      const [lo, hi] = Site.zeroAxis(pts.flatMap((q) => [q.v, q.e]), kpi(m).format);
+      const { a: lo, b: hi, edge } = Site.trendAxis(pts.flatMap((q) => [q.v, q.e]), kpi(m).format, S.scale === 'zero', 3); zoomed = zoomed ?? edge;
       const x = (i) => M.l + (i + .5) / tr.length * (w - M.l - M.r), y = (v) => M.t + (hi - v) / (hi - lo) * (H - M.t - M.b), s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'img', 'aria-label': `${kpi(m).name}: ${pts.map((q) => `${fmt.month(q.t.m)} ${V(m, q.v)}, group ${V(m, q.e)}`).join('; ')}` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
       for (const t of ticks(lo, hi, 3, kpi(m).format)) { el('line', { x1: M.l, x2: w - M.r, y1: y(t), y2: y(t) }, g); text(ax, M.l - 6, y(t) + 4, tick(m, t), '', 'end'); }
       tr.forEach((t, i) => text(ax, x(i), H - 6, fmt.monthShort(t.m), '', 'middle'));
       el('path', { class: 'l2', d: Site.linePath(pts.map((q) => ({ k: q.i, x: x(q.i), y: y(q.e) }))) }, s); el('path', { class: 'l1', d: Site.linePath(pts.map((q) => ({ k: q.i, x: x(q.i), y: y(q.v) }))) }, s);
       pts.forEach((q) => { el('circle', { class: 'pt' + (few(m, q.p) ? ' low' : ''), cx: x(q.i), cy: y(q.v), r: 4 }, s); tip(el('rect', { class: 'hit0', x: x(q.i) - 20, y: 0, width: 40, height: H - M.b }, s), () => `<b>${fmt.month(q.t.m)}</b><br>${esc(kpi(m).name)}: <b>${V(m, q.v)}</b><br>Group: ${V(m, q.e)}<br>${mark(m, sig(m, q.p))}<br><span class="muted">n = ${fmt.count(C.n(m, q.p))}</span>`); });
-    } }
+    } Site.axisNote($('ax-agent'), { edge: zoomed, many: true, zero: S.scale === 'zero', set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderAgent(); } }); }
     $('lg-agent').innerHTML = leg([['<line class="l1" x2="20" y1="7" y2="7"/>', 'Agent'], ['<line class="l2" x2="20" y1="7" y2="7"/>', 'Group, for the same contacts (adherence and quality: whole group)'], ['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few']]);
     const p = tot(W.ms, isA), g = cur.group, row = (n, v, e, fx, u) => { const a1 = fmt.displayed(v, u), b1 = fmt.displayed(e, u); return `<tr><td>${n}</td><td>${fx(v)}</td><td>${fx(e)}</td><td><b>${u === 'duration' ? G2('aht', a1 - b1) : G2('quality', a1 - b1)}</b></td></tr>`; }, head = (a1, b1) => `<thead><tr><th scope="col">${a1}</th><th scope="col">Agent</th><th scope="col">${b1}</th><th scope="col">Difference</th></tr></thead>`;
     const none = '<p class="note" style="padding:12px">No data for this period.</p>';

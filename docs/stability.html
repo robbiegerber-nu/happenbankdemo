@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/spc.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -123,6 +123,7 @@
         <div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label>
           <button class="btn" type="button" id="csv-main" hidden>Download CSV</button><button class="btn" type="button" id="tb-main">View as table</button></div></div>
       <div class="line" id="l-main" aria-live="polite"></div>
+      <div class="axnote" id="ax-main" hidden></div>
       <div class="chart" id="c-main"></div><div class="sr-only" id="live" aria-live="polite"></div><div class="legend" id="lg-main"></div><div class="tbl" id="tbl-main" tabindex="0" role="region" aria-label="Values over time" hidden></div>
       <div class="note" id="n-main"></div>
     </section>
@@ -130,6 +131,7 @@
       <div class="head"><div><h2 id="t-split"></h2><div class="sub" id="s-split"></div></div>
         <div class="tools"><button class="btn" type="button" id="csv-split" hidden>Download CSV</button><button class="btn" type="button" id="tb-split">View as table</button></div></div>
       <div class="line" id="l-split" aria-live="polite"></div>
+      <div class="axnote" id="ax-split" hidden></div>
       <div id="c-split"></div><div class="tbl" id="tbl-split" tabindex="0" role="region" aria-label="Values by category" hidden></div>
     </section>
     <details class="how card"><summary>How the limits and signals work</summary><ul>
@@ -176,7 +178,7 @@
     if (!p.has('end') && one('f-end', carried())) S.end = carried();
     S.member = p.get('member');
     Site.setDataThrough(THROUGH);
-    $('footer-generated').textContent = `Data through ${fmt.date(THROUGH)} · exported ${fmt.date(e.generated_at)}, ${fmt.time(e.generated_at)} CT · Process stability monitor v1.0`;
+    $('footer-generated').textContent = `Data through ${fmt.date(THROUGH)} · exported ${fmt.date(e.generated_at)}, ${fmt.time(e.generated_at)} CT · Process stability monitor v1.1`;
     return load();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The control chart data could not be loaded. ' + e.message; }
@@ -283,11 +285,11 @@
       : `<b>No signals</b> in ${count(r.usable, unit())}: the variation is within these limits.`;
     const sunday = !isWeek() && ['volume', 'digital_share', 'sl_email', 'fcr', 'complaints'].includes(S.metric), weekday = !isWeek() && ['staffing', 'occupancy', 'sl_phone', 'sl_chat', 'asa_phone', 'abandon'].includes(S.metric);
     $('n-main').textContent = [r.extended && r.lim ? `The baseline was extended back to ${fmt.date(iso(r.bs))}; control limits need at least ${SPC.MIN_BASELINE} points.` : '', sunday ? 'Sundays have few contacts, all by email or secure message, which widens the daily limits. Use the weekly grain for this metric.' : weekday ? 'This metric changes by day of the week. The weekly grain removes that pattern.' : ''].filter(Boolean).join(' ');
-    $('c-main').hidden = $('lg-main').hidden = tblMain; $('tbl-main').hidden = $('csv-main').hidden = !tblMain;
+    $('ax-main').hidden = true; $('c-main').hidden = $('lg-main').hidden = tblMain; $('tbl-main').hidden = $('csv-main').hidden = !tblMain;
     $('tb-main').textContent = tblMain ? 'View as chart' : 'View as table'; $('tb-main').setAttribute('aria-pressed', tblMain);
     if (tblMain) $('tbl-main').innerHTML = `<table><thead><tr><th scope="col">${isWeek() ? 'Week' : 'Day'}</th><th scope="col">${esc(M.k.short)}</th><th scope="col">Center</th><th scope="col">LCL</th><th scope="col">UCL</th><th scope="col" class="l">Signal</th></tr></thead><tbody>` +
       r.pts.slice().reverse().map((p) => `<tr><td>${dateName(p.t)}${p.inPeriod ? '' : ' (baseline)'}</td><td class="${p.low ? 'low' : ''}">${V(p.v, true)}${p.low ? ' (too few)' : ''}</td>${r.lim ? [r.lim.center, p.l.lcl, p.l.ucl].map((v) => `<td>${V(v, true)}</td>`).join('') : '<td>–</td><td>–</td><td>–</td>'}<td class="l">${sigHtml(p)}</td></tr>`).join('') + '</tbody></table>';
-    else { chart($('c-main'), r, false); legend(r); }
+    else { chart($('c-main'), r, false); legend(r); Site.axisNote($('ax-main'), { edge: r.edge }); }
   }
   const sigHtml = (p) => p.sig.length ? `<span class="status ${p.sig.includes('outside') ? 'off' : 'watch'}">${p.sig.map((s) => RULE[s]).join(', ')}</span>` : '';
   function legend(r) {
@@ -303,7 +305,7 @@
     if (!show) return;
     const dimWord = S.dim.toLowerCase(), cat = S.view === 'cat';
     $('t-split').textContent = cat ? `${M.k.name} by ${dimWord}, whole period, ${+S.sigma}σ limits` : `${M.k.name} by ${dimWord}, ${grainWord()}, ${+S.sigma}σ limits`;
-    $('c-split').hidden = tblSplit; $('tbl-split').hidden = $('csv-split').hidden = !tblSplit;
+    $('ax-split').hidden = true; $('c-split').hidden = tblSplit; $('tbl-split').hidden = $('csv-split').hidden = !tblSplit;
     $('tb-split').textContent = tblSplit ? 'View as chart' : 'View as table'; $('tb-split').setAttribute('aria-pressed', tblSplit);
     cat ? renderCategories() : renderPanels();
   }
@@ -326,6 +328,7 @@
       host.firstChild.append(el);
       chart(el.querySelector('.chart'), r, true);
     }
+    const zoomed = list.filter((r) => r.edge != null); Site.axisNote($('ax-split'), { edge: zoomed.length ? zoomed[0].edge : null, many: true });
   }
   const total = (r) => { const x = r.per.reduce((s, p) => s + p.x, 0); return M.k.spc.scale == null ? x : (x / r.n) * M.k.spc.scale; };
 
@@ -349,7 +352,7 @@
     const W = box.clientWidth, H = 360, m = { t: 16, r: 96, b: 74, l: 60 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / list.length;
     const vals = list.flatMap((r) => [r.value, r.lcl, r.ucl]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - v) / (b - a) * ih, x = (i) => m.l + step * (i + .5);
     const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${M.k.name} by ${S.dim}. ${out.length} of ${list.length} outside the limits. Use View as table for values.` }, box);
-    axis(s, a, b, y, m.l, m.l + iw);
+    axis(s, a, b, y, m.l, m.l + iw); Site.axisNote($('ax-split'), { edge: edgeOf(a, b) });
     el('line', { class: 'c-cl', x1: m.l, x2: m.l + iw, y1: y(center.value), y2: y(center.value) }, s);
     text(s, m.l + iw + 8, y(center.value) + 4, 'Center ' + V(center.value), 'c-lab');
     list.forEach((r, i) => {
@@ -370,6 +373,7 @@
   function text(p, x, y, s, cls, anchor) { const t = el('text', { x, y, ...(cls ? { class: cls } : {}), ...(anchor ? { 'text-anchor': anchor } : {}) }, p); t.textContent = s; return t; }
   const diamond = (x, y, r) => `M${x},${y - r}L${x + r},${y}L${x},${y + r}L${x - r},${y}Z`;
   // control charts are scaled to their limits, not to zero (Style Guide): the limits are what the reader compares with
+  const edgeOf = (a, b) => (a > 0 ? a : b < 0 ? b : null);   // where a scale stops short of zero
   function pad(a, b) { const d = (b - a || Math.abs(b) || 1) * .08, [lo, hi] = bounds() || [-Infinity, Infinity]; return [Math.max(lo, a - d), Math.min(hi, b + d)]; }
   function tick(v) {
     switch (M.k.format) {
@@ -396,6 +400,7 @@
     const x = (t) => m.l + (t - t0) / (t1 - t0) * iw;
     const shown = pts.filter((p) => !p.low), src = shown.length ? shown : pts;
     const vals = src.flatMap((p) => p.l ? [p.v, p.l.lcl, p.l.ucl] : [p.v]), [a, b] = pad(Math.min(...vals), Math.max(...vals)), y = (v) => m.t + (b - Math.min(b, Math.max(a, v))) / (b - a) * ih;
+    r.edge = edgeOf(a, b);
     const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: small ? 'img' : 'group', 'aria-label': `${M.k.name}, ${r.name}, ${grainWord()}, ${range(r.w.s, r.w.e)}. ${r.lim ? `${r.out.length} outside the limits, ${r.run.length} run-rule signals.` : 'No limits.'} Use View as table for values.` }, host);
     if (S.base !== 'self' && r.be > t0) el('rect', { class: 'c-base', x: m.l, y: m.t, width: Math.max(0, x(r.w.s) - m.l), height: ih }, s);
     axis(s, a, b, y, m.l, m.l + iw, small ? 4 : 5);

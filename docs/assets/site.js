@@ -334,6 +334,39 @@
     return [lo < 0 ? lo - pad : 0, hi > 0 || lo === 0 ? (format === 'pct' ? Math.max(hi, Math.min(100, hi + pad)) : hi + pad) : 0];
   }
 
+  // Axis of a trend drawn as lines: zoomed to its values, unless the reader asks for a full scale (zero) or the zoomed scale would
+  // reach zero or nearly so. The range is never under 5% of the typical value (or too small for its labels), so noise doesn't fill the chart. An end that stops
+  // short of zero falls on a round step, so it has its own axis label. Returns { a, b, edge }; edge is the value the zoomed scale
+  // stops at, or null where there is nothing to choose.
+  function trendAxis(vals, format, zero, n = 5) {
+    const full = zeroAxis(vals, format), none = { a: full[0], b: full[1], edge: null }, v = vals.filter((q) => q != null && Number.isFinite(q));
+    if (!v.length) return none;
+    let lo = Math.min(...v), hi = Math.max(...v); if (lo <= 0 && hi >= 0) return none;
+    const abs = v.map(Math.abs).sort((p, q) => p - q), need = Math.max(hi - lo, abs[abs.length >> 1] * .05, n * (format === 'duration' || format === 'wait' ? 1 : .1)), pad = (need - (hi - lo)) / 2 + need * .12, neg = hi < 0;
+    lo -= pad; hi += pad; if (format === 'pct' && hi > 100) hi = Math.max(100, ...v);
+    if (neg ? hi >= 0 : lo <= 0) return none;
+    // round the end nearer zero to a step; trim the padding at the other end when that keeps the steps fine
+    const least = Math.min(...v), most = Math.max(...v); let edge = neg ? hi : lo;
+    for (let i = 0; i < 6; i++) {
+      const st = tickStep((neg ? edge - lo : hi - edge) / n, format), e = neg ? Math.ceil(hi / st - 1e-9) * st : Math.floor(lo / st + 1e-9) * st, cap = st * n * .9999;
+      if (neg && e - lo > cap && e - least <= cap) lo = e - cap; else if (!neg && hi - e > cap && most - e <= cap) hi = e + cap;
+      if (Math.abs(e - edge) < 1e-9) break; edge = e;
+    }
+    edge = +edge.toFixed(8);
+    if (Math.abs(edge) < Math.abs(neg ? lo : hi) * .2) return none;
+    return zero ? { ...none, edge } : { a: neg ? lo : edge, b: neg ? edge : hi, edge };
+  }
+  // The line above a trend that says its scale doesn't start at zero, with the button that switches. Returns its text, for the chart's
+  // spoken name. o: { edge, zero, show: value → text, set: (zero) → redraw (none: no button), many: one line for charts with different scales }
+  function axisNote(host, o) {
+    host.hidden = o.edge == null; host.innerHTML = ''; if (host.hidden) return '';
+    const named = o.set && !o.many, at = named && o.show(o.edge), nil = named && o.show(0);
+    const text = o.zero ? [o.many ? 'Full scales, starting at zero.' : 'Full scale, starting at zero.', 'Small changes may be hard to see.'] : ['Zoomed in to show detail.', o.many ? 'Not all of these scales start at zero, so changes look bigger than they would on a full scale.' : !named ? 'This scale doesn’t start at zero, so changes look bigger than they would on a full scale.' : o.edge < 0 ? `This scale stops at ${at}, not ${nil}, so changes look bigger than they would on a full scale.` : `This scale starts at ${at}, not ${nil}, so changes look bigger than they would on a full scale.`];
+    host.innerHTML = `<span><b>${esc(text[0])}</b> ${esc(text[1])}</span>${o.set ? ` <button type="button" class="link-btn">${o.zero ? 'Zoom in' : 'Start at zero'}</button>` : ''}`;
+    if (o.set) host.querySelector('button').addEventListener('click', () => { o.set(!o.zero); const q = host.querySelector('button'); if (q) q.focus({ preventScroll: true }); });
+    return text.join(' ');
+  }
+
   // Axis steps: round numbers, and whole minutes or seconds for times
   function tickStep(raw, format) {
     if (!(raw > 0)) return 1;
@@ -371,5 +404,5 @@
     return 'sorted by ' + label.replace(/^[A-Z](?=[a-z])/, (c) => c.toLowerCase());
   }
 
-  window.Site = { sortList, monthWindow, ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
+  window.Site = { sortList, monthWindow, ticks, tickStep, linePath, perDay, monthDays, eventKey, zeroAxis, trendAxis, axisNote, setDataThrough, focusKey, restoreFocus, changeMark, downloadCsv, copyLink, renderChrome, fmt, statusOf, STATUS_WORD, changeQuality, infoButton, showTip, hideTip, esc, el, DISCLAIMER, WIKI, currentTheme };
 })();

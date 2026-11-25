@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/personas.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -110,6 +110,7 @@
     </section>
     <section class="card" aria-labelledby="t-tr">
       <div class="head"><div><h2 id="t-tr"></h2><div class="sub" id="s-tr"></div></div><div class="tools"><button class="btn" id="csv-tr" type="button">Download CSV</button><button class="btn" id="tb-tr" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-tr" hidden></div>
       <div class="sm" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
     </section>
     <section class="card wide-only" aria-labelledby="t-ch">
@@ -131,7 +132,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), P = Personas, M = P.METRICS;
   Site.renderChrome('personas');
-  const DEF = { q: '', cmp: 'prior', p: '', s: '', a: '', d: '', metric: 'csat', dim: 'p', sg: '', sr: '' }, S = { ...DEF }, files = {}; let IDX, K, CELL, req = 0, cur = {}, NOW, WAS; const tbl = { tr: false, ch: false };
+  const DEF = { q: '', cmp: 'prior', p: '', s: '', a: '', d: '', metric: 'csat', dim: 'p', sg: '', sr: '', scale: '' }, S = { ...DEF }, files = {}; let IDX, K, CELL, req = 0, cur = {}, NOW, WAS; const tbl = { tr: false, ch: false };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/personas/${m}.json.gz`);
   const shift = (m, n) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo - 1 + n, 1)).toISOString().slice(0, 7); }, qOf = (m) => { const [y, mo] = m.split('-').map(Number); return `${y}-${String(Math.floor((mo - 1) / 3) * 3 + 1).padStart(2, '0')}`; }, qName = (q) => `Q${(+q.slice(5) + 2) / 3} ${q.slice(0, 4)}`, qMonths = (q) => [0, 1, 2].map((i) => shift(q, i));
@@ -143,8 +144,8 @@
     IDX.rch = new Map(); for (const r of i.reach) (IDX.rch.get(r[0]) || (IDX.rch.set(r[0], []), IDX.rch.get(r[0]))).push(r);
     DEF.q = S.q = i.quarters[i.quarters.length - 1]; $('f-q').innerHTML = [...i.quarters].reverse().map((q) => `<option value="${q}">${qName(q)}</option>`).join('');
     const opt = (id, rows) => { $(id).innerHTML = '<option value="">All</option>' + rows.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); }; opt('f-p', i.personas.map((x) => [x.id, x.name])); opt('f-s', Object.entries(i.names.s)); opt('f-a', Object.entries(i.names.a));
-    const p = new URLSearchParams(location.search); for (const key of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) { const v = p.get(key); if (v && [...$('f-' + key).options].some((o) => o.value === v)) S[key] = v; } if (M.includes(p.get('metric'))) S.metric = p.get('metric'); for (const k of ['sg', 'sr']) S[k] = p.get(k) || '';
-    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer & persona insights v1.1`;
+    const p = new URLSearchParams(location.search); for (const key of ['q', 'cmp', 'p', 's', 'a', 'd', 'dim']) { const v = p.get(key); if (v && [...$('f-' + key).options].some((o) => o.value === v)) S[key] = v; } if (M.includes(p.get('metric'))) S.metric = p.get('metric'); if (p.get('scale') === 'zero') S.scale = 'zero'; for (const k of ['sg', 'sr']) S[k] = p.get(k) || '';
+    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer & persona insights v1.2`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer data could not be loaded. ' + e.message; }
@@ -218,14 +219,14 @@
     const m = trendMetric(), k = K[m], key = (c, ch, r, mm) => `${c[S.dim]}~${mm}`, map = totals(cur.td, key, S.dim), aMap = totals(cur.td, (c, ch, r, mm) => mm, S.dim);
     for (const mm of cur.tm) { const q = qOf(mm); for (const [id, n] of IDX.cust.get(q) || []) { const c = CELL.get(id); if (!okCell(c, S.dim)) continue; const t = map.get(`${c[S.dim]}~${mm}`); if (t) t.cm = (t.cm || 0) + n; const a = aMap.get(mm); if (a) a.cm = (a.cm || 0) + n; } }
     const rows = groups().map(([id]) => ({ id, name: DIM[S.dim].label(id), pts: cur.tm.map((mm) => { const t = map.get(`${id}~${mm}`); return { mm, t, v: P.value(m, t), low: !t || low(m, t) }; }) })), all = cur.tm.map((mm) => P.value(m, aMap.get(mm))); cur.trend = { m, rows, all };
-    $('t-tr').textContent = `${k.name} by ${DIM[S.dim].name.toLowerCase()}, 13 months`; $('s-tr').textContent = `${k.short}, monthly, ${fmt.month(cur.tm[0])} – ${fmt.month(cur.tm[cur.tm.length - 1])} · same scale in every chart${S.metric === 'reach' ? ' · contact rate is shown, because reach is counted per quarter' : ''}${m === 'rate' ? ' · per month, so shorter months read a little lower' : ''}`; swap('tr', ['c-tr', 'lg-tr']);
+    $('t-tr').textContent = `${k.name} by ${DIM[S.dim].name.toLowerCase()}, 13 months`; $('s-tr').textContent = `${k.short}, monthly, ${fmt.month(cur.tm[0])} – ${fmt.month(cur.tm[cur.tm.length - 1])} · same scale in every chart${S.metric === 'reach' ? ' · contact rate is shown, because reach is counted per quarter' : ''}${m === 'rate' ? ' · per month, so shorter months read a little lower' : ''}`; swap('tr', ['c-tr', 'lg-tr']); $('ax-tr').hidden = true;
     if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th>${rows.map((r) => `<th scope="col">${esc(r.name)}</th>`).join('')}<th scope="col">All shown</th></tr></thead><tbody>${cur.tm.map((mm, i) => `<tr><td>${fmt.month(mm)}</td>${rows.map((r) => `<td class="${r.pts[i].low ? 'low' : ''}">${V(m, r.pts[i].v)}${r.pts[i].low ? ' (too few)' : ''}</td>`).join('')}<td>${V(m, all[i])}</td></tr>`).reverse().join('')}</tbody></table>`; return; }
     const host = $('c-tr'); host.innerHTML = ''; $('lg-tr').innerHTML = ''; const vs = [...rows.flatMap((r) => r.pts.map((p) => p.v)), ...all].filter((v) => v != null); if (!vs.length) { host.textContent = 'No data for these filters.'; return; }
-    const [lo, hi] = Site.zeroAxis([...vs, ...(k.target == null ? [] : [k.target])], k.format);
+    const { a: lo, b: hi, edge } = Site.trendAxis([...vs, ...(k.target == null ? [] : [k.target])], k.format, S.scale === 'zero', 4), scale = Site.axisNote($('ax-tr'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderTrend(); } });
     const boxes = rows.map(() => host.appendChild(document.createElement('div')));
     rows.forEach((r, i) => { const box = boxes[i], on = S[S.dim] === String(r.id); box.innerHTML = `<div class="sm-h">${esc(r.name)}${on ? ' (selected)' : ''}</div>`; const w = box.clientWidth || 300, H = 130, G = { l: 46, r: 8, t: 6, b: 22 }, x = (j) => G.l + (j + .5) / cur.tm.length * (w - G.l - G.r), y = (v) => G.t + (hi - v) / (hi - lo) * (H - G.t - G.b);
-      const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, ${r.name}. Use View as table for values.` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
-      for (const t of ticks(lo, hi, 3, F(m))) { el('line', { x1: G.l, x2: w - G.r, y1: y(t), y2: y(t) }, g); text(ax, G.l - 6, y(t) + 4, tick(m, t), '', 'end'); } cur.tm.forEach((mm, j) => { if ((cur.tm.length - 1 - j) % 4 === 0) text(ax, x(j), H - 6, fmt.monthShort(mm) + (j === 0 ? ' ’' + mm.slice(2, 4) : ''), '', 'middle'); });
+      const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, ${r.name}. ${scale} Use View as table for values.` }, box), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+      for (const t of ticks(lo, hi, 4, F(m))) { el('line', { x1: G.l, x2: w - G.r, y1: y(t), y2: y(t) }, g); text(ax, G.l - 6, y(t) + 4, tick(m, t), '', 'end'); } cur.tm.forEach((mm, j) => { if ((cur.tm.length - 1 - j) % 4 === 0) text(ax, x(j), H - 6, fmt.monthShort(mm) + (j === 0 ? ' ’' + mm.slice(2, 4) : ''), '', 'middle'); });
       if (k.target != null) el('line', { class: 'tg', x1: G.l, x2: w - G.r, y1: y(k.target), y2: y(k.target) }, s);
       const path = (a) => a.map((v, j) => [v, j]).filter((q) => q[0] != null).map(([v, j]) => ({ k: j, x: x(j), y: y(v) })), draw = (a) => Site.linePath(path(a)), good = (j) => r.pts[j] && r.pts[j].v != null && !r.pts[j].low; el('path', { class: 'l3', d: draw(all) }, s); el('path', { class: 'l1', d: draw(r.pts.map((p) => (p.low ? null : p.v))) }, s);
       r.pts.forEach((p, j) => { if (p.v == null) return; if (p.low || (!good(j - 1) && !good(j + 1))) el('circle', { class: 'pt' + (p.low ? ' low' : ''), cx: x(j), cy: y(p.v), r: 3 }, s); const h = el('rect', { class: 'hit', x: x(j) - (w - G.l - G.r) / cur.tm.length / 2, y: G.t, width: (w - G.l - G.r) / cur.tm.length, height: H - G.t - G.b, tabindex: j === cur.tm.length - 1 ? 0 : -1, role: 'img', 'aria-label': `${r.name}, ${fmt.month(p.mm)}: ${V(m, p.v)}, all ${V(m, all[j])}${p.low ? ', too few' : ''}` }, s); tip(h, () => `<b>${esc(r.name)}</b><br>${fmt.month(p.mm)}: <b>${V(m, p.v)}</b><br>All shown: ${V(m, all[j])}<br><span class="muted">n = ${fmt.count(P.n(m, p.t))}${p.low ? ', too few' : ''}</span>`); }); arrows(s); });

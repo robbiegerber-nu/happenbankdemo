@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <style>
   /* Colors, type, header and buttons come from assets/site.css. These aliases map this page's names onto the shared tokens. */
   :root {
@@ -387,6 +387,7 @@
       <figure class="card chart-card" style="margin:0">
         <div class="chart-head"><figcaption class="chart-title">Overall health score by run (out of 100)</figcaption>
           <div class="card-tools"><button class="btn" type="button" id="trend-csv" hidden>Download CSV</button><button class="btn" type="button" id="trend-table" aria-pressed="false">View as table</button></div></div>
+        <div class="axnote" id="ax-trend" hidden></div>
         <div id="trend"></div>
         <div id="trend-tbl" class="scroll" hidden></div>
       </figure>
@@ -800,10 +801,12 @@ function renderTrend() {
   h.forEach((r, i) => { const p = phaseOf(r); if (!phases.length || phases[phases.length - 1].p !== p) phases.push({ p, a: i, b: i }); else phases[phases.length - 1].b = i; });
   const twoPhases = phases.length > 1;
   const W = Math.max(280, Math.round($('trend').clientWidth || $('trend').closest('figure').clientWidth - 32 || 560)), H = twoPhases ? 256 : 230, m = { t: 22, r: 28, b: twoPhases ? 70 : 44, l: 40 };
-  const lo = 0, hi = 100;
+  const full = S.trendZero, fit = Site.trendAxis(h.map(r => +r.score), 'pct', full), zoom = fit.edge != null && !full, lo = zoom ? fit.a : 0, hi = zoom ? fit.b : 100;
+  const scale = Site.axisNote($('ax-trend'), { edge: fit.edge, zero: full, show: v => String(v), set: z => { S.trendZero = z; renderTrend(); } });
+  if ($('trend').hidden) $('ax-trend').hidden = true;
   const x = i => h.length === 1 ? (m.l + W - m.r) / 2 : m.l + i * (W - m.l - m.r) / (h.length - 1);
   const y = v => m.t + (hi - v) * (H - m.t - m.b) / (hi - lo);
-  const ticks = []; for (let v = lo; v <= hi; v += 25) ticks.push(v);
+  const ticks = zoom ? Site.ticks(lo, hi, 5, 'pct') : [0, 25, 50, 75, 100];
   const path = h.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(+r.score).toFixed(1)}`).join('');
   const si = h.findIndex(r => r.run_id === S.selected);
   // labels: keep the selected, last and first runs, then add others only where they don't collide (20+ runs on a phone)
@@ -828,7 +831,7 @@ function renderTrend() {
        <text class="phase-cap" x="${mid}" y="${H - 9}" text-anchor="middle">${esc(label)}</text>`;
   }).join('');
   $('trend').innerHTML = `
-    <svg class="trend" viewBox="0 0 ${W} ${H}" role="group" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}">
+    <svg class="trend" viewBox="0 0 ${W} ${H}" role="group" aria-label="Overall health score by run: ${h.map(r => `run ${r.run_id} ${r.score}`).join(', ')}. ${scale}">
       ${phaseSvg}
       <g class="grid">${ticks.map(v => `<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>
         <text class="axis-label" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v}</text>`).join('')}</g>
@@ -1578,7 +1581,7 @@ function wire() {
   $('v-astable').addEventListener('click', () => { V.table = !V.table; drawVolume(); });
   $('trend-table').addEventListener('click', e => {
     const on = $('trend-tbl').hidden; $('trend-tbl').hidden = !on; $('trend').hidden = on; $('trend-csv').hidden = !on;
-    e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.textContent = on ? 'View as chart' : 'View as table'; if (!on) renderTrend();
+    e.currentTarget.setAttribute('aria-pressed', on); e.currentTarget.textContent = on ? 'View as chart' : 'View as table'; if (on) $('ax-trend').hidden = true; else renderTrend();
   });
   $('trend-tbl').addEventListener('click', e => { const r = e.target.closest('[data-run]'); if (r) showRun(+r.dataset.run); });
   // each CSV holds what its table shows, with full values

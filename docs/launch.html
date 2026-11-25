@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/launch.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -89,6 +89,7 @@
     <p class="note" id="n-tiles">Weeks 0–3 after the launch, for the contact reasons it was expected to affect, against the 6 weeks before it was announced (weeks −8 to −3). Select a tile to chart it.</p>
     <section class="card" aria-labelledby="t-ser">
       <div class="head"><div><h2 id="t-ser"></h2><div class="sub" id="s-ser"></div></div><div class="tools"><button class="btn" id="csv-ser" type="button">Download CSV</button><button class="btn" id="tb-ser" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-ser" hidden></div>
       <div class="chart" id="c-ser"></div><div class="legend" id="lg-ser"></div><div class="tbl" id="tbl-ser" tabindex="0" role="region" aria-label="Values by week" hidden></div><p class="note" id="n-ser"></p>
     </section>
     <section class="card wide-only" aria-labelledby="t-rea">
@@ -119,17 +120,17 @@
     volume: { name: 'Contacts', short: 'Contacts', format: 'count', better: 'none', minN: 0, definition: 'Contacts offered for the reasons the launch was expected to affect, against what was expected that week.', formula: 'Expected = baseline contacts a week × how other reasons moved that week', target: null, wiki: 'service-and-access' },
     sl: { name: 'Service level, all channels', short: 'Service level', format: 'pct', better: 'higher', minN: 50, target: null, definition: "Share of contacts answered within their own queue's threshold, all channels together. Targets differ by channel, so none is shown.", formula: 'Answered within threshold ÷ (answered + abandoned − short abandons)', exclusions: 'Excludes abandons under 5 seconds.', wiki: 'service-and-access' }
   };
-  let IDX, LA, EV, S = { l: null, metric: 'volume' }, DEF = {}, cur = {}, table = false; const cache = new Map();
+  let IDX, LA, EV, S = { l: null, metric: 'volume', scale: '' }, DEF = {}, cur = {}, table = false; const cache = new Map();
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   Promise.all([get('data/dashboards/kpis.json'), get('data/dashboards/launch/index.json.gz'), get('data/dashboards/events.json')]).then(([k, i, e]) => {
     const all = Object.fromEntries([...k.kpis, ...k.extra].map((x) => [x.id, x])); for (const m of ['aht', 'fcr', 'csat', 'repeat']) K[m] = all[m];
     IDX = i; LA = i.launches; EV = e.events; IDX.rowsBy = new Map();
     for (const r of i.rows) { const o = Object.fromEntries(i.keys.map((c, j) => [c, r[j]])); (IDX.rowsBy.get(o.l) || (IDX.rowsBy.set(o.l, []), IDX.rowsBy.get(o.l))).push(o); }
-    DEF = { l: LA[LA.length - 1].id, metric: 'volume', sort: '' }; S = { ...DEF };
+    DEF = { l: LA[LA.length - 1].id, metric: 'volume', sort: '', scale: '' }; S = { ...DEF };
     $('f-l').innerHTML = [...LA].reverse().map((x) => `<option value="${x.id}">${esc(x.name)} (${fmt.date(x.date)})</option>`).join('');
-    const p = new URLSearchParams(location.search); if (LA.some((x) => String(x.id) === p.get('l'))) S.l = +p.get('l'); if (L.METRICS.includes(p.get('metric'))) S.metric = p.get('metric'); S.sort = p.get('sort') || '';
+    const p = new URLSearchParams(location.search); if (LA.some((x) => String(x.id) === p.get('l'))) S.l = +p.get('l'); if (L.METRICS.includes(p.get('metric'))) S.metric = p.get('metric'); S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)}; launches use data to ${fmt.date(i.used_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Product launch impact v1.1`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)}; launches use data to ${fmt.date(i.used_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Product launch impact v1.2`;
     update();
   }).catch((e) => { $('loading').hidden = false; $('loading').textContent = 'The launch data could not be loaded. ' + e.message; });
 
@@ -149,7 +150,7 @@
   function update() {
     const W = win(LA.find((x) => x.id === S.l)); cur.W = W;
     $('loading').hidden = true; $('content').hidden = false; $('f-l').value = S.l;
-    const p = new URLSearchParams(); if (S.l !== DEF.l) p.set('l', S.l); if (S.metric !== DEF.metric) p.set('metric', S.metric); if (S.sort) p.set('sort', S.sort); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+    const p = new URLSearchParams(); if (S.l !== DEF.l) p.set('l', S.l); if (S.metric !== DEF.metric) p.set('metric', S.metric); if (S.sort) p.set('sort', S.sort); if (S.scale) p.set('scale', S.scale); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
     const l = W.l, last = W.sum ? W.sum.last : 0;
     $('s-page').textContent = `${l.name} · launched ${fmt.date(l.date)} · 8 weeks before to ${last + 1} ${last ? 'weeks' : 'week'} after`;
     renderSummary(W); renderTiles(W); renderSeries(W); renderReasons(W); renderWho(W); renderPlan(); renderAll();
@@ -198,13 +199,13 @@
     const m = S.metric, k = K[m], l = W.l, s0 = L.series(m, W.aff, W.oth), pts = s0.pts.filter((p) => p.v != null).map((p) => ({ ...p, low: p.n < k.minN, base: L.BASE.includes(p.w) })), host = $('c-ser'); cur.ser = pts;
     $('t-ser').textContent = `${k.name} for affected reasons, by week`; $('s-ser').textContent = `${k.short}, weekly from launch day, weeks −8 to ${pts.length ? wk(pts[pts.length - 1].w) : '–'} · ${l.name}`;
     $('n-ser').textContent = m === 'volume' ? 'Expected is the baseline moved by how other reasons changed that week, so seasons and holidays are not counted as launch effect. The range is 3 standard deviations of the 6 baseline weeks; with so few weeks it is approximate.' : 'Expected is the baseline rate; the range is 3 standard deviations of the 6 baseline weeks, and approximate. If other reasons move too, the cause may be wider than the launch, or the launch may be slowing everything down.';
-    host.hidden = $('lg-ser').hidden = table; $('tbl-ser').hidden = !table; $('tb-ser').textContent = table ? 'View as chart' : 'View as table'; $('tb-ser').setAttribute('aria-pressed', table);
+    $('ax-ser').hidden = true; host.hidden = $('lg-ser').hidden = table; $('tbl-ser').hidden = !table; $('tb-ser').textContent = table ? 'View as chart' : 'View as table'; $('tb-ser').setAttribute('aria-pressed', table);
     const oc = m !== 'volume';
     if (table) { $('tbl-ser').innerHTML = `<table><thead><tr><th scope="col">Week</th><th scope="col">${esc(k.short)}</th><th scope="col">Expected</th><th scope="col">Normal range</th><th scope="col">Reading</th>${oc ? '<th scope="col">Other reasons</th>' : ''}<th scope="col">n</th></tr></thead><tbody>${pts.map((p) => `<tr><td>${wName(l, p.w)}</td><td class="${p.low ? 'low' : ''}">${V(m, p.v)}</td><td>${V(m, p.e)}</td><td>${V(m, Math.max(0, p.lo))} – ${V(m, p.hi)}</td><td>${p.low ? 'too few' : p.out ? (p.v > p.hi ? 'above range' : 'below range') : 'in range'}${p.base ? ' (baseline)' : ''}</td>${oc ? `<td>${V(m, p.other)}</td>` : ''}<td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-ser').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for this launch.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 300, G = { t: 42, r: 14, b: 44, l: 60 }, iw = w - G.l - G.r, ih = H - G.t - G.b, w0 = pts[0].w, nW = pts[pts.length - 1].w - w0 + 1, step = iw / nW, x = (q) => G.l + (q - w0 + .5) * step;
-    const vs = pts.flatMap((p) => [p.v, p.lo, p.hi, ...(p.other != null ? [p.other] : [])]); const [a, b] = Site.zeroAxis(vs, k.format); const y = (v) => G.t + (b - v) / (b - a) * ih;
-    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by week. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const vs = pts.flatMap((p) => [p.v, p.lo, p.hi, ...(p.other != null ? [p.other] : [])]); const { a, b, edge } = Site.trendAxis(vs, k.format, S.scale === 'zero'), scale = Site.axisNote($('ax-ser'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; go(); } }); const y = (v) => G.t + (b - v) / (b - a) * ih;
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by week. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     pts.forEach((p) => { if (!narrow || p.w % 4 === 0) text(ax, x(p.w), H - 26, wk(p.w), '', 'middle'); }); text(ax, G.l + iw / 2, H - 6, 'Weeks from launch', '', 'middle');
     el('path', { class: 'rng', d: pts.map((p, i) => `${i ? 'L' : 'M'}${x(p.w)},${y(Math.max(a, p.hi))}`).join('') + [...pts].reverse().map((p) => `L${x(p.w)},${y(Math.max(a, p.lo))}`).join('') + 'Z' }, s);

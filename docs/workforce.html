@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/workforce.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -104,6 +104,7 @@
     <p class="note" id="n-tiles"></p>
     <section class="card" aria-labelledby="t-day">
       <div class="head"><div><h2 id="t-day"></h2><div class="sub" id="s-day"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-day" type="button" hidden>Download CSV</button><button class="btn" id="tb-day" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-day" hidden></div>
       <div class="chart" id="c-day"></div><div class="legend" id="lg-day"></div><div class="tbl" id="tbl-day" tabindex="0" role="region" aria-label="Values by day" hidden></div>
     </section>
     <section class="card" aria-labelledby="t-prof">
@@ -134,7 +135,7 @@
   const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   // agent groups, and the channels their requirement covers (phone agents also make callbacks)
   const GROUPS = { 1: { name: 'Phone', serves: 'phone and callback', ch: [1, 4] }, 2: { name: 'Chat', serves: 'chat', ch: [2] }, 3: { name: 'Email', serves: 'email and secure message', ch: null } };
-  const DEF = { days: '30', end: 'latest', ch: '1', site: '', metric: 'adherence', team: [], dow: [], iv: null, day: null, sort: '' }, S = { ...DEF, team: [], dow: [] };
+  const DEF = { days: '30', end: 'latest', ch: '1', site: '', metric: 'adherence', team: [], dow: [], iv: null, day: null, sort: '', scale: '' }, S = { ...DEF, team: [], dow: [] };
   const files = {}; let IDX, SVC, KPI, EV, ROWS, W, req = 0, events = true, tblDay = false, tblProf = false, A, B0, cur = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
@@ -156,11 +157,11 @@
     if (one('f-ch', p.get('ch'))) S.ch = p.get('ch');
     if (teams().some((t) => t.site === p.get('site'))) S.site = p.get('site');
     if (['adherence', 'conformance', 'shrinkage', 'occupancy', 'staffing', 'forecast'].includes(p.get('metric'))) S.metric = p.get('metric');
-    S.sort = p.get('sort') || ''; S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x)); S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
+    S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero'; S.team = p.getAll('team').map(Number).filter((x) => teams().some((t) => t.id === x)); S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
     if (p.get('iv') != null && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
     if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day');
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Workforce management v1.1`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Workforce management v1.2`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The workforce data could not be loaded. ' + e.message; }
@@ -224,7 +225,7 @@
   function writeUrl() {
     const p = new URLSearchParams(); for (const k of ['days', 'end', 'ch', 'site', 'metric']) if (S[k] !== DEF[k]) p.set(k, S[k]);
     if (S.end === 'latest' && carried()) p.set('end', 'latest');
-    S.team.forEach((x) => p.append('team', x)); S.dow.forEach((x) => p.append('dow', x)); if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort);
+    S.team.forEach((x) => p.append('team', x)); S.dow.forEach((x) => p.append('dow', x)); if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort); if (S.scale) p.set('scale', S.scale);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
   function toggle(k, v, add) { const a = S[k]; S[k] = a.includes(v) ? (add ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : add ? [...a, v] : [v]; go(); }
@@ -264,14 +265,14 @@
     const m = S.metric, k = kpi(m), host = $('c-day'), iv = m === 'staffing' || m === 'forecast', map = iv ? intervals(A, (x) => x.d, ['day']) : daily(W.s, W.e, (r) => r.d, ['day']);
     const pts = [...map].map(([d, p]) => ({ d, t: ts(d), p, v: val(m, p), low: low(m, p) })).filter((x) => x.v != null).sort((a, b) => a.t - b.t); cur.day = pts;
     $('t-day').textContent = `${k.name} by day, ${G().name.toLowerCase()} agents`; $('s-day').textContent = `${k.short}, daily, ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · the line breaks on days with no one scheduled`;
-    host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
+    $('ax-day').hidden = true; host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
     const nm = (x) => `${DOW[dowOf(x.d)]}, ${fmt.date(x.d)}`;
     if (tblDay) { $('tbl-day').innerHTML = `<table><thead><tr><th scope="col">Day</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}</tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${nm(x)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v, true)}</td>${k.target == null ? '' : `<td>${badge(m, x.p)}</td>`}</tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-day').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 270, M = { t: 44, r: narrow ? 10 : 92, b: 28, l: 56 }, iw = w - M.l - M.r, ih = H - M.t - M.b, tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch), src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, vs = [...pts.map((x) => x.v), ...tg, ...wb];
-    const [a, b] = Site.zeroAxis(vs, k.format);
+    const { a, b, edge } = Site.trendAxis(vs, k.format, S.scale === 'zero'), scale = Site.axisNote($('ax-day'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderDay(); } });
     const x = (t) => M.l + (t - W.s + DAY / 2) / (W.e - W.s + DAY) * iw, y = (v) => M.t + (b - v) / (b - a) * ih, step = iw / ((W.e - W.s) / DAY + 1);
-    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, k.format)) { el('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g); text(ax, M.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     let lx = -99; for (let t = W.s; t <= W.e; t += DAY) { const d = new Date(t); if (+S.days > 7 && d.getUTCDay() !== 0) continue; if (x(t) - lx < 50) continue; text(ax, x(t), H - 8, +S.days > 7 ? fmt.dateShort(iso(t)) : DOW[d.getUTCDay()].slice(0, 3) + ' ' + d.getUTCDate(), '', 'middle'); lx = x(t); }
     const marks = []; if (events) { let n = 0; for (const e of EV) { const p = ts(e.start), q = ts(e.end); if (q < W.s || p > W.e) continue; n++; const ea = Math.max(M.l, x(p) - step / 2), eb = Math.min(M.l + iw, x(q) + step / 2); if (e.span === 'Period') el('rect', { class: 'evb', x: ea, y: M.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: x(p), x2: x(p), y1: M.t, y2: M.t + ih }, s); marks.push([e, n, e.span === 'Period' ? ea : x(p)]); } }

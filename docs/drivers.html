@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/drivers.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -112,6 +112,7 @@
       <div class="head"><div><h2 id="t-head"></h2><div class="sub" id="s-head"></div></div>
         <div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-trend" type="button" hidden>Download CSV</button><button class="btn" id="tb-trend" type="button">View as table</button></div></div>
       <div class="kpi" id="kpi"></div><div class="line" id="so"></div>
+      <div class="axnote" id="ax-tr" hidden></div>
       <div class="chart" id="trend"></div><div class="legend" id="lg-trend"></div><div class="tbl" tabindex="0" role="region" aria-label="Values by month" id="tbl-trend" hidden></div>
     </section>
     <section class="card" id="c-water" aria-labelledby="t-water"><h2 id="t-water"></h2><div class="sub" id="s-water"></div><div class="line" id="l-water"></div><div class="chart" id="water"></div><div class="legend" id="lg-water"></div></section>
@@ -138,7 +139,7 @@
   Site.renderChrome('drivers');
   const PATHS = [['Channel', 'Queue', 'Reason group', 'Reason'], ['Site', 'Team', 'Agent'], ['Persona', 'Segment', 'Age band']];
   const DIMS = PATHS.flat(), WORK = ['Site', 'Team', 'Agent'], CUST = PATHS[2], PL = { Channel: 'channels', Queue: 'queues', 'Reason group': 'reason groups', Reason: 'reasons', Site: 'sites', Team: 'teams', Agent: 'agents', Persona: 'personas', Segment: 'segments', 'Age band': 'age bands' };
-  const S = { month: null, cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', f: {} };
+  const S = { month: null, cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', scale: '', f: {} };
   let IDX, KPIS, SECTIONS, EV, N = {}, META = {}, events = true, tblTrend = false, req = 0, cur = null;
   const files = {}, carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const K = () => KPIS.find((k) => k.id === S.metric), P = () => D.PARTS[S.metric], allowed = (d) => !WORK.includes(d) || !!P().agent;
@@ -161,10 +162,10 @@
     base = S.month;
     if (p.get('cmp') === 'year') S.cmp = 'year';
     if (D.PARTS[p.get('metric')]) S.metric = p.get('metric');
-    if (DIMS.includes(p.get('by'))) S.by = p.get('by'); S.sort = p.get('sort') || '';
+    if (DIMS.includes(p.get('by'))) S.by = p.get('by'); S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero';
     for (const d of DIMS) if (p.getAll(d).length) S.f[d] = p.getAll(d);
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.3`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Performance driver explorer v1.4`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The explorer data could not be loaded. ' + e.message; }
@@ -289,7 +290,7 @@
     if (S.month !== last || carried()) p.set('m', S.month);
     if (S.cmp !== 'prior') p.set('cmp', S.cmp);
     if (S.metric !== 'sl_phone') p.set('metric', S.metric);
-    if (S.by !== 'Queue') p.set('by', S.by); if (S.sort) p.set('sort', S.sort);
+    if (S.by !== 'Queue') p.set('by', S.by); if (S.sort) p.set('sort', S.sort); if (S.scale) p.set('scale', S.scale);
     for (const [d, v] of Object.entries(S.f)) v.forEach((x) => p.append(d, x));
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
@@ -320,16 +321,16 @@
     if (click) { node.addEventListener('click', click); node.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); click(e); } }); }
   }
   function renderTrend() {
-    const pts = cur.trend, k = K(), host = $('trend');
+    const pts = cur.trend, k = K(), host = $('trend'); $('ax-tr').hidden = true;
     host.hidden = $('lg-trend').hidden = tblTrend; $('tbl-trend').hidden = $('csv-trend').hidden = !tblTrend;
     $('tb-trend').textContent = tblTrend ? 'View as chart' : 'View as table'; $('tb-trend').setAttribute('aria-pressed', tblTrend);
     if (tblTrend) { $('tbl-trend').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.short)}</th><th scope="col">Sample (n)</th></tr></thead><tbody>${pts.slice().reverse().map((p) => `<tr><td>${fmt.month(p.m)}</td><td class="${p.n < k.minN ? 'low' : ''}">${V(p.v, true)}</td><td>${fmt.count(p.n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; const W = host.clientWidth || 800, narrow = W < 560, H = 260, m = { t: 44, r: narrow ? 10 : 92, b: 26, l: 58 }, iw = W - m.l - m.r, ih = H - m.t - m.b, step = iw / pts.length;
     const tot = k.format === 'count', pv = (p) => (tot ? p.v / Site.monthDays(p.m) : p.v), ok = pts.filter((p) => p.v != null); if (!ok.length) { host.textContent = 'No data for these filters.'; return; }
     const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch);
-    const [a, b] = Site.zeroAxis([...ok.map(pv), ...tg, ...wb], k.format);
+    const { a, b, edge } = Site.trendAxis([...ok.map(pv), ...tg, ...wb], k.format, S.scale === 'zero', 4), scale = Site.axisNote($('ax-tr'), { edge, zero: S.scale === 'zero', show: tick, set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderTrend(); } });
     const x = (i) => m.l + step * (i + .5), y = (v) => m.t + (b - v) / (b - a) * ih;
-    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(pts[pts.length - 1].m)}. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const s = el('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group', 'aria-label': `${k.name}, monthly, ${fmt.month(pts[0].m)} to ${fmt.month(pts[pts.length - 1].m)}. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 4, unit())) { el('line', { x1: m.l, x2: m.l + iw, y1: y(t), y2: y(t) }, g); text(ax, m.l - 8, y(t) + 4, tick(t), '', 'end'); }
     let last = Infinity; for (let i = pts.length - 1; i >= 0; i--) { const lab = i === 0 || pts[i].m.endsWith('-01') ? fmt.month(pts[i].m).replace(' 20', " '") : fmt.monthShort(pts[i].m); if (last - x(i) < 34 + (lab.length > 3 ? 16 : 0)) continue; text(ax, x(i), H - 6, lab, '', 'middle'); last = x(i); }
     const xd = (iso) => { const i = pts.findIndex((p) => p.m === iso.slice(0, 7)); const dd = +iso.slice(8), [yy, mo] = iso.split('-').map(Number); return i < 0 ? (iso < pts[0].m ? m.l : m.l + iw) : m.l + step * (i + (dd - 1) / new Date(Date.UTC(yy, mo, 0)).getUTCDate()); };
@@ -453,7 +454,7 @@
   });
   $('tbl-break').addEventListener('click', (e) => { const n = e.target.closest('[data-i]'), dr = e.target.closest('[data-drill]'); if (n) toggle(S.by, cur.rows[+n.dataset.i].key, e.ctrlKey || e.metaKey); if (dr) drill(S.by, cur.rows[+dr.dataset.drill].key); });
   $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; writeUrl(); renderBreak(); });
-  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', f: {} }); base = S.month; carried(null); events = $('t-events').checked = true; go(); });
+  $('f-reset').addEventListener('click', () => { Object.assign(S, { month: IDX.months[IDX.months.length - 1], cmp: 'prior', metric: 'sl_phone', by: 'Queue', sort: '', scale: '', f: {} }); base = S.month; carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
   $('t-events').addEventListener('change', (e) => { events = e.target.checked; renderTrend(); });
   $('tb-trend').addEventListener('click', () => { tblTrend = !tblTrend; if (cur && cur.trend) renderTrend(); });

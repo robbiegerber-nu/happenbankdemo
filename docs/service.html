@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/service.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -101,6 +101,7 @@
     <div class="sr-only" id="live" aria-live="polite"></div>
     <section class="card" aria-labelledby="t-day">
       <div class="head"><div><h2 id="t-day"></h2><div class="sub" id="s-day"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-day" type="button" hidden>Download CSV</button><button class="btn" id="tb-day" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-day" hidden></div>
       <div class="chart" id="c-day"></div><div class="legend" id="lg-day"></div><div class="tbl" id="tbl-day" tabindex="0" role="region" aria-label="Values by day" hidden></div>
     </section>
     <section class="card" aria-labelledby="t-heat">
@@ -127,7 +128,7 @@
   Site.renderChrome('service');
   const DAY = 864e5, iso = (t) => new Date(t).toISOString().slice(0, 10), ts = (s) => Date.parse(s + 'T00:00:00Z');
   const DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DEF = { days: '30', end: 'latest', ch: '1', metric: 'sl', q: [], dow: [], iv: null, day: null, sort: '' };
+  const DEF = { days: '30', end: 'latest', ch: '1', metric: 'sl', q: [], dow: [], iv: null, day: null, sort: '', scale: '' };
   const S = { ...DEF }, files = {};
   let IDX, KPI, EV, B = [], B0 = [], W, req = 0, events = true, tblDay = false, tblProf = false, cur = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
@@ -149,9 +150,9 @@
     S.q = p.getAll('q').map(Number).filter((x) => queues().some((q) => q.id === x));
     S.dow = p.getAll('dow').map(Number).filter((x) => DOW[x]);
     if (p.get('iv') && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
-    if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day'); S.sort = p.get('sort') || '';
+    if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day'); S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.1`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.2`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The service data could not be loaded. ' + e.message; }
@@ -229,7 +230,7 @@
     for (const k of ['days', 'end', 'ch', 'metric']) if (S[k] !== DEF[k]) p.set(k, S[k]);
     if (S.end === 'latest' && carried()) p.set('end', 'latest');
     S.q.forEach((x) => p.append('q', x)); S.dow.forEach((x) => p.append('dow', x));
-    if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort);
+    if (S.iv != null) p.set('iv', S.iv); if (S.day) p.set('day', S.day); if (S.sort) p.set('sort', S.sort); if (S.scale) p.set('scale', S.scale);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
   function toggle(k, v, add) { const a = S[k]; S[k] = a.includes(v) ? (add ? a.filter((x) => x !== v) : a.length > 1 ? [v] : []) : add ? [...a, v] : [v]; go(); }
@@ -273,14 +274,14 @@
     cur.day = pts;
     $('t-day').textContent = `${k.name} by day, ${chan().name.toLowerCase()}`;
     $('s-day').textContent = `${k.short}, daily, ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))}${k.target == null ? '' : ' · target ' + k.targetLabel} · the line breaks on closed days`;
-    host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
+    $('ax-day').hidden = true; host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
     if (tblDay) { $('tbl-day').innerHTML = `<table><thead><tr><th scope="col">Day</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">Offered</th><th scope="col">Forecast</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${DOW[new Date(x.t).getUTCDay()].slice(0, 3)}, ${fmt.date(x.d)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v, true)}</td>${k.target == null ? '' : `<td>${badge(m, x.p)}</td>`}<td>${fmt.count(x.p.o)}</td><td>${fmt.count(x.p.f)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; if (!pts.length) { host.textContent = 'No contacts for these filters.'; $('lg-day').innerHTML = ''; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 280, M = { t: 44, r: narrow ? 10 : 92, b: 28, l: 56 }, iw = w - M.l - M.r, ih = H - M.t - M.b, fc = m === 'volume';
     const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch), ok = pts.filter((x) => !x.low), src = ok.length ? ok : pts, vals = [...pts.map((x) => x.v), ...tg, ...wb, ...(fc ? pts.map((x) => x.p.f) : [])];
-    const [a, b] = Site.zeroAxis(vals, k.format);
+    const { a, b, edge } = Site.trendAxis(vals, k.format, S.scale === 'zero'), scale = Site.axisNote($('ax-day'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderDay(); } });
     const x = (t) => M.l + (t - W.s + DAY / 2) / (W.e - W.s + DAY) * iw, y = (v) => M.t + (b - v) / (b - a) * ih, step = iw / +S.days;
-    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, k.format)) { el('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g); text(ax, M.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     let lx = -99; for (let t = W.s; t <= W.e; t += DAY) { if (+S.days > 7 && new Date(t).getUTCDay() !== 0) continue; if (x(t) - lx < (narrow ? 54 : 48)) continue; text(ax, x(t), H - 8, +S.days > 7 ? fmt.dateShort(iso(t)) : DOW[new Date(t).getUTCDay()].slice(0, 3) + ' ' + new Date(t).getUTCDate(), '', 'middle'); lx = x(t); }
     const marks = [];

@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/cx.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -104,6 +104,7 @@
     <p class="note" id="n-tiles"></p>
     <section class="card" aria-labelledby="t-tr">
       <div class="head"><div><h2 id="t-tr"></h2><div class="sub" id="s-tr"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-tr" type="button">Download CSV</button><button class="btn" id="tb-tr" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-tr" hidden></div>
       <div class="chart" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
     </section>
     <section class="card" aria-labelledby="t-grp">
@@ -134,7 +135,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, statusOf, STATUS_WORD, changeQuality } = Site, $ = (id) => document.getElementById(id), M = CX.METRICS;
   Site.renderChrome('cx');
-  const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason', sg: '', st: '', sc: '' }, S = { ...DEF };
+  const DEF = { m: '', cmp: 'prior', ch: '', rg: '', q: '', r: '', s: '', p: '', metric: 'csat', dim: 'reason', sg: '', st: '', sc: '', scale: '' }, S = { ...DEF };
   let base = '', IDX, KPI, EV, TR, NOW, WAS, QCH, RG, req = 0, events = true, cur = {}; const tbl = { tr: false, dist: false }, files = {};
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
@@ -164,9 +165,9 @@
     for (const key of ['cmp', 'ch', 'rg', 's', 'p', 'dim']) if (one('f-' + key, p.get(key))) S[key] = p.get(key);
     if (i.queues.some((x) => String(x[0]) === p.get('q'))) S.q = p.get('q');
     if (i.reasons.some((x) => String(x[0]) === p.get('r'))) S.r = p.get('r');
-    if (M.includes(p.get('metric'))) S.metric = p.get('metric'); for (const k of ['sg', 'st', 'sc']) S[k] = p.get(k) || '';
+    if (M.includes(p.get('metric'))) S.metric = p.get('metric'); if (p.get('scale') === 'zero') S.scale = 'zero'; for (const k of ['sg', 'st', 'sc']) S[k] = p.get(k) || '';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.3`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Customer experience v1.4`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The customer experience data could not be loaded. ' + e.message; }
@@ -232,13 +233,13 @@
   function renderTrend() {
     const m = S.metric, k = kpi(m), host = $('c-tr'), pts = TR.map((x, i) => ({ ...x, i, v: CX.value(m, x.t), low: low(m, x.t) })).filter((x) => x.v != null); cur.tr = pts;
     $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()}${k.target == null ? ' · no target' : ' · target ' + k.targetLabel} · click a month to show it, again to undo`;
-    swap('tr', ['c-tr', 'lg-tr']);
+    swap('tr', ['c-tr', 'lg-tr']); $('ax-tr').hidden = true;
     if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">n</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${fmt.month(x.m)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v)}${x.low ? ' (too few)' : ''}</td>${k.target == null ? '' : `<td>${x.low ? '–' : STATUS_WORD[statusOf(k, x.v)]}</td>`}<td>${fmt.count(x.t[m].n)}</td></tr>`).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; $('lg-tr').innerHTML = ''; if (!pts.length) { host.textContent = 'No data for these filters.'; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 270, G = { t: 40, r: narrow ? 10 : 92, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, src = pts.filter((x) => !x.low).length ? pts.filter((x) => !x.low) : pts, tg = k.target == null ? [] : [k.target], vs = [...pts.map((x) => x.v), ...tg, ...(tg.length ? [k.watch] : [])];
-    const [a, b] = Site.zeroAxis(vs, k.format);
+    const { a, b, edge } = Site.trendAxis(vs, k.format, S.scale === 'zero'), scale = Site.axisNote($('ax-tr'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderTrend(); } });
     const step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih, t0 = ts(TR[0].m + '-01'), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate(); return G.l + (i + (d.getUTCDate() - .5) / len) * step; };
-    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
     TR.forEach((q, i) => { if (!narrow || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), q.m === S.m ? 'now' : '', 'middle'); });
     el('rect', { class: 'mband', x: x(TR.findIndex((q) => q.m === S.m)) - step / 2, y: G.t, width: step, height: ih }, s); const tEnd = ts(lastDay(TR[TR.length - 1].m)), marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tEnd); if (q < t0 || ts(e.start) > tEnd) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }

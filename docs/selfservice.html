@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <script src="assets/selfservice.js?v=1.0"></script>
 <style>
   main.wrap { padding-top: 28px; }
@@ -101,6 +101,7 @@
     <p class="note" id="n-tiles"></p>
     <section class="card" aria-labelledby="t-tr">
       <div class="head"><div><h2 id="t-tr"></h2><div class="sub" id="s-tr"></div></div><div class="tools"><label class="toggle"><input type="checkbox" id="t-events" checked> Show events</label><button class="btn" id="csv-tr" type="button">Download CSV</button><button class="btn" id="tb-tr" type="button">View as table</button></div></div>
+      <div class="axnote" id="ax-tr" hidden></div>
       <div class="chart" id="c-tr"></div><div class="legend" id="lg-tr"></div><div class="tbl" id="tbl-tr" tabindex="0" role="region" aria-label="Values by month" hidden></div>
     </section>
     <section class="card" aria-labelledby="t-mix">
@@ -136,7 +137,7 @@
   'use strict';
   const { fmt, esc, showTip, hideTip, changeQuality } = Site, $ = (id) => document.getElementById(id), Q = SelfService;
   Site.renderChrome('selfservice');
-  const DEF = { m: '', cmp: 'year', p: '', metric: 'contain', c: '1', by: 'r', sh: 'n', tk: 'n', op: 'n' }, S = { ...DEF }, files = {}; let base = '', IDX, K, EV, IVR, TASKS, req = 0, cur = {}, TR, NOW, WAS, events = true; const tbl = { tr: false, mix: false };
+  const DEF = { m: '', cmp: 'year', p: '', metric: 'contain', c: '1', by: 'r', sh: 'n', tk: 'n', op: 'n', scale: '' }, S = { ...DEF }, files = {}; let base = '', IDX, K, EV, IVR, TASKS, req = 0, cur = {}, TR, NOW, WAS, events = true; const tbl = { tr: false, mix: false };
   const carried = (m) => { try { if (m === null) sessionStorage.removeItem('happen-demo-month'); else if (m) sessionStorage.setItem('happen-demo-month', m); return sessionStorage.getItem('happen-demo-month'); } catch (e) { return null; } };
   const get = async (u) => { const r = await fetch(u, { cache: 'no-cache' }); if (!r.ok) throw new Error(u + ': ' + r.status); const b = new Uint8Array(await r.arrayBuffer()); return JSON.parse(b[0] === 0x1f && b[1] === 0x8b ? await new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text() : new TextDecoder().decode(b)); };
   const file = (u) => (files[u] ??= get(u).catch((e) => { delete files[u]; throw e; })), month = (m) => file(`data/dashboards/selfservice/${m}.json.gz`);
@@ -150,8 +151,8 @@
     TASKS = i.tasks; IVR = new Map(); for (const r of i.ivr) { const o = Object.fromEntries(i.ivr_keys.map((c, j) => [c, r[j]])); (IVR.get(o.m) || (IVR.set(o.m, []), IVR.get(o.m))).push(o); }
     const full = i.months.filter((m) => lastDay(m) <= i.data_through); DEF.m = S.m = full[full.length - 1]; $('f-m').innerHTML = [...full].reverse().map((m) => `<option value="${m}">${fmt.month(m)}</option>`).join('');
     $('f-p').innerHTML = '<option value="">All</option>' + i.personas.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); $('f-c').innerHTML = i.channels.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join('');
-    const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v); if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried(); base = S.m; for (const k in SORT) $('f-' + k).innerHTML = Object.entries(SORT[k]).map(([v, o]) => `<option value="${v}">${o[0]}</option>`).join(''); for (const key of ['cmp', 'p', 'c', 'by', 'sh', 'tk', 'op']) if (one('f-' + key, p.get(key))) S[key] = p.get(key); if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
-    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Self-service & channel shift v1.6`;
+    const p = new URLSearchParams(location.search), one = (id, v) => v && [...$(id).options].some((o) => o.value === v); if (one('f-m', p.get('m'))) S.m = p.get('m'); else if (one('f-m', carried())) S.m = carried(); base = S.m; for (const k in SORT) $('f-' + k).innerHTML = Object.entries(SORT[k]).map(([v, o]) => `<option value="${v}">${o[0]}</option>`).join(''); for (const key of ['cmp', 'p', 'c', 'by', 'sh', 'tk', 'op']) if (one('f-' + key, p.get(key))) S[key] = p.get(key); if (p.get('scale') === 'zero') S.scale = 'zero'; if (METRICS.includes(p.get('metric'))) S.metric = p.get('metric');
+    Site.setDataThrough(i.data_through); $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Self-service & channel shift v1.7`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The self-service data could not be loaded. ' + e.message; }
@@ -213,11 +214,12 @@
   // ---------- Trend ----------
   function renderTrend() {
     const m = S.metric, k = K[m], st = m === 'stuck', tot = k.format === 'count', rows = TR.map((x, i) => ({ m: x.m, i, t: x.val[m], v: tot && x.val[m] != null ? x.val[m] / Site.monthDays(x.m) : x.val[m], b: st && x.done.k ? x.done.b7 / x.done.k * 100 : null, x })).filter((r) => r.v != null); cur.tr = rows;
-    $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()} · no target${tot ? ' · average per day, because months differ in length' : ''} · click a month to show it, again to undo`; swap('tr', ['c-tr', 'lg-tr']);
+    $('t-tr').textContent = `${k.name} by month`; $('s-tr').textContent = `${k.short}, monthly, ${span()} · no target${tot ? ' · average per day, because months differ in length' : ''} · click a month to show it, again to undo`; swap('tr', ['c-tr', 'lg-tr']); $('ax-tr').hidden = true;
     if (tbl.tr) { $('tbl-tr').innerHTML = `<table><thead><tr><th scope="col">Month</th>${tot ? `<th scope="col">${esc(k.short)}</th><th scope="col">Average per day</th>` : `<th scope="col">${esc(k.short)}</th>`}${st ? '<th scope="col">7 days before</th>' : ''}${NOW.X[m] ? '<th scope="col">n</th>' : ''}</tr></thead><tbody>${rows.slice().reverse().map((r) => `<tr><td>${fmt.month(r.m)}</td>${tot ? `<td>${V(m, r.t)}</td>` : ''}<td>${V(m, r.v)}</td>${st ? `<td>${V(m, r.b)}</td>` : ''}${NOW.X[m] ? `<td>${fmt.count(r.x.X[m][1])}</td>` : ''}</tr>`).join('')}</tbody></table>`; return; }
     const host = $('c-tr'); host.innerHTML = ''; if (!rows.length) { host.textContent = 'No data for these filters.'; return; }
-    const w = host.clientWidth || 800, narrow = w < 560, H = 260, G = { t: 40, r: 12, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, vs = rows.flatMap((r) => [r.v, ...(r.b == null ? [] : [r.b])]); const [a, b] = Site.zeroAxis(vs, k.format), step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih;
-    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
+    const w = host.clientWidth || 800, narrow = w < 560, H = 260, G = { t: 40, r: 12, b: 28, l: 52 }, iw = w - G.l - G.r, ih = H - G.t - G.b, vs = rows.flatMap((r) => [r.v, ...(r.b == null ? [] : [r.b])]); const { a, b, edge } = Site.trendAxis(vs, k.format, S.scale === 'zero'), step = iw / TR.length, x = (i) => G.l + (i + .5) * step, y = (v) => G.t + (b - v) / (b - a) * ih;
+    const scale = Site.axisNote($('ax-tr'), { edge, zero: S.scale === 'zero', show: (v) => tick(m, v), set: (z) => { S.scale = z ? 'zero' : ''; writeUrl(); renderTrend(); } });
+    const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by month. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, F(m))) { el('line', { x1: G.l, x2: G.l + iw, y1: y(t), y2: y(t) }, g); text(ax, G.l - 8, y(t) + 4, tick(m, t), '', 'end'); } TR.forEach((q, i) => { if (!narrow || (TR.indexOf(NOW) - i) % 2 === 0) text(ax, x(i), H - 8, fmt.monthShort(q.m) + (q.m.endsWith('-01') || (i === 0 && !narrow) ? ` ’${q.m.slice(2, 4)}` : ''), q.m === S.m ? 'now' : '', 'middle'); });
     el('rect', { class: 'mband', x: x(TR.findIndex((q) => q.m === S.m)) - step / 2, y: G.t, width: step, height: ih }, s); 
     const t0 = ts(TR[0].m + '-01'), tE = ts(lastDay(TR[TR.length - 1].m)), xt = (t) => { const d = new Date(t), i = TR.findIndex((q) => q.m === d.toISOString().slice(0, 7)), len = +lastDay(d.toISOString().slice(0, 7)).slice(8); return G.l + (i + (d.getUTCDate() - .5) / len) * step; }, marks = []; if (events) { let n = 0; for (const e of EV) { const p = Math.max(ts(e.start), t0), q = Math.min(ts(e.end), tE); if (q < p) continue; n++; const ea = xt(p), eb = xt(q); if (e.span === 'Period' && eb - ea > 4) el('rect', { class: 'evb', x: ea, y: G.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: ea, x2: ea, y1: G.t, y2: G.t + ih }, s); marks.push([e, n, ea]); } }

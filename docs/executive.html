@@ -8,8 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/site.css?v=1.7">
-<script src="assets/site.js?v=3.1"></script>
+<link rel="stylesheet" href="assets/site.css?v=1.9">
+<script src="assets/site.js?v=3.3"></script>
 <style>
   main.wrap { padding-top: 28px; }
   .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
@@ -165,6 +165,7 @@
 
     <div class="summary" id="summary" aria-live="polite"></div>
 
+    <div class="axnote" id="ax-tiles" hidden></div>
     <div id="sections"></div>
 
     <section class="detail" id="detail" aria-labelledby="detail-title">
@@ -178,6 +179,7 @@
           <button class="btn" id="t-table" type="button" aria-pressed="false">View as table</button>
         </div>
       </div>
+      <div class="axnote" id="ax-trend" hidden></div>
       <div class="chart" id="trend"></div><div class="sr-only" id="trend-live" aria-live="polite"></div>
       <div class="legend" id="trend-legend"></div>
       <div id="trend-table" class="hidden"></div>
@@ -195,7 +197,7 @@
   const TREND = { m: 24, q: 8 }, SPARK = { m: 13, q: 8 };   // periods shown, by view
 
   let KPIS, SECTIONS, DATA, months, fullMonths, partialMonth, quarters, partialQuarter, total = {}, drivers = {}, events = [];
-  const state = { view: 'm', month: null, quarter: null, cmp: 'prior', kpi: null, events: true, table: false };
+  const state = { view: 'm', month: null, quarter: null, cmp: 'prior', kpi: null, events: true, table: false, scale: '' };
   let defaults;
 
   Promise.all([
@@ -232,7 +234,7 @@
     defaults = { view: 'm', month: lastM, quarter: quarterFor(lastM), cmp: 'prior', kpi: null };
     Site.setDataThrough(DATA.data_through);
     document.getElementById('footer-generated').textContent =
-      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.4`;
+      `Data through ${fmt.date(DATA.data_through)} · exported ${fmt.date(DATA.generated_at)}, ${fmt.time(DATA.generated_at)} CT · Executive scorecard v1.5`;
   }
   const val = (k, m) => (total[k] && total[k][m] ? total[k][m].v : null);
   const nOf = (k, m) => (total[k] && total[k][m] ? total[k][m].n : null);
@@ -282,6 +284,7 @@
     state.quarter = state.view === 'q' ? q : quarterFor(state.month);
     if (state.view === 'q' && quarterFor(state.month) !== q) state.month = qMonths(q)[2];
     state.cmp = p.get('cmp') === 'year' ? 'year' : 'prior';
+    state.scale = p.get('scale') === 'zero' ? 'zero' : '';
     state.kpi = kpiById(p.get('kpi')) ? p.get('kpi') : null;
     state.kpiPicked = !!state.kpi;
   }
@@ -293,6 +296,7 @@
     if (state.view === 'q') p.set('q', qMonths(state.quarter)[0]);
     else if (state.month !== defaults.month || carriedMonth()) p.set('m', state.month);
     if (state.cmp !== 'prior') p.set('cmp', state.cmp);
+    if (state.scale) p.set('scale', state.scale);
     if (state.kpi && state.kpiPicked) p.set('kpi', state.kpi);
     history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
   }
@@ -425,6 +429,8 @@
       for (const kpi of KPIS.filter((k) => k.section === sec.id)) grid.append(tile(kpi, m, pm));
       host.append(s);
     }
+    const edges = KPIS.map((k) => domain(k, windowEnding(m, SPARK[state.view]).map((x) => plotted(k, x)).filter((v) => v != null)).edge).filter((e) => e != null);
+    Site.axisNote(document.getElementById('ax-tiles'), { edge: edges.length ? edges[0] : null, many: true, zero: state.scale === 'zero', set: setScale });
   }
 
   function tile(kpi, m, pm) {
@@ -460,9 +466,11 @@
   }
   // totals are drawn per calendar day, because months and quarters differ in length
   const isTotal = (kpi) => kpi.format === 'count', plotted = (kpi, m) => { const v = val(kpi.id, m); return isTotal(kpi) && v != null ? v / pDays(m) : v; };
-  function domain(kpi, vals) {
-    return Site.zeroAxis(kpi.target == null ? vals : [...vals].concat(kpi.target, kpi.watch), kpi.format);
+  function domain(kpi, vals, n) {
+    return Site.trendAxis(kpi.target == null ? vals : [...vals].concat(kpi.target, kpi.watch), kpi.format, state.scale === 'zero', n);
   }
+  // one choice for the tiles' small trends and the trend chart
+  const setScale = (z) => { state.scale = z ? 'zero' : ''; writeUrl(); renderTiles(); renderDetail(); };
   function watchRanges(kpi) {   // [from, to] value ranges to shade as the watch band
     if (kpi.target == null) return [];
     if (kpi.better === 'higher') return [[kpi.watch, kpi.target]];
@@ -476,7 +484,7 @@
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     const pts = ms.map((m) => ({ m, v: plotted(kpi, m) })).filter((p) => p.v != null);
     if (pts.length < 2) return;
-    const [lo, hi] = domain(kpi, pts.map((p) => p.v));
+    const { a: lo, b: hi } = domain(kpi, pts.map((p) => p.v));
     const x = (i) => pad + (i / (ms.length - 1)) * (W - pad * 2 - 4);
     const y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - pad * 2);
     for (const [a, b] of watchRanges(kpi)) svgEl('rect', { class: 's-watch', x: 0, width: W, y: y(Math.max(a, b)), height: Math.abs(y(a) - y(b)) }, svg);
@@ -496,7 +504,7 @@
     document.getElementById('t-events').checked = state.events;
     const tb = document.getElementById('t-table');
     tb.setAttribute('aria-pressed', state.table); tb.textContent = state.table ? 'View as chart' : 'View as table';
-    document.getElementById('trend').classList.toggle('hidden', state.table);
+    document.getElementById('trend').classList.toggle('hidden', state.table); document.getElementById('ax-trend').hidden = true;
     document.getElementById('trend-legend').classList.toggle('hidden', state.table);
     document.getElementById('trend-table').classList.toggle('hidden', !state.table);
     if (state.table) renderTable(kpi, ms); else trendChart(kpi, ms);
@@ -511,7 +519,7 @@
     const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'group' }, host);
     const pts = ms.map((m) => ({ m, v: plotted(kpi, m), n: nOf(kpi.id, m) }));
     const vals = pts.filter((p) => p.v != null).map((p) => p.v);
-    const [lo, hi] = domain(kpi, vals);
+    const { a: lo, b: hi, edge } = domain(kpi, vals, phone ? 4 : 5), scale = Site.axisNote(document.getElementById('ax-trend'), { edge, zero: state.scale === 'zero', show: (v) => tickLabel(kpi, v), set: setScale });
     const iw = W - M.l - M.r, ih = H - M.t - M.b, step = iw / ms.length;
     const x = (i) => M.l + step * (i + 0.5);
     const y = (v) => M.t + ih - ((v - lo) / (hi - lo)) * ih;
@@ -520,7 +528,7 @@
       if (i < 0) return iso < pStart(ms[0]) ? M.l : iso > pEnd(ms[ms.length - 1]) ? M.l + iw : null;
       return M.l + step * (i + (Date.parse(iso) - Date.parse(pStart(ms[i]))) / 864e5 / pDays(ms[i]));
     };
-    svg.setAttribute('aria-label', `${kpi.name}, ${unit()}ly from ${pName(ms[0])} to ${pName(ms[ms.length - 1])}. Latest ${fmt.value(plotted(kpi, ms[ms.length - 1]), kpi.format)}${isTotal(kpi) ? ' a day' : ''}. Use View as table for exact values.`);
+    svg.setAttribute('aria-label', `${kpi.name}, ${unit()}ly from ${pName(ms[0])} to ${pName(ms[ms.length - 1])}. Latest ${fmt.value(plotted(kpi, ms[ms.length - 1]), kpi.format)}${isTotal(kpi) ? ' a day' : ''}. ${scale} Use View as table for exact values.`);
 
     // grid + y axis
     const ticks = Site.ticks(lo, hi, phone ? 4 : 5, kpi.format);
@@ -725,7 +733,7 @@
     carriedMonth(state.month); render();
   });
   document.getElementById('f-cmp').addEventListener('change', (e) => { state.cmp = e.target.value; render(); });
-  document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false }); carriedMonth(null); render(); });
+  document.getElementById('f-reset').addEventListener('click', () => { Object.assign(state, defaults, { kpiPicked: false, scale: '' }); carriedMonth(null); render(); });
   document.getElementById('phone-f').addEventListener('click', (e) => { const o = document.getElementById('ctls').classList.toggle('open'); e.currentTarget.setAttribute('aria-expanded', o); });
   document.getElementById('t-events').addEventListener('change', (e) => { state.events = e.target.checked; renderDetail(); });
   document.getElementById('t-table').addEventListener('click', () => { state.table = !state.table; renderDetail(); });
