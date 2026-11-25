@@ -96,5 +96,8 @@ CREATE OR REPLACE VIEW qa.v_chat_ticket AS
 SELECT t.number, 'QA-' || lpad(t.number::text, 4, '0') AS ticket, t.created_at, t.reason, t.comment, t.status, t.finding, t.issue, v.reference, v.question, v.answer, v.label, v.verdict,
        (SELECT string_agg(k.differences, E'\n' ORDER BY k.request) FROM qa.v_chat_check k WHERE k.id = t.log_id) AS differences,
        (SELECT json_agg(json_build_object('request', k.request, 'verdict', k.verdict, 'agreed', k.agreed, 'differed', k.differed) ORDER BY k.request) FROM qa.chat_check k WHERE k.log_id = t.log_id) AS checks,
-       t.reviewed_at, t.log_id
+       t.reviewed_at, t.log_id,
+       -- the fifth weekday after the report (holidays are not skipped), and whether a response is still owed
+       (SELECT d::date FROM generate_series((t.created_at AT TIME ZONE 'America/Chicago')::date + 1, (t.created_at AT TIME ZONE 'America/Chicago')::date + 9, interval '1 day') d WHERE extract(isodow FROM d) < 6 ORDER BY d OFFSET 4 LIMIT 1) AS due,
+       t.issue IS NULL AND t.status <> 'closed' AS response_owed
 FROM qa.chat_ticket t JOIN qa.v_chat_verdict v ON v.id = t.log_id ORDER BY t.number DESC;

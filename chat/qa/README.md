@@ -45,7 +45,7 @@ The SQL comes from fixed templates in [`verify.mjs`](verify.mjs) and never reads
 node chat/qa/ticket.mjs
 ```
 
-Add a number to see one (`node chat/qa/ticket.mjs 1`), then `--status` and `--finding` to record your decision. `--issue` **previews** a public GitHub issue; it is only created with `--publish`. `--close "..."` previews closing it. The issue never holds the question, the answer or the reader's comment.
+Add a number to see one (`node chat/qa/ticket.mjs 1`), then `--status` and `--finding` to record your decision. `--issue` **previews** a public GitHub issue; it is only created with `--publish`. `--close "..."` previews closing it. **Readers are told a response will be posted within 5 business days.** The list shows when each is due (holidays aren't skipped), and a ticket can't be closed without an issue unless you add `--no-response`. The issue never holds the question, the answer or the reader's comment.
 
 `daily_check.ps1` copies, checks and shows a message when there is something to review. `-Install` runs it every day.
 
