@@ -1,7 +1,7 @@
 -- Validation queries: Performance driver explorer
 -- The page defaults to phone service level, October 2026 compared with September 2026.
 -- Channel setting: the page pairs channels: Phone for service level, ASA and AHT; Phone | Chat for abandon rate; Email | Secure Message for email; All for FCR, Digital share, Volume.
--- Run one query at a time (select it, then run). Every query only reads data.
+-- Copy one query at a time (from WITH settings to the ;) into the pgAdmin 4 Query Tool and run it. Every query only reads data.
 -- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
 -- Names must match exactly, including capitals. See README.md in this folder.
 

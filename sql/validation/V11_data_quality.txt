@@ -1,6 +1,6 @@
 -- Validation queries: Data quality
 -- The page opens on the latest discovery run (run 22). Here the date range is the day a run was made, or the business day, as noted.
--- Run one query at a time (select it, then run). Every query only reads data.
+-- Copy one query at a time (from WITH settings to the ;) into the pgAdmin 4 Query Tool and run it. Every query only reads data.
 -- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
 -- Names must match exactly, including capitals. See README.md in this folder.
 

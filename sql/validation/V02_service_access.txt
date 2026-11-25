@@ -1,7 +1,7 @@
 -- Validation queries: Service & access operations
 -- The page defaults to Phone and the 30 days ending on the last day of data (Oct 17 - Nov 15, 2026).
 -- The page shows one channel at a time.
--- Run one query at a time (select it, then run). Every query only reads data.
+-- Copy one query at a time (from WITH settings to the ;) into the pgAdmin 4 Query Tool and run it. Every query only reads data.
 -- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
 -- Names must match exactly, including capitals. See README.md in this folder.
 

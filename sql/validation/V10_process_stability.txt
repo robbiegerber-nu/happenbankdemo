@@ -2,7 +2,7 @@
 -- The page defaults to phone service level by week, 3 sigma, the 6 months to Nov 15, 2026 and a baseline of the 6 months before.
 -- Weeks run Sunday to Saturday and only whole weeks count. If the baseline has fewer than 20 usable points the page extends it back;
 -- if baseline_points is below 20 here, move baseline_start earlier until it reaches 20.
--- Run one query at a time (select it, then run). Every query only reads data.
+-- Copy one query at a time (from WITH settings to the ;) into the pgAdmin 4 Query Tool and run it. Every query only reads data.
 -- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
 -- Names must match exactly, including capitals. See README.md in this folder.
 

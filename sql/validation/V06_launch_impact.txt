@@ -1,7 +1,7 @@
 -- Validation queries: Product launch impact
 -- The page opens on the newest launch. Weeks are 7 days counted from launch day; baseline is weeks -8 to -3, results are weeks 0 to 3.
 -- The page leaves out days after October 31, 2026 (the November loads replay October). Run 6.1 to get the dates for another launch.
--- Run one query at a time (select it, then run). Every query only reads data.
+-- Copy one query at a time (from WITH settings to the ;) into the pgAdmin 4 Query Tool and run it. Every query only reads data.
 -- Filters: 'All' means no filter. Separate several values with ' | ', for example 'Phone | Chat'.
 -- Names must match exactly, including capitals. See README.md in this folder.
 

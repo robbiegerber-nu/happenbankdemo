@@ -4,25 +4,25 @@ Queries for checking dashboard numbers against the database. They read the sourc
 
 | File | Dashboard | Queries |
 |---|---|---|
-| [V01](V01_executive_scorecard.sql) | Executive scorecard | 5 |
-| [V02](V02_service_access.sql) | Service & access operations | 5 |
-| [V03](V03_workforce.sql) | Workforce management | 5 |
-| [V04](V04_coaching.sql) | Agent & team coaching | 5 |
-| [V05](V05_customer_experience.sql) | Customer experience | 4 |
-| [V06](V06_launch_impact.sql) | Product launch impact | 5 |
-| [V07](V07_personas.sql) | Customer & persona insights | 4 |
-| [V08](V08_self_service.sql) | Self-service & channel shift | 5 |
-| [V09](V09_driver_explorer.sql) | Performance driver explorer | 4 |
-| [V10](V10_process_stability.sql) | Process stability monitor | 4 |
-| [V11](V11_data_quality.sql) | Data quality | 5 |
+| [V01](V01_executive_scorecard.txt) | Executive scorecard | 5 |
+| [V02](V02_service_access.txt) | Service & access operations | 5 |
+| [V03](V03_workforce.txt) | Workforce management | 5 |
+| [V04](V04_coaching.txt) | Agent & team coaching | 5 |
+| [V05](V05_customer_experience.txt) | Customer experience | 4 |
+| [V06](V06_launch_impact.txt) | Product launch impact | 5 |
+| [V07](V07_personas.txt) | Customer & persona insights | 4 |
+| [V08](V08_self_service.txt) | Self-service & channel shift | 5 |
+| [V09](V09_driver_explorer.txt) | Performance driver explorer | 4 |
+| [V10](V10_process_stability.txt) | Process stability monitor | 4 |
+| [V11](V11_data_quality.txt) | Data quality | 5 |
 
 Ask the data (the AI chat) has no file of its own: it answers with the other dashboards' calculations.
 
 ## How to use one
 
-1. Connect to database `happen_demo` and open a file in any SQL tool (pgAdmin, DBeaver, VS Code).
+1. In pgAdmin 4, open the Query Tool on database `happen_demo`, and open a text file here in any editor.
 2. Change the values in the block marked `CHANGE THESE VALUES`. Dates are included at both ends.
-3. Select that one query and run it. Compare with the page; the comment above each query says where to look.
+3. Copy that one query (from `WITH settings` to the `;`) into the Query Tool and run it. Compare with the page; the comment above each query says where to look.
 
 ```sql
 WITH settings AS (
