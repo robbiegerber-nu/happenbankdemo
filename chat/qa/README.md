@@ -49,7 +49,9 @@ Add a number to see one (`node chat/qa/ticket.mjs 1`), then `--status` and `--fi
 
 `private_tickets.mjs` puts the **full ticket** (reason, comment, question, answer, check, SQL, checklist) in a private repository, for whoever handles it, and deletes it after 90 days. It checks new answers first, and previews unless you add `--publish`, and stops unless GitHub says the repository is private. `ticket.mjs` notes the public response there.
 
-`daily_check.ps1` copies, checks, adds new tickets to the private repository and shows a message when there is something to review. `-Install` runs it every day.
+**To respond, comment on the private ticket.** A comment that starts with `RESPOND no problem:` (or `problem confirmed`, `more information`, `duplicate`) is posted publicly; `CLOSE:` closes both; `CLOSE WITHOUT RESPONSE:` is for tests and spam. `respond.mjs` does it: it previews unless you add `--publish`, uses only approved people's comments, and refuses a response that repeats the reader's words. The `ticket.mjs` commands still work.
+
+`daily_check.ps1` copies, checks, adds new tickets to the private repository, posts responses written there and shows a message when there is something to review. `-Install` runs it every day.
 
 ## Notes
 

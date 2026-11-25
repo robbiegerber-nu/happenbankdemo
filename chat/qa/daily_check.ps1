@@ -1,4 +1,4 @@
-# Copies the chat's log, checks new answers, adds new tickets to the private repository, and shows a message if there is anything to review.
+# Copies the chat's log, checks new answers, adds new tickets to the private repository, posts responses written there, and shows a message if there is anything to review.
 #   powershell -ExecutionPolicy Bypass -File chat\qa\daily_check.ps1            run once
 #   powershell -ExecutionPolicy Bypass -File chat\qa\daily_check.ps1 -Install   run every day at 9 a.m. (a Windows scheduled task)
 #   powershell -ExecutionPolicy Bypass -File chat\qa\daily_check.ps1 -Remove    stop running it
@@ -17,6 +17,7 @@ function Show-Note([string]$text) { $text; if (-not $Quiet) { (New-Object -ComOb
 & $node (Join-Path $PSScriptRoot 'sync_log.mjs'); if ($LASTEXITCODE -ne 0) { Show-Note 'The question log could not be copied. Run chat\qa\sync_log.mjs to see why.'; exit 1 }
 & $node (Join-Path $PSScriptRoot 'verify_log.mjs'); if ($LASTEXITCODE -ne 0) { Show-Note 'The answers could not be checked. Run chat\qa\verify_log.mjs to see why.'; exit 1 }
 & $node (Join-Path $PSScriptRoot 'private_tickets.mjs') --publish --quiet-if-missing; if ($LASTEXITCODE -ne 0) { Show-Note 'New tickets could not be added to the private repository. Run: node chat/qa/private_tickets.mjs --publish'; exit 1 }
+& $node (Join-Path $PSScriptRoot 'respond.mjs') --publish --quiet-if-missing; if ($LASTEXITCODE -ne 0) { Show-Note 'A response on a private ticket could not be posted. Run: node chat/qa/respond.mjs' }
 $row = & $psql -w -h localhost -U postgres -d $db -At -F '|' -v ON_ERROR_STOP=1 -c "SELECT (SELECT count(*) FROM qa.chat_ticket WHERE status = 'new'), (SELECT count(*) FROM qa.v_chat_ticket WHERE response_owed AND due <= (now() AT TIME ZONE 'America/Chicago')::date), (SELECT count(*) FROM qa.v_chat_verdict WHERE verdict IN ('mismatch', 'error') AND asked_central > now() AT TIME ZONE 'America/Chicago' - interval '7 days'), (SELECT count(*) FROM qa.v_chat_verdict WHERE label = 'Check the figures' AND asked_central > now() AT TIME ZONE 'America/Chicago' - interval '7 days')"
 if ($LASTEXITCODE -ne 0) { Show-Note 'The results could not be read from Postgres.'; exit 1 }
 $n = $row -split '\|'
