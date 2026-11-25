@@ -177,7 +177,7 @@
     $('chips').innerHTML = cur.chips.map(([k, t]) => `<button type="button" class="chip" data-q="${k}" aria-label="Remove ${esc(t)}">${esc(t)} ×</button>`).join('');
     const n = cur.chips.length + ['q', 'cmp'].filter((k) => S[k] !== DEF[k]).length; $('phone-f').textContent = n ? `Filters (${n})` : 'Filters';
     $('s-page').textContent = `${qName(S.q)} (${fmt.monthShort(S.q)}–${fmt.monthShort(shift(S.q, 2))}) · ${NOW.all.cust ? fmt.count(NOW.all.cust) + ' customers' : 'no customers match these filters'} · ${WAS ? `compared with ${qName(WAS.q)}` : `no ${cmpName()} to compare`}`;
-    const pr = S.p && IDX.personas.find((x) => x.id === +S.p); $('about').hidden = !pr; $('about').textContent = pr ? `${pr.name}: ${pr.about} Preferred channel: ${pr.channel.toLowerCase()}.` : '';
+    const pr = S.p && IDX.personas.find((x) => x.id === +S.p); $('about').hidden = !pr; $('about').textContent = pr ? `${pr.name}: ${pr.about} Preferred channel: ${pr.channel.toLowerCase()}. Digital comfort: ${pr.digital} of 5. Price sensitivity: ${pr.price.toLowerCase()}. Typical ages: ${pr.ages.replace('-', '–')}. This is how the persona is defined, not a measured result.` : '';
   }
   function writeUrl() { const p = new URLSearchParams(); for (const k of Object.keys(DEF)) if (S[k] !== DEF[k]) p.set(k, S[k]); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : '')); }
   function chg(m, now, was) { if (!was || low(m, was) || low(m, now)) return null; const a = P.value(m, now), b = P.value(m, was), c = fmt.change(a, b, F(m)), real = P.beyond(m, now, was); return c && { c, real, q: real ? changeQuality(K[m], a, b, c) : 'neutral' }; }
