@@ -31,5 +31,10 @@
  "Q29": ["launch_impact", {"launch": "Mobile App Re-platform"}, ["changes.csat.raw", "changes.csat.raw_baseline"], {"changes.csat.reading": "beyond chance"}],
  "Q30": ["launch_impact", {"launch": "AI Chat Assistant"}, ["changes.csat.raw", "changes.csat.raw_baseline"], {"changes.csat.reading": "within chance, so it can’t be told apart from no change"}],
  "Q31": ["get_metric", {"metric": "csat", "from": "2026-10", "filters": {"channel": "Callback", "segment": "Private"}}, ["n", "raw"], {"too_few": true}],
- "Q36": ["get_metric", {"metric": "sl_phone", "from": "2023-01"}, "error"]
+ "Q36": ["get_metric", {"metric": "sl_phone", "from": "2023-01"}, "error"],
+ "Q46": ["trend", {"metric": "csat", "from": "2025-10", "to": "2026-10"}, ["months.0.raw", "months.1.raw", "months.2.raw", "months.3.raw", "months.4.raw", "months.5.raw", "months.6.raw", "months.7.raw", "months.8.raw", "months.9.raw", "months.10.raw", "months.11.raw", "months.12.raw"]],
+ "Q47": ["trend", {"metric": "sl_phone", "from": "2025-10", "to": "2026-10"}, ["months.0.raw", "months.1.raw", "months.2.raw", "months.3.raw", "months.4.raw", "months.5.raw", "months.6.raw", "months.7.raw", "months.8.raw", "months.9.raw", "months.10.raw", "months.11.raw", "months.12.raw"], {"months.12.status": "On target"}],
+ "Q48": ["trend", {"metric": "volume", "from": "2025-10", "to": "2026-10"}, ["months.0.raw", "months.1.raw", "months.2.raw", "months.3.raw", "months.4.raw", "months.5.raw", "months.6.raw", "months.7.raw", "months.8.raw", "months.9.raw", "months.10.raw", "months.11.raw", "months.12.raw"]],
+ "Q49": ["breakdown", {"metric": "volume", "by": "channel", "from": "2026-10", "chart": true}, ["rows.0.raw", "rows.1.raw", "rows.2.raw", "rows.3.raw", "rows.4.raw"]],
+ "Q52": ["trend", {"metric": "csat", "to": "2026-12"}, "error"]
 }

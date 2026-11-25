@@ -44,12 +44,12 @@
     if (part.length === 1) return part[0];
     fail(`${part.length ? 'More than one' : 'No'} ${dim} matches "${v}". ${(part.length ? part : all).length <= 45 ? 'Choose from: ' + (part.length ? part : all).map((x) => x[1]).join('; ') + '.' : ''}`);
   }
-  function period(from, to, what = 'period') {
+  function period(from, to, what = 'period', most = 13) {
     if (!/^\d{4}-\d\d$/.test(from || '')) fail(`Give the ${what} as YYYY-MM months. Data is monthly here; days and weeks are not available to the chat.`);
     to = to || from; if (!/^\d{4}-\d\d$/.test(to) || to < from) fail(`The ${what} is not valid.`);
     const first = names.months[0], last = names.months[names.months.length - 1];
     if (from < first || to > last) fail(`The data has full months from ${Site.fmt.month(first)} to ${Site.fmt.month(last)}; ${from}${to !== from ? ' to ' + to : ''} is outside it.`);
-    const ms = []; for (let m = from; m <= to; m = shift(m, 1)) ms.push(m); if (ms.length > 13) fail('At most 13 months at a time.'); return ms;
+    const ms = []; for (let m = from; m <= to; m = shift(m, 1)) ms.push(m); if (ms.length > most) fail(`At most ${most} months at a time.`); return ms;
   }
   const label = (ms) => (ms.length === 1 ? Site.fmt.month(ms[0]) : `${Site.fmt.month(ms[0])} – ${Site.fmt.month(ms[ms.length - 1])}`);
   function checkFilters(engine, f) {
@@ -107,6 +107,15 @@
   // is a difference beyond chance (3 standard errors)? null when it cannot be tested from totals
   function beyond(engine, id, a, b) { if (!a || !b) return null; if (engine === 'cx') return CX.beyond(id, a.set, b.set); if (a.share && b.share) return SelfService.beyond(a.x, a.n, b.x, b.n); return null; }
   const basis = { drivers: (k) => (['csat', 'nps'].includes(k) ? 'surveys' : 'contacts'), cx: (k) => (['csat', 'nps', 'ces'].includes(k) ? 'surveys' : 'contacts'), workforce: () => 'agent-days', scorecard: () => null, menu: (k) => (k === 'no_agent' ? 'requests' : 'menu sessions'), customers: () => 'customer-months' };
+  // how one period's result compares with another's, and whether the difference is beyond chance
+  function compare(kpi, engine, id, t, b, few) {
+    const c = Site.fmt.change(t.v, b.v, kpi.format), real = beyond(engine, id, t, b);
+    return { change: c.flat ? 'no change' : c.text, beyond_chance: real, reading: few ? 'too few records to compare' : c.flat ? 'no change' : real === false ? 'within chance, so it can’t be told apart from no change' : real ? { better: 'improved, beyond chance', worse: 'slipped, beyond chance', neutral: 'changed, beyond chance' }[Site.changeQuality(kpi, t.v, b.v, c)] : 'chance not tested for this measure' };
+  }
+  // what the page draws. Hidden from JSON, so it is never sent to the AI and the AI cannot change it
+  const withChart = (out, chart) => Object.defineProperty(out, 'chart', { value: chart, enumerable: false });
+  const eventsIn = async (ms) => (await file('events.json')).events.filter((e) => e.start <= lastDay(ms[ms.length - 1]) && e.end >= ms[0] + '-01');
+  const eventName = (e) => `${e.name} (${Site.fmt.date(e.start)}${e.end !== e.start ? ' – ' + Site.fmt.date(e.end) : ''})`;
   // KPIs that cover two channels together have one target, for the combined figure only
   const PAIRED = ['abandon', 'sl_email'];
   function show(kpi, engine, id, t, oneChannel) {
@@ -134,11 +143,28 @@
     const out = { metric: kpi.name, ...show(kpi, engine, a.metric, t, flt.some((x) => x[0] === 'channel' || x[0] === 'queue')), source: source(engine, a.metric, ms, flt, kpi) };
     if (a.compare_from) {
       const cs = period(a.compare_from, a.compare_to, 'comparison period'), b = (await RUN[engine](a.metric, cs, flt)).get('all'); if (!b || b.v == null) fail('There are no records for the comparison period.');
-      const c = Site.fmt.change(t.v, b.v, kpi.format), s = show(kpi, engine, a.metric, b, flt.some((x) => x[0] === 'channel' || x[0] === 'queue')), real = beyond(engine, a.metric, t, b);
-      out.comparison = { period: label(cs), ...s, change: c.flat ? 'no change' : c.text, beyond_chance: real, reading: s.too_few || out.too_few ? 'too few records to compare' : c.flat ? 'no change' : real === false ? 'within chance, so it can’t be told apart from no change' : real ? { better: 'improved, beyond chance', worse: 'slipped, beyond chance', neutral: 'changed, beyond chance' }[Site.changeQuality(kpi, t.v, b.v, c)] : 'chance not tested for this measure' };
+      const s = show(kpi, engine, a.metric, b, flt.some((x) => x[0] === 'channel' || x[0] === 'queue'));
+      out.comparison = { period: label(cs), ...s, ...compare(kpi, engine, a.metric, t, b, s.too_few || out.too_few) };
     }
-    const ev = (await file('events.json')).events.filter((e) => e.start <= lastDay(ms[ms.length - 1]) && e.end >= ms[0] + '-01'); if (ev.length) out.events_in_period = ev.map((e) => `${e.name} (${Site.fmt.date(e.start)}${e.end !== e.start ? ' – ' + Site.fmt.date(e.end) : ''})`);
+    const ev = await eventsIn(ms); if (ev.length) out.events_in_period = ev.map(eventName);
     return out;
+  }
+  // One KPI by month. Totals are also given per day, because months differ in length (Style Guide).
+  async function trend(a) {
+    await load(); const { engine, kpi } = metric(a.metric), flt = checkFilters(engine, a.filters), one = flt.some((x) => x[0] === 'channel' || x[0] === 'queue'), total = kpi.format === 'count', surveys = ['csat', 'nps', 'ces'].includes(a.metric);
+    const end = engine === 'customers' ? shift(names.pe.quarters[names.pe.quarters.length - 1], 2) : names.months[names.months.length - 1], to = a.to || end, first = engine === 'customers' ? names.pe.quarters[0] : names.months[0], from = a.from || (/^\d{4}-\d\d$/.test(to) && shift(to, -12) > first ? shift(to, -12) : first);
+    const ms = period(from, to, 'period', engine === 'drivers' ? 13 : 36); if (ms.length < 3) fail('A trend needs at least 3 months. Use get_metric with a comparison for fewer.');
+    const at = await Promise.all(ms.map(async (m) => (await RUN[engine](a.metric, [m], flt)).get('all')));
+    const V = (v) => Site.fmt.value(v, kpi.format, true), pts = ms.map((m, i) => { const t = at[i]; if (!t || t.v == null) return { m, v: null, t: null }; const s = show(kpi, engine, a.metric, t, one); return { m, t, s, few: s.too_few, total: t.v, v: s.too_few ? null : total ? t.v / Site.monthDays(m) : t.v, n: s.n }; });
+    const ok = pts.filter((p) => p.v != null); if (ok.length < 2) fail('There are too few records in too many months to show a trend for that selection. Offer a wider view.');
+    const word = (p) => (total ? `${V(p.total)} (${V(p.v)} a day)` : V(p.v)), hi = ok.reduce((x, p) => (p.v > x.v ? p : x)), lo = ok.reduce((x, p) => (p.v < x.v ? p : x)), A = ok[0], Z = ok[ok.length - 1], aimed = kpi.target != null && !(one && PAIRED.includes(a.metric)), src = source(engine, a.metric, ms, flt, kpi);
+    const cmp = compare(kpi, engine, a.metric, total ? { ...Z.t, v: Z.v } : Z.t, total ? { ...A.t, v: A.v } : A.t, false), ev = await eventsIn(ms);
+    const out = { metric: kpi.name, months: pts.map((p) => (p.t == null ? { month: Site.fmt.month(p.m), value: 'no records' } : { month: Site.fmt.month(p.m), value: p.s.value, raw: p.total, ...(total && !p.few ? { per_day: V(p.v), raw_per_day: p.v } : {}), ...(p.n != null && !total ? { n: p.n } : {}), ...(p.few ? { too_few: true } : aimed ? { status: p.s.status } : {}) })),
+      target: aimed ? kpi.targetLabel : kpi.target == null ? 'this KPI has no target' : 'set for both channels together, not for one', ...(aimed ? { months_on_target: `${ok.filter((p) => p.s.status === Site.STATUS_WORD.good).length} of ${ok.length}` } : {}), ...(surveys || pts.some((p) => p.few) ? { counted: basis[engine](a.metric) || undefined, minimum_n: kpi.minN } : {}),
+      highest: `${word(hi)} in ${Site.fmt.month(hi.m)}`, lowest: `${word(lo)} in ${Site.fmt.month(lo.m)}`,
+      first_to_last: { from: Site.fmt.month(A.m), from_value: word(A), to: Site.fmt.month(Z.m), to_value: word(Z), ...cmp, ...(total ? { change_is: 'in the average per day' } : {}) },
+      events_in_period: ev.map(eventName), note: 'The page shows these months as a line chart. Only first_to_last has been tested for chance, where it says so: do not call other rises or falls real, and do not describe a steady direction.', source: src };
+    return withChart(out, { kind: 'line', id: a.metric, kpi, total, target: aimed ? kpi.target : null, counted: basis[engine](a.metric), through: names.through, period: label(ms), filters: src.filters, pts: pts.map(({ m, v, total: whole, n, few }) => ({ m, v, total: whole ?? null, n: n ?? null, few: !!few })), events: ev });
   }
   async function breakdown(a) {
     await load(); const { engine, kpi } = metric(a.metric), ms = period(a.from, a.to), flt = checkFilters(engine, a.filters), dims = [...DIMS[engine], ...(a.metric === 'complaints' ? SPLIT.cx : [])];
@@ -149,7 +175,11 @@
     const tot = rows.reduce((s, r) => s + (r.count || 0), 0); if (tot) rows.forEach((r) => { r.share = Site.fmt.value(r.count / tot * 100, 'pct'); });
     const dir = a.order === 'lowest' ? 1 : -1; rows.sort((x, y) => x.too_few - y.too_few || (x.too_few ? x.name.localeCompare(y.name) : dir * (x.raw - y.raw))); const n = Math.min(Math.max(1, a.limit || 10), 15); rows.forEach((r) => { if (r.count != null) r.count_shown = Site.fmt.count(r.count); });
     const pair = PAIRED.includes(a.metric) && a.by === 'channel' ? (await RUN[engine](a.metric, ms, flt)).get('all') : null;
-    return { metric: kpi.name, ...(pair ? { combined: show(kpi, engine, a.metric, pair) } : {}), by: a.by, order: a.order === 'lowest' ? 'lowest first' : 'highest first', groups: rows.length, rows: rows.slice(0, n), shown: Math.min(n, rows.length), note: rows.length && rows.every((r) => r.too_few) ? 'Every group has too few records. Do not list their values or name a highest or lowest.' : rows.some((r) => r.too_few) ? 'Groups marked too_few are last, in name order, and must not be ranked.' : undefined, source: source(engine, a.metric, ms, flt, kpi) };
+    const src = source(engine, a.metric, ms, flt, kpi), out = { metric: kpi.name, ...(pair ? { combined: show(kpi, engine, a.metric, pair) } : {}), by: a.by, order: a.order === 'lowest' ? 'lowest first' : 'highest first', groups: rows.length, rows: rows.slice(0, n), shown: Math.min(n, rows.length), note: rows.length && rows.every((r) => r.too_few) ? 'Every group has too few records. Do not list their values or name a highest or lowest.' : rows.some((r) => r.too_few) ? 'Groups marked too_few are last, in name order, and must not be ranked.' : undefined, source: src };
+    // no chart of teams: nothing here ranks them
+    if (!a.chart || ['team', 'site', 'agent_group'].includes(a.by) || rows.filter((x) => !x.too_few).length < 2) return out;
+    const aimed = kpi.target != null && !PAIRED.includes(a.metric); out.chart_note = 'The page shows these rows as a bar chart.';
+    return withChart(out, { kind: 'bar', id: a.metric, kpi, title: split ? 'Complaints' : null, by: a.by.replace('_', ' '), order: out.order, groups: rows.length, target: aimed ? kpi.target : null, counted: basis[engine](a.metric), through: names.through, period: label(ms), filters: src.filters, rows: rows.slice(0, n).map((x) => ({ name: x.name, v: x.too_few ? null : x.count ?? x.raw, text: x.too_few ? '' : x.count != null ? Site.fmt.count(x.count) : x.value, share: x.share || '', n: x.n, few: x.too_few })) });
   }
   const HAP = [['Resolved on first contact', 1, true], ['Not transferred', 2, false], ['Not escalated', 4, false], ['Answered within the service level', 8, true], ['No repeat contact within 7 days', 16, false]];
   async function score_by_outcome(a) {
@@ -174,7 +204,8 @@
   const obj = (properties, required) => ({ type: 'object', properties, required, additionalProperties: false });
   const TOOLS = [
     { name: 'get_metric', description: 'One KPI for a month or range of months, with its target, status, number of records and, if a comparison period is given, the change and whether it is beyond chance.', input_schema: obj({ metric: str('KPI id', Object.keys(M)), from: str(MON), to: str(MON + '. Leave out for a single month'), filters: FIL, compare_from: str(MON + ' to compare with'), compare_to: str(MON) }, ['metric', 'from']), run: get_metric },
-    { name: 'breakdown', description: 'One KPI split by a dimension, highest or lowest first. Groups with too few records come last and must not be ranked.', input_schema: obj({ metric: str('KPI id', Object.keys(M)), by: str('Dimension', [...new Set([...Object.values(DIMS).flat(), ...SPLIT.cx])]), from: str(MON), to: str(MON), filters: FIL, order: str('Order', ['highest', 'lowest']), limit: { type: 'integer', description: 'Rows, 1 to 15' } }, ['metric', 'by', 'from']), run: breakdown },
+    { name: 'breakdown', description: 'One KPI split by a dimension, highest or lowest first. Groups with too few records come last and must not be ranked.', input_schema: obj({ metric: str('KPI id', Object.keys(M)), by: str('Dimension', [...new Set([...Object.values(DIMS).flat(), ...SPLIT.cx])]), from: str(MON), to: str(MON), filters: FIL, order: str('Order', ['highest', 'lowest']), limit: { type: 'integer', description: 'Rows, 1 to 15' }, chart: { type: 'boolean', description: 'Also show the rows on the page as a bar chart. Not available for teams, sites or agent groups' } }, ['metric', 'by', 'from']), run: breakdown },
+    { name: 'trend', description: 'One KPI month by month, shown on the page as a line chart, with the highest and lowest month and whether the change from the first month to the last is beyond chance. At least 3 months; service level, speed of answer, abandon rate, contacts, handle time and digital share at most 13 at a time. Without dates it gives the last 13 full months.', input_schema: obj({ metric: str('KPI id', Object.keys(M)), from: str(MON), to: str(MON), filters: FIL }, ['metric']), run: trend },
     { name: 'score_by_outcome', description: 'Survey scores by what happened on the contact: resolved first time, transferred, escalated, within service level, contacted again. Association only, not cause.', input_schema: obj({ metric: str('Survey score', ['csat', 'nps', 'ces']), from: str(MON), to: str(MON) }, ['from']), run: score_by_outcome },
     { name: 'launch_impact', description: 'What happened to contacts, handle time, resolution, satisfaction and repeat contacts after a product launch, against its own baseline.', input_schema: obj({ launch: str('Launch name or part of it') }, ['launch']), run: launch_impact },
     { name: 'describe_data', description: 'What the data covers: months, KPIs with definitions, targets and allowed filters, launches, events, and what is not available.', input_schema: obj({ metric: str('One KPI id, or leave out for all', Object.keys(M)) }, []), run: describe_data }

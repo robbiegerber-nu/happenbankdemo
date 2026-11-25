@@ -20,7 +20,9 @@ export async function fakeClaude(p) {
   if (q.includes('REFUSE')) return msg([], 'refusal');
   if (q.includes('COSTLY')) return { ...msg([{ type: 'text', text: 'expensive' }], 'end_turn'), usage: { input_tokens: 0, output_tokens: 60000 } };
   if (q.includes('LOOP') && (!p.tool_choice || p.tool_choice.type !== 'none')) return msg([{ type: 'tool_use', id: 'toolu_' + ++n, name: 'describe_data', input: {} }], 'tool_use');
-  if (results.length && !last.content.some((b) => b.type === 'text')) { const r = JSON.parse(results[0].content); return msg([{ type: 'thinking', thinking: '', signature: 'x' }, { type: 'text', text: r.error ? 'The tool said: ' + r.error : `Phone service level was **${r.value}** in October 2026.` }], 'end_turn'); }
+  if (results.length && !last.content.some((b) => b.type === 'text')) { const r = JSON.parse(results[0].content); return msg([{ type: 'thinking', thinking: '', signature: 'x' }, { type: 'text', text: r.error ? 'The tool said: ' + r.error : r.months ? `It was **${r.first_to_last.from_value}** in ${r.first_to_last.from} and **${r.first_to_last.to_value}** in ${r.first_to_last.to}: ${r.first_to_last.reading}.` : r.rows ? `**${r.rows[0].name}** is first, at ${r.rows[0].value}.` : `Phone service level was **${r.value}** in October 2026.` }], 'end_turn'); }
+  if (/TREND (\w+)/.test(q)) return msg([{ type: 'tool_use', id: 'toolu_' + ++n, name: 'trend', input: { metric: q.match(/TREND (\w+)/)[1] } }], 'tool_use');
+  if (/BARS (\w+) (\w+)/.test(q)) { const [, metric, by] = q.match(/BARS (\w+) (\w+)/); return msg([{ type: 'tool_use', id: 'toolu_' + ++n, name: 'breakdown', input: { metric, by, from: '2026-10', chart: true } }], 'tool_use'); }
   if (/service level/i.test(q)) return msg([{ type: 'thinking', thinking: '', signature: 'x' }, { type: 'tool_use', id: 'toolu_' + ++n, name: 'get_metric', input: { metric: 'sl_phone', from: '2026-10' } }], 'tool_use');
   return msg([{ type: 'text', text: 'Pretend answer to: ' + q.slice(0, 80) }], 'end_turn');
 }

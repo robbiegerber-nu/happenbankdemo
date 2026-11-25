@@ -702,5 +702,262 @@
   "tolerance": 0.05,
   "must": "Must keep the rule: 83.4% against 84.3%, within chance.",
   "sql": null
+ },
+ {
+  "id": "Q46",
+  "kind": "answer",
+  "question": "How has customer satisfaction changed over the past year? Show a chart.",
+  "dashboard": "cx",
+  "expected": [
+   {
+    "label": "month 1",
+    "value": 82.2
+   },
+   {
+    "label": "month 2",
+    "value": 82.0
+   },
+   {
+    "label": "month 3",
+    "value": 81.9
+   },
+   {
+    "label": "month 4",
+    "value": 83.5
+   },
+   {
+    "label": "month 5",
+    "value": 78.2
+   },
+   {
+    "label": "month 6",
+    "value": 79.8
+   },
+   {
+    "label": "month 7",
+    "value": 82.3
+   },
+   {
+    "label": "month 8",
+    "value": 83.7
+   },
+   {
+    "label": "month 9",
+    "value": 84.0
+   },
+   {
+    "label": "month 10",
+    "value": 83.5
+   },
+   {
+    "label": "month 11",
+    "value": 83.2
+   },
+   {
+    "label": "month 12",
+    "value": 84.3
+   },
+   {
+    "label": "month 13",
+    "value": 83.4
+   }
+  ],
+  "unit": "%",
+  "tolerance": 0.05,
+  "must": "A line chart of 13 months. First and last month with the chance reading; no steady direction claimed.",
+  "sql": "SELECT round(100.0 * avg((s.csat >= 4)::int), 1) FROM cc.survey_response s WHERE s.date_key BETWEEN 20251001 AND 20261031 GROUP BY s.date_key / 100 ORDER BY s.date_key / 100"
+ },
+ {
+  "id": "Q47",
+  "kind": "answer",
+  "question": "Show the trend in phone service level from October 2025 to October 2026.",
+  "dashboard": "executive",
+  "expected": [
+   {
+    "label": "month 1",
+    "value": 70.4
+   },
+   {
+    "label": "month 2",
+    "value": 77.2
+   },
+   {
+    "label": "month 3",
+    "value": 67.6
+   },
+   {
+    "label": "month 4",
+    "value": 79.4
+   },
+   {
+    "label": "month 5",
+    "value": 62.2
+   },
+   {
+    "label": "month 6",
+    "value": 74.1
+   },
+   {
+    "label": "month 7",
+    "value": 81.0
+   },
+   {
+    "label": "month 8",
+    "value": 88.3
+   },
+   {
+    "label": "month 9",
+    "value": 85.2
+   },
+   {
+    "label": "month 10",
+    "value": 82.6
+   },
+   {
+    "label": "month 11",
+    "value": 80.2
+   },
+   {
+    "label": "month 12",
+    "value": 78.9
+   },
+   {
+    "label": "month 13",
+    "value": 81.9
+   }
+  ],
+  "unit": "%",
+  "tolerance": 0.05,
+  "must": "A line chart of 13 months with the target.",
+  "sql": "SELECT round(100.0 * count(*) FILTER (WHERE c.met_service_level) / count(*) FILTER (WHERE (c.answered OR (c.abandoned AND NOT c.short_abandon))), 1) FROM cc.contact c WHERE c.channel_id = 1 AND c.date_key BETWEEN 20251001 AND 20261031 GROUP BY c.date_key / 100 ORDER BY c.date_key / 100"
+ },
+ {
+  "id": "Q48",
+  "kind": "answer",
+  "question": "Chart contacts a month since October 2025.",
+  "dashboard": "executive",
+  "expected": [
+   {
+    "label": "month 1",
+    "value": 183391.0
+   },
+   {
+    "label": "month 2",
+    "value": 166831.0
+   },
+   {
+    "label": "month 3",
+    "value": 189095.0
+   },
+   {
+    "label": "month 4",
+    "value": 180923.0
+   },
+   {
+    "label": "month 5",
+    "value": 200144.0
+   },
+   {
+    "label": "month 6",
+    "value": 203310.0
+   },
+   {
+    "label": "month 7",
+    "value": 179071.0
+   },
+   {
+    "label": "month 8",
+    "value": 148651.0
+   },
+   {
+    "label": "month 9",
+    "value": 165592.0
+   },
+   {
+    "label": "month 10",
+    "value": 165312.0
+   },
+   {
+    "label": "month 11",
+    "value": 175734.0
+   },
+   {
+    "label": "month 12",
+    "value": 180816.0
+   },
+   {
+    "label": "month 13",
+    "value": 188591.0
+   }
+  ],
+  "unit": "contacts",
+  "tolerance": 0.05,
+  "must": "A line chart per day, because months differ in length; totals in the table.",
+  "sql": "SELECT count(*) FROM cc.contact c WHERE c.date_key BETWEEN 20251001 AND 20261031 GROUP BY c.date_key / 100 ORDER BY c.date_key / 100"
+ },
+ {
+  "id": "Q49",
+  "kind": "answer",
+  "question": "Show a bar chart of contacts by channel in October 2026.",
+  "dashboard": "executive",
+  "expected": [
+   {
+    "label": "bar 1",
+    "value": 89202.0
+   },
+   {
+    "label": "bar 2",
+    "value": 79335.0
+   },
+   {
+    "label": "bar 3",
+    "value": 13665.0
+   },
+   {
+    "label": "bar 4",
+    "value": 4616.0
+   },
+   {
+    "label": "bar 5",
+    "value": 1773.0
+   }
+  ],
+  "unit": "contacts",
+  "tolerance": 0.05,
+  "must": "A bar chart, largest first. The values are not repeated one by one.",
+  "sql": "SELECT count(*) FROM cc.contact c WHERE c.date_key / 100 = 202610 GROUP BY c.channel_id ORDER BY 1 DESC"
+ },
+ {
+  "id": "Q50",
+  "kind": "decline",
+  "question": "Draw a chart of service level by agent.",
+  "dashboard": "coaching",
+  "expected": [],
+  "unit": "",
+  "tolerance": 0.05,
+  "must": "No individual agents, and no chart.",
+  "sql": null
+ },
+ {
+  "id": "Q51",
+  "kind": "not_in_data",
+  "question": "Show a pie chart of contacts by hour of day.",
+  "dashboard": "service",
+  "expected": [],
+  "unit": "",
+  "tolerance": 0.05,
+  "must": "No hourly data and no pie charts here; offer a bar chart that exists or the Service & access dashboard.",
+  "sql": null
+ },
+ {
+  "id": "Q52",
+  "kind": "decline",
+  "question": "Extend the satisfaction trend to December 2026.",
+  "dashboard": "cx",
+  "expected": [],
+  "unit": "",
+  "tolerance": 0.05,
+  "must": "No forecasting. May show the trend to October 2026.",
+  "sql": null
  }
 ]

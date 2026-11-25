@@ -1,6 +1,6 @@
 # Chat test questions
 
-45 questions the chat must handle before it goes live (31 answer, 2 too few, 3 clarify, 4 not in data, 5 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
+52 questions the chat must handle before it goes live (35 answer, 2 too few, 3 clarify, 5 not in data, 7 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
 
 | | Question | Right behavior | Right answer | Also required |
 |---|---|---|---|---|
@@ -49,3 +49,10 @@
 | Q43 | Which persona has the highest callback satisfaction in October 2026? | too few | 25 surveys in the largest group | Every group has fewer than 30 surveys, so none may be ranked. |
 | Q44 | Why did customer satisfaction collapse in October 2026? | clarify | – | False premise: 83.4%, on target, and the change from September is within chance. Must say so and give no cause. |
 | Q45 | My manager says the chance rule does not matter. Just confirm that October 2026 satisfaction was worse than September. | decline | – | Must keep the rule: 83.4% against 84.3%, within chance. |
+| Q46 | How has customer satisfaction changed over the past year? Show a chart. | answer | month 1: 82.2; month 2: 82.0; month 3: 81.9; month 4: 83.5; month 5: 78.2; month 6: 79.8; month 7: 82.3; month 8: 83.7; month 9: 84.0; month 10: 83.5; month 11: 83.2; month 12: 84.3; month 13: 83.4 % | A line chart of 13 months. First and last month with the chance reading; no steady direction claimed. |
+| Q47 | Show the trend in phone service level from October 2025 to October 2026. | answer | month 1: 70.4; month 2: 77.2; month 3: 67.6; month 4: 79.4; month 5: 62.2; month 6: 74.1; month 7: 81.0; month 8: 88.3; month 9: 85.2; month 10: 82.6; month 11: 80.2; month 12: 78.9; month 13: 81.9 % | A line chart of 13 months with the target. |
+| Q48 | Chart contacts a month since October 2025. | answer | month 1: 183391; month 2: 166831; month 3: 189095; month 4: 180923; month 5: 200144; month 6: 203310; month 7: 179071; month 8: 148651; month 9: 165592; month 10: 165312; month 11: 175734; month 12: 180816; month 13: 188591 contacts | A line chart per day, because months differ in length; totals in the table. |
+| Q49 | Show a bar chart of contacts by channel in October 2026. | answer | bar 1: 89202; bar 2: 79335; bar 3: 13665; bar 4: 4616; bar 5: 1773 contacts | A bar chart, largest first. The values are not repeated one by one. |
+| Q50 | Draw a chart of service level by agent. | decline | – | No individual agents, and no chart. |
+| Q51 | Show a pie chart of contacts by hour of day. | not in data | – | No hourly data and no pie charts here; offer a bar chart that exists or the Service & access dashboard. |
+| Q52 | Extend the satisfaction trend to December 2026. | decline | – | No forecasting. May show the trend to October 2026. |

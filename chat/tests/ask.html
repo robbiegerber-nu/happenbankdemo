@@ -1,0 +1,34 @@
+<!doctype html>
+<!-- Asks the AI every test question, each in its own conversation, and keeps the answers to be read and marked.
+     Start the server with chat/server/local-ai.ps1 (add -Pretend for a free rehearsal), serve the project folder on port 8768,
+     open http://localhost:8768/chat/tests/ask.html and press Start. ?from=Q10&to=Q20 or ?only=Q46,Q47 asks some of them.
+     The figure check is the one in docs/chat.html. Nothing is marked here: expected values are shown beside each answer. -->
+<html lang="en"><head><meta charset="utf-8"><title>Ask the test questions</title><base href="../../docs/">
+<script src="assets/site.js"></script><script src="assets/cx.js"></script><script src="assets/drivers.js"></script><script src="assets/workforce.js"></script><script src="assets/selfservice.js"></script><script src="assets/launch.js"></script><script src="assets/chat-tools.js"></script>
+<style>body{font:14px system-ui;margin:24px}td,th{padding:6px 10px;text-align:left;vertical-align:top;border-bottom:1px solid #ccc;white-space:pre-wrap}</style></head><body>
+<h1>Ask the test questions</h1><p><button id="go">Start</button> <span id="s">Not started</span></p><table id="t"></table>
+<script>
+const P = new URLSearchParams(location.search), SERVER = 'http://127.0.0.1:' + (+P.get('port') || 8787), $ = (i) => document.getElementById(i); window.results = [];
+const figures = (t) => (t.replace(/[, ]/g, '').match(/\d+(?:\.\d+)?/g) || []).map((x) => String(parseFloat(x)));
+const telling = (t) => [...new Set(figures(t.replace(/\b13 (full )?months\b/g, 'months')))].filter((x) => !(Number.isInteger(+x) && (+x <= 12 || (+x >= 2024 && +x <= 2026))));
+let pass = null;
+async function post(path, body) { try { const r = await fetch(SERVER + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(pass ? { authorization: 'Bearer ' + pass } : {}) }, body: JSON.stringify(body) }), b = await r.json(); return r.ok ? b : { error: b.error, message: b.message }; } catch (e) { return { error: 'offline', message: String(e) }; } }
+$('go').addEventListener('click', async () => {
+  $('go').disabled = true; let qs = await (await fetch(new URL('questions.json', location.href), { cache: 'no-cache' })).json();
+  if (P.get('only')) qs = qs.filter((q) => P.get('only').split(',').includes(q.id)); qs = qs.filter((q) => q.id >= (P.get('from') || 'Q00') && q.id <= (P.get('to') || 'Q99'));
+  const l = await post('/login', { code: 'local-test' }); if (l.error) { $('s').textContent = l.message; $('go').disabled = false; return; } pass = l.pass;
+  for (const q of qs) {
+    const t0 = Date.now(), calls = []; let seen = q.question, r = await post('/ask', { question: q.question }); const id = r.conversation;
+    for (let i = 0; r.type === 'tools' && i < 10; i++) {
+      const out = []; for (const c of r.calls) { const o = await ChatTools.run(c.name, c.input), s = JSON.stringify(o), content = s.length > 14000 ? JSON.stringify({ error: 'That result is too long. Ask for less at once.' }) : s; seen += ' ' + content; calls.push({ name: c.name, input: c.input, error: o.error || null, chart: o.chart ? o.chart.kind : null }); out.push({ id: c.id, content, ...(o.error ? { error: true } : {}) }); }
+      r = await post('/tools', { conversation: id, results: out });
+    }
+    const have = new Set(figures(seen)), row = { id: q.id, kind: q.kind, question: q.question, text: r.error ? null : r.text, failed: r.error ? r.error + ': ' + r.message : null, odd: r.error ? [] : telling(r.text).filter((x) => !have.has(x)), calls, charts: calls.filter((c) => c.chart).length, seconds: Math.round((Date.now() - t0) / 1000), expected: q.expected.map((e) => e.value), must: q.must };
+    results.push(row); localStorage.setItem('chat-test-run', JSON.stringify(results));
+    const tr = $('t').insertRow(); [q.id, q.question, row.text || row.failed, row.odd.length ? 'CHECK ' + row.odd.join(', ') : '', calls.map((c) => c.name + ' ' + JSON.stringify(c.input) + (c.chart ? ' [' + c.chart + ' chart]' : '') + (c.error ? ' ERROR ' + c.error : '')).join('\n'), row.expected.join(', ') + '\n' + row.must].forEach((x) => { tr.insertCell().textContent = x; });
+    $('s').textContent = `${results.length} of ${qs.length} asked`;
+    if (['spend', 'day', 'visitor', 'offline', 'ai'].includes(r.error)) { $('s').textContent += ` · stopped at ${q.id}: ${r.message}`; return; }
+  }
+  $('s').textContent = `Done: ${results.length} asked, ${results.filter((r) => r.odd.length).length} with unchecked figures, ${results.reduce((n, r) => n + r.charts, 0)} charts`;
+});
+</script></body></html>

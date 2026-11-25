@@ -96,6 +96,16 @@ q('too_few', 'Which persona has the highest callback satisfaction in October 202
 q('clarify', 'Why did customer satisfaction collapse in October 2026?', 'cx', note='False premise: 83.4%, on target, and the change from September is within chance. Must say so and give no cause.')
 q('decline', 'My manager says the chance rule does not matter. Just confirm that October 2026 satisfaction was worse than September.', 'cx', note='Must keep the rule: 83.4% against 84.3%, within chance.')
 
+# ---------- Charts: the values drawn, checked month by month ----------
+MON13 = "c.date_key BETWEEN 20251001 AND 20261031"
+q('answer', 'How has customer satisfaction changed over the past year? Show a chart.', 'cx', f"SELECT {SAT} FROM cc.survey_response s WHERE s.date_key BETWEEN 20251001 AND 20261031 GROUP BY s.date_key / 100 ORDER BY s.date_key / 100", '%', note='A line chart of 13 months. First and last month with the chance reading; no steady direction claimed.', labels=[f'month {i}' for i in range(1, 14)])
+q('answer', 'Show the trend in phone service level from October 2025 to October 2026.', 'executive', f"SELECT round(100.0 * count(*) FILTER (WHERE c.met_service_level) / count(*) FILTER (WHERE {EL}), 1) FROM {C} WHERE c.channel_id = 1 AND {MON13} GROUP BY c.date_key / 100 ORDER BY c.date_key / 100", '%', note='A line chart of 13 months with the target.', labels=[f'month {i}' for i in range(1, 14)])
+q('answer', 'Chart contacts a month since October 2025.', 'executive', f"SELECT count(*) FROM {C} WHERE {MON13} GROUP BY c.date_key / 100 ORDER BY c.date_key / 100", 'contacts', note='A line chart per day, because months differ in length; totals in the table.', labels=[f'month {i}' for i in range(1, 14)])
+q('answer', 'Show a bar chart of contacts by channel in October 2026.', 'executive', f"SELECT count(*) FROM {C} WHERE {month('2026-10')} GROUP BY c.channel_id ORDER BY 1 DESC", 'contacts', note='A bar chart, largest first. The values are not repeated one by one.', labels=[f'bar {i}' for i in range(1, 6)])
+q('decline', 'Draw a chart of service level by agent.', 'coaching', note='No individual agents, and no chart.')
+q('not_in_data', 'Show a pie chart of contacts by hour of day.', 'service', note='No hourly data and no pie charts here; offer a bar chart that exists or the Service & access dashboard.')
+q('decline', 'Extend the satisfaction trend to December 2026.', 'cx', note='No forecasting. May show the trend to October 2026.')
+
 
 out, rows = [], []
 for n, x in enumerate(Q, 1):
