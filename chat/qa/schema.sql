@@ -41,3 +41,37 @@ SELECT left(l.id::text, 8) AS reference, l.asked_at AT TIME ZONE 'America/Chicag
        x.c -> 'input' ->> 'metric' AS metric, x.c -> 'input' ->> 'from' AS from_month, x.c -> 'input' ->> 'to' AS to_month, x.c -> 'input' -> 'filters' AS filters,
        x.c -> 'input' ->> 'by' AS split_by, x.c -> 'result' ->> 'value' AS value, x.c ->> 'error' AS error, x.c -> 'input' AS input, x.c -> 'result' AS result, l.id
 FROM qa.chat_log l CROSS JOIN LATERAL jsonb_array_elements(l.calls) WITH ORDINALITY AS x(c, n) ORDER BY l.asked_at DESC, x.n;
+
+-- ---------- Checks against the source tables (verify_log.mjs) ----------
+CREATE TABLE IF NOT EXISTS qa.chat_check (
+  log_id       uuid NOT NULL REFERENCES qa.chat_log (id) ON DELETE CASCADE,
+  request      int NOT NULL,
+  checked_at   timestamptz NOT NULL DEFAULT now(),
+  verdict      text NOT NULL,
+  agreed       int NOT NULL,
+  differed     int NOT NULL,
+  details      jsonb NOT NULL,
+  sql          text NOT NULL,
+  data_through date,
+  PRIMARY KEY (log_id, request)
+);
+COMMENT ON TABLE  qa.chat_check IS 'One row per request behind a logged answer: what the database says, against what the chat was given.';
+COMMENT ON COLUMN qa.chat_check.verdict IS 'match, mismatch, no figure (none was given), not covered (no template yet), not finished, error.';
+COMMENT ON COLUMN qa.chat_check.sql IS 'The query, ready to paste into pgAdmin. Fixed templates; the AI writes none of it.';
+
+CREATE OR REPLACE VIEW qa.v_chat_check AS
+SELECT left(l.id::text, 8) AS reference, l.asked_at AT TIME ZONE 'America/Chicago' AS asked_central, l.question, k.request, c.value ->> 'name' AS tool, c.value -> 'input' AS input, k.verdict, k.agreed, k.differed,
+       (SELECT string_agg((x ->> 'what') || ': chat ' || coalesce(x ->> 'logged', '-') || ', database ' || coalesce(x ->> 'database', '-'), E'\n') FROM jsonb_array_elements(k.details) x WHERE NOT (x ->> 'ok')::boolean) AS differences,
+       k.sql, k.checked_at AT TIME ZONE 'America/Chicago' AS checked_central, k.data_through AS checked_data_through, l.data_through AS asked_data_through, l.id
+FROM qa.chat_check k JOIN qa.chat_log l ON l.id = k.log_id LEFT JOIN LATERAL (SELECT l.calls -> (k.request - 1) AS value) c ON true
+ORDER BY l.asked_at DESC, k.request;
+
+-- one row per question, with what a person still needs to look at
+CREATE OR REPLACE VIEW qa.v_chat_verdict AS
+SELECT left(l.id::text, 8) AS reference, l.asked_at AT TIME ZONE 'America/Chicago' AS asked_central, l.status, l.label, l.question, l.answer,
+       CASE WHEN count(k.*) = 0 THEN 'not checked yet' WHEN bool_or(k.verdict = 'mismatch') THEN 'mismatch' WHEN bool_or(k.verdict = 'error') THEN 'error' WHEN bool_or(k.verdict = 'not finished') THEN 'not finished'
+            WHEN bool_or(k.verdict = 'not covered') AND bool_or(k.verdict = 'match') THEN 'match, partly covered' WHEN bool_or(k.verdict = 'not covered') THEN 'not covered' WHEN bool_or(k.verdict = 'match') THEN 'match' ELSE 'no figure' END AS verdict,
+       sum(k.agreed) AS agreed, sum(k.differed) AS differed,
+       CASE WHEN l.status <> 'answered' THEN 'Not answered: read it' WHEN bool_or(k.verdict IN ('mismatch', 'error')) THEN 'Figure differs: investigate' WHEN l.label = 'Check the figures' THEN 'Figure in the answer not in the results: ' || coalesce(l.unchecked, '')
+            WHEN bool_or(k.verdict = 'match') AND NOT bool_or(k.verdict IN ('not covered', 'not finished')) THEN 'Figures agree: wording only' ELSE 'Read the answer' END AS for_a_person, l.id
+FROM qa.chat_log l LEFT JOIN qa.chat_check k ON k.log_id = l.id GROUP BY l.id ORDER BY l.asked_at DESC;
