@@ -70,7 +70,7 @@ async function route(path, body, req, env) {
     const m = /^([0-9a-f-]{36})\.([0-9a-f]{64})$/.exec(body.ticket || ''); if (!m || !same(m[2], await mac(env.SESSION_SECRET, 'report|' + m[1]))) return no('ticket', 'That answer could not be found.');
     if (!REASONS.includes(body.reason)) return no('reason', 'Please choose a reason.'); const comment = typeof body.comment === 'string' ? body.comment.trim() : ''; if (comment.length > num(env, 'COMMENT_CHARS')) return no('long', `Please keep comments to ${env.COMMENT_CHARS} characters.`);
     if (!(await ledger.takeReport(who, num(env, 'VISITOR_REPORTS_PER_DAY'), num(env, 'REPORTS_PER_DAY')))) return no('reports', 'The limit for reports today has been reached. Please try again tomorrow.', 429);
-    let t; try { t = await fileTicket(env, m[1], body.reason, comment); } catch (e) { console.error('ticket error', e && e.name); return no('save', 'Your report could not be saved. Please try again.', 500); }
+    let t; try { t = await fileTicket(env, m[1], body.reason, comment, body.notice); } catch (e) { console.error('ticket error', e && e.name); return no('save', 'Your report could not be saved. Please try again.', 500); }
     return t ? { status: 200, body: t } : no('gone', 'That answer is no longer kept, so it cannot be reported.', 410);
   }
   return no('path', 'Not found.', 404);

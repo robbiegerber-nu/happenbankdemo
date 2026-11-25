@@ -3,12 +3,13 @@
 //   node chat/qa/respond.mjs --publish    post it (the daily check does this)
 // On a private ticket, a comment that starts with one of these is acted on; every other comment stays private:
 //   RESPOND no problem: ...               also: problem confirmed, more information, duplicate. Posted publicly; a later one is added as an update
+//   RESPOND HIDE QUESTION no problem: ...   leaves the question out; RESPOND SHOW QUESTION ... publishes one that was held
 //   CLOSE: ...                            posted publicly, and both tickets are closed
 //   CLOSE WITHOUT RESPONSE: ...           for a test or spam: nothing is posted publicly
 // Only comments by approved people are used (HAPPEN_QA_RESPONDERS, separated by commas). A response that repeats the reader's own
 // words is refused. Each comment is used once: a rocket means done, a confused face means it was refused, with the reason in a reply.
 import { spawnSync } from 'node:child_process'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
-import { PRIVATE, PUBLIC, gh, json, load, no, privateReady, safe, stop } from './ticket_lib.mjs'; import { psql } from './verify.mjs';
+import { PRIVATE, PUBLIC, gh, json, load, no, privateReady, questionChoice, safe, stop } from './ticket_lib.mjs'; import { psql } from './verify.mjs';
 const publish = process.argv.includes('--publish'), WHO = (process.env.HAPPEN_QA_RESPONDERS || 'robbiegerber-nu').toLowerCase().split(',').map((x) => x.trim()), OUTCOME = { 'problem confirmed': 'confirmed', 'no problem': 'no_problem', 'no problem found': 'no_problem', 'more information': 'more_info', duplicate: 'duplicate' };
 psql('CREATE TABLE IF NOT EXISTS qa.ticket_command (comment_id bigint PRIMARY KEY, number int NOT NULL, done_at timestamptz NOT NULL DEFAULT now(), result text NOT NULL);');
 const ready = privateReady(); if (ready === 'missing' && process.argv.includes('--quiet-if-missing')) process.exit(0); if (ready !== 'private') stop(`STOPPED: GitHub does not say that ${PRIVATE} is private. Nothing was read or sent.`);
@@ -23,10 +24,10 @@ function almost(b) {
 }
 function parse(body) {
   const b = String(body || '').replace(/\r/g, '').replace(/^[\s*_>#`]+/, ''), m = /^(RESPOND|CLOSE WITHOUT RESPONSE|CLOSE)\b([^:\n]*):[*_]*\s*([\s\S]*)$/i.exec(b); if (!m) return /^RESPOND\b/i.test(b) || /^CLOSE\s*$/i.test(b) || /^CLOSE WITHOUT RESPONSE\b/i.test(b) ? { bad: 'Start with, for example, "RESPOND no problem:" or "CLOSE:", followed by the text.' } : almost(b) ? { bad: almost(b) + ' Nothing was done. Please add a new comment, or leave it as it is if it was meant to stay private.' } : null;
-  const kind = m[1].toUpperCase(), what = m[2].replace(/[*_]/g, '').trim().toLowerCase(), text = m[3].trim(); if (kind !== 'RESPOND' && what) return kind === 'CLOSE' ? null : { bad: 'Use "CLOSE WITHOUT RESPONSE:" followed by the reason.' };
+  const kind = m[1].toUpperCase(), q = /^\s*(hide|show)\s+question\s+/i.exec(m[2].replace(/[*_]/g, '')), what = m[2].replace(/[*_]/g, '').replace(/^\s*(hide|show)\s+question\s+/i, '').trim().toLowerCase(), text = m[3].trim(); if (kind !== 'RESPOND' && what) return kind === 'CLOSE' ? null : { bad: 'Use "CLOSE WITHOUT RESPONSE:" followed by the reason.' };
   if (kind === 'RESPOND' && !OUTCOME[what]) return { bad: `"${what || '(nothing)'}" is not an outcome. Use: problem confirmed, no problem, more information or duplicate.` };
   if (!text) return { bad: 'There is no text after the colon.' }; if (text.startsWith('--')) return { bad: 'The text cannot start with two dashes.' }; if (text.length > 4000) return { bad: 'Please keep it to 4,000 characters.' };
-  return { kind, status: OUTCOME[what], what, text };
+  return { kind, status: OUTCOME[what], what, text, question: q ? q[1].toLowerCase() : null };
 }
 const ticket = (...a) => { const r = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'ticket.mjs'), ...a], { encoding: 'utf8' }); if (r.status !== 0) throw new Error((r.stderr || 'failed').trim().slice(0, 400)); return r.stdout; };
 const api = (args) => gh(['api', ...args], undefined, true), react = (id, c) => api(['-X', 'POST', `repos/${PRIVATE}/issues/comments/${id}/reactions`, '-f', `content=${c}`]);
@@ -37,13 +38,13 @@ for (const k of json("SELECT number, private_issue FROM qa.chat_ticket WHERE pri
   for (const c of JSON.parse(raw)) {
     const id = Number(c.id); if (!Number.isSafeInteger(id) || used.has(id) || (c.reactions && (c.reactions.rocket || c.reactions.confused))) continue;
     const p = parse(c.body); if (!p) continue; const t = load(`t.number = ${k.number}`)[0]; if (t.status === 'closed') break;
-    const why = !WHO.includes(String(c.user && c.user.login).toLowerCase()) ? 'Only approved people can respond from a ticket.' : p.bad ? p.bad : p.kind !== 'CLOSE WITHOUT RESPONSE' && repeats(p.text, t.comment, t.question) ? 'This repeats the reader\'s own words, and they were told those would not be published. Please reword it in a new comment.' : p.kind === 'CLOSE' && !t.issue ? 'The reader was told a response will be posted. Use RESPOND first, or "CLOSE WITHOUT RESPONSE:" for a test or spam.' : p.kind === 'CLOSE WITHOUT RESPONSE' && t.issue ? 'A public response was already posted, so use "CLOSE:".' : null;
+    const why = !WHO.includes(String(c.user && c.user.login).toLowerCase()) ? 'Only approved people can respond from a ticket.' : p.bad ? p.bad : p.kind !== 'CLOSE WITHOUT RESPONSE' && repeats(p.text, t.comment, (p.question ? t.notice >= 2 && p.question === 'show' : questionChoice(t).show) ? '' : t.question) ? 'This repeats the reader\'s own words, and they were told those would not be published. Please reword it in a new comment.' : p.question === 'show' && !(t.notice >= 2) ? 'This reader was told their question would stay private, so it cannot be shown.' : p.question && t.issue ? 'The response is already posted, so the question cannot be changed here. Edit the public issue on GitHub.' : p.kind === 'RESPOND' && !t.issue && !p.question && questionChoice(t).hold ? `The question is held: it ${questionChoice(t).why.replace('HELD: it ', '')}. Use "RESPOND HIDE QUESTION ${p.what}:", or "RESPOND SHOW QUESTION ${p.what}:" if it is fine to publish.` : p.kind === 'CLOSE' && !t.issue ? 'The reader was told a response will be posted. Use RESPOND first, or "CLOSE WITHOUT RESPONSE:" for a test or spam.' : p.kind === 'CLOSE WITHOUT RESPONSE' && t.issue ? 'A public response was already posted, so use "CLOSE:".' : null;
     if (!publish) { waiting++; console.log(`${no(k.number)}  ${why ? 'WOULD REFUSE: ' + why : `WOULD ${p.kind}${p.what ? ' (' + p.what + ')' : ''}: ${p.text}`}`); continue; }
     const mark = (result, face) => { psql(`INSERT INTO qa.ticket_command (comment_id, number, result) VALUES (${id}, ${k.number}, '${result}') ON CONFLICT DO NOTHING;`); react(id, face); };
     if (why) { mark('refused', 'confused'); gh(['issue', 'comment', String(k.private_issue), '--repo', PRIVATE, '--body-file', '-'], `Not posted. ${safe(why)}`, true); refused++; console.log(`${no(k.number)}  refused: ${why}`); continue; }
     try {
       if (p.kind === 'RESPOND' && t.issue) { if (gh(['issue', 'comment', String(t.issue), '--repo', PUBLIC, '--body-file', '-'], `**Update (${p.what}):** ${safe(p.text)}`, true) === null) throw new Error('the update could not be posted'); mark('updated', 'rocket'); ticket(String(k.number), '--status', p.status, '--finding', p.text); gh(['issue', 'comment', String(k.private_issue), '--repo', PRIVATE, '--body-file', '-'], `Update posted: https://github.com/${PUBLIC}/issues/${t.issue}`, true); }
-      else if (p.kind === 'RESPOND') { ticket(String(k.number), '--status', p.status, '--finding', p.text); ticket(String(k.number), '--issue', '--publish'); mark('responded', 'rocket'); }
+      else if (p.kind === 'RESPOND') { ticket(String(k.number), '--status', p.status, '--finding', p.text, ...(p.question ? ['--' + p.question + '-question'] : [])); ticket(String(k.number), '--issue', '--publish'); mark('responded', 'rocket'); }
       else if (p.kind === 'CLOSE') { ticket(String(k.number), '--close', p.text, '--publish'); mark('closed', 'rocket'); }
       else { ticket(String(k.number), '--close', p.text, '--no-response'); mark('closed', 'rocket'); }
       did++; console.log(`${no(k.number)}  ${p.kind.toLowerCase()}: done`);
