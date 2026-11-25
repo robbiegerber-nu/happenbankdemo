@@ -56,5 +56,5 @@ This takes about 75 minutes. It drops and recreates the `happen_demo` database, 
 | [`sql/dashboards/`](sql/dashboards/) | Exports the JSON the operational dashboards read, refreshed after each daily load with no failed check |
 | [`sql/remediation/`](sql/remediation/) | Documented, re-runnable fixes for data defects found by discovery |
 | [`tools/`](tools/) | `generate_data_dictionary.ps1`: rebuilds the wiki's column pages from the database's own documentation |
-| [`chat/`](chat/) | The AI chat's server and tests ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/3c-AI-Chat)) |
+| [`chat/`](chat/) | The AI chat's server, tests and question log for quality checks ([how it works](https://github.com/robbiegerber-nu/happenbankdemo/wiki/3c-AI-Chat)) |
 | [`docs/`](docs/) | GitHub Pages site: the dashboards above and their JSON data |

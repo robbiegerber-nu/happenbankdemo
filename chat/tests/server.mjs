@@ -1,6 +1,6 @@
 // Tests the chat server with the pretend AI: no key, no cost, nothing published.
 //   node chat/tests/server.mjs
-import { spawn } from 'node:child_process'; import path from 'node:path'; import os from 'node:os'; import fs from 'node:fs';
+import { spawn } from 'node:child_process'; import path from 'node:path'; import os from 'node:os'; import fs from 'node:fs'; import { spawnSync } from 'node:child_process';
 const dir = process.env.HAPPEN_CHAT || path.join(os.homedir(), 'happen-chat'), state = path.join(dir, 'test-state'), O = 'https://robbiegerber-nu.github.io';
 let ok = 0, bad = 0; const t = (name, pass, info = '') => { pass ? ok++ : bad++; console.log(`${pass ? 'pass' : 'FAIL'}  ${name}${pass ? '' : '  ' + JSON.stringify(info)}`); };
 async function server(port, vars, run) {
@@ -45,6 +45,30 @@ await server(8791, { VISITOR_QUESTIONS_PER_DAY: '100', QUESTIONS_PER_DAY: '100',
   r = await post('/ask', { question: 'q' }, A); const c3 = r.b.conversation; for (let i = 0; i < 9; i++) r = await post('/ask', { question: 'q' + i, conversation: c3 }, A); t('the tenth question is the last', r.b.left === 0, r); r = await post('/ask', { question: 'one more', conversation: c3 }, A); t('an eleventh question is refused', r.s === 409 && r.b.error === 'full', r);
   t('questions and codes are not logged', !/hello|test-code|service level/i.test(log()), log().slice(0, 300));
 });
+// ---------- The question log ----------
+const about = { notice: 1, data_through: '2026-11-15', exported_at: '2026-11-23T15:08:02', page: '2026-11-25' };
+const d1 = (sql) => { const r = spawnSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'execute', 'happen-demo-qa', '--local', '--persist-to', state, '--json', '--command', sql], { cwd: dir, encoding: 'utf8', env: { ...process.env, WRANGLER_SEND_METRICS: 'false' } }); try { return JSON.parse(r.stdout.slice(r.stdout.indexOf('[')))[0].results; } catch { return [{ failed: (r.stdout + r.stderr).slice(0, 300) }]; } };
+await server(8798, { VISITOR_QUESTIONS_PER_DAY: '100', QUESTIONS_PER_DAY: '100', MONTHLY_USD: '50' }, async (post, url, log) => {
+  const A = await login(post), result = JSON.stringify({ value: '81.9%', raw: 81.9, source: { dashboard: 'x' } }), fin = (r) => post('/tools', { conversation: r.b.conversation, results: r.b.calls.map((c) => ({ id: c.id, content: result })) }, A);
+  let r = await post('/ask', { question: 'no notice shown' }, A); t('a page without the notice is not logged and gets no reference', r.s === 200 && !r.b.ref, r);
+  r = await post('/ask', { question: "service level '); DROP TABLE chat_log; --", about }, A); const c1 = r.b.conversation; r = await fin(r); t('a logged answer carries a reference', /^[0-9a-f]{8}$/.test(r.b.ref || ''), r); const ref = r.b.ref;
+  r = await post('/ask', { question: 'and hello again', about, conversation: c1 }, A); r = await post('/ask', { question: 'service level unfinished', about }, A); r = await post('/ask', { question: 'REFUSE', about }, A); r = await post('/ask', { question: 'OVERLOAD', about }, A);
+  r = await post('/ask', { question: 'hello odd about', about: { notice: 1, data_through: 'x'.repeat(500), page: '<b>', secret: 'no' } }, A);
+  const rows = d1('SELECT * FROM chat_log ORDER BY asked_at'), by = (q) => rows.find((x) => (x.question || '').includes(q)) || {}, a = by('DROP'), calls = JSON.parse(a.calls || '[]');
+  t('each logged question has one row', rows.length === 6, rows.map((x) => [x.question, x.failed]));
+  t('question, answer, request and result are kept', a.status === 'answered' && a.answer.includes('81.9%') && calls.length === 1 && calls[0].name === 'get_metric' && calls[0].input.metric === 'sl_phone' && calls[0].result.raw === 81.9 && a.id.startsWith(ref), a);
+  t('label, data date, versions, cost and time are kept', a.label === 'Dashboard figures' && a.data_through === '2026-11-15' && a.page_version === '2026-11-25' && /^[0-9a-f]{12}$/.test(a.rules_version) && a.usd > 0 && a.seconds >= 0, a);
+  const f = by('hello again'); t('a follow-up is grouped and holds only its own requests', f.conversation === a.conversation && f.calls === '[]' && f.status === 'answered', f);
+  t('an unfinished question stays as asked, with its request', by('unfinished').status === 'asked' && JSON.parse(by('unfinished').calls).length === 1, by('unfinished'));
+  t('declined and failed questions are kept', by('REFUSE').status === 'declined' && by('OVERLOAD').status === 'ai_error', rows);
+  const o = by('odd about'); t('odd page details are dropped', o.status === 'answered' && o.data_through === null && o.page_version === null, o);
+  t('nothing identifies the visitor', !/127\.0\.0\.1|test-code|Bearer/.test(JSON.stringify(rows)) && a.conversation.length === 8, rows);
+  t('logging failures and questions are not in the server log', !/log error|DROP|hello/.test(log()), log().slice(0, 300));
+  d1("UPDATE chat_log SET asked_at = '2026-01-01T00:00:00.000Z' WHERE question = 'REFUSE'");
+});
+// the page and the server must label answers the same way
+{ const page = fs.readFileSync(new URL('../../docs/chat.html', import.meta.url), 'utf8'), srv = fs.readFileSync(new URL('../server/src/log.js', import.meta.url), 'utf8'), norm = (s) => s.replace(/\/\*.*?\*\//g, '').replace(/\s+/g, ''), part = (s, re) => norm((s.match(re) || [''])[0]);
+  for (const re of [/figures = \(t\) =>[^\n]*String\(parseFloat\(x\)\)\)/, /telling = \(text\) =>[^\n]*\+x <= 2026\)\)\)/, /odd\.length \? 'Check the figures'[^\n]*?'No figures used'/]) t('page and server agree: ' + re.source.slice(0, 22), part(page, re) && part(page, re) === part(srv, re), [part(page, re), part(srv, re)]); }
 await server(8792, { VISITOR_QUESTIONS_PER_DAY: '3', QUESTIONS_PER_DAY: '100', LOGIN_TRIES_PER_HOUR: '4' }, async (post) => {
   const A = await login(post); let r; for (let i = 0; i < 3; i++) r = await post('/ask', { question: 'q' }, A); t('questions up to the visitor limit work', r.s === 200, r); r = await post('/ask', { question: 'q' }, A); t('the visitor limit stops the next one', r.s === 429 && r.b.error === 'visitor', r);
   r = await post('/ask', { question: 'q' }, await login(post)); t('logging in again does not reset the limit', r.s === 429, r); for (let i = 0; i < 3; i++) r = await post('/login', { code: 'guess' + i }); t('code guessing is stopped', r.s === 429, r); r = await post('/login', { code: 'test-code' }); t('even the right code waits after too many tries', r.s === 429, r);
@@ -54,4 +78,4 @@ await server(8794, { MONTHLY_USD: '2', QUESTIONS_PER_DAY: '100', VISITOR_QUESTIO
 await server(8795, { KEEP_MINUTES: '0.03' }, async (post) => { const A = await login(post); let r = await post('/ask', { question: 'hello' }, A); const c = r.b.conversation; await new Promise((s) => setTimeout(s, 4000)); r = await post('/ask', { question: 'still there?', conversation: c }, A); t('conversations are deleted after the time is up', r.s === 410, r); });
 await server(8796, { PASS_HOURS: '0.0005' }, async (post) => { const A = await login(post); await new Promise((s) => setTimeout(s, 2500)); const r = await post('/ask', { question: 'hello' }, A); t('a pass expires', r.s === 401, r); });
 await server(8797, { FAKE_AI: '0' }, async (post) => { const A = await login(post), r = await post('/ask', { question: 'hello' }, A); t('without a key it fails safely', r.s === 502 && !/key/i.test(r.b.message), r); });
-fs.rmSync(state, { recursive: true, force: true }); console.log(`\n${ok} passed, ${bad} failed`); process.exit(bad ? 1 : 0);
+if (process.env.KEEP_STATE) console.log('kept ' + state); else fs.rmSync(state, { recursive: true, force: true }); console.log(`\n${ok} passed, ${bad} failed`); process.exit(bad ? 1 : 0);

@@ -5,6 +5,9 @@
   "send_metrics": false,
   "durable_objects": { "bindings": [{ "name": "CONVERSATION", "class_name": "Conversation" }, { "name": "LEDGER", "class_name": "Ledger" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Conversation", "Ledger"] }],
+  // The question log. The id is not a secret: reading it needs the Cloudflare sign-in.
+  "d1_databases": [{ "binding": "LOG", "database_name": "happen-demo-qa", "database_id": "993ea269-8281-47f2-85d3-912d6ee8a679" }],
+  "triggers": { "crons": ["20 8 * * *"] },
   "observability": { "enabled": false },
   // Limits. Changing one here and publishing again is all it takes.
   "vars": {
@@ -17,6 +20,7 @@
     "TOOL_ROUNDS": "6",
     "KEEP_MINUTES": "30",
     "PASS_HOURS": "12",
+    "KEEP_LOG_DAYS": "80",
     "LOGIN_TRIES_PER_HOUR": "10"
   }
   // Secrets, set with "wrangler secret put" and never kept in a file here: ANTHROPIC_API_KEY, ACCESS_CODE, SESSION_SECRET

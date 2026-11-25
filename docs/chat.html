@@ -64,7 +64,7 @@
   <h1>Ask the data</h1>
   <p class="sub">Ask about service, satisfaction, staffing, customers, launches or self-service. Every number comes from the dashboards' own calculations, with a link to check it.</p>
   <section class="card" aria-labelledby="t-try"><h2 id="t-try">Try one of these</h2><div class="chips" id="try"></div></section>
-  <section class="card" id="gate" aria-labelledby="t-gate" hidden><h2 id="t-gate">Ask your own question</h2><p class="sub">With an access code you can ask anything about the data. Your questions and the figures needed to answer them are sent to an AI service (Claude) through this site's server, which deletes the conversation after 30 minutes without use. Please don't type personal information.</p>
+  <section class="card" id="gate" aria-labelledby="t-gate" hidden><h2 id="t-gate">Ask your own question</h2><p class="sub">With an access code you can ask anything about the data. Your questions and the figures needed to answer them are sent to an AI service (Claude) through this site's server. Questions and answers are kept for up to 90 days to check their quality, without your name or internet address. Please don't type personal information.</p>
     <form class="gate" id="gate-form"><label class="sr-only" for="code">Access code</label><input id="code" type="password" autocomplete="off" maxlength="200" aria-describedby="gate-err" placeholder="Access code"><button class="btn" type="submit">Continue</button></form><p class="err" id="gate-err" role="alert"></p></section>
   <div class="log" id="log" role="log" aria-live="polite" aria-label="Conversation"></div>
   <div class="sr-only" id="say" role="status"></div>
@@ -115,6 +115,7 @@
   const LIVE = 'https://happen-demo-chat.contact-center-demo.workers.dev';
   const SERVER = test && /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(test) ? test : LIVE;
   const store = (v) => { try { if (v === null) sessionStorage.removeItem('happen-demo-chat'); else if (v) sessionStorage.setItem('happen-demo-chat', v); return sessionStorage.getItem('happen-demo-chat'); } catch (e) { return v || null; } };
+  const PAGE_VERSION = '2026-11-25', DATA = {};   // sent with each question, so a logged answer can be checked against the data it used
   let pass = SERVER ? store() : null, conversation = null, busy = false;
   async function post(path, body) {
     let r; try { r = await fetch(SERVER + path, { method: 'POST', headers: { 'content-type': 'application/json', ...(pass ? { authorization: 'Bearer ' + pass } : {}) }, body: JSON.stringify(body) }); } catch (e) { return { error: 'offline', message: 'The chat server can’t be reached just now. The prepared questions still work.' }; }
@@ -122,7 +123,7 @@
   }
   function showMode() {
     $('gate').hidden = !SERVER || !!pass; $('fresh').hidden = !conversation;
-    $('mode').textContent = !SERVER || !pass ? 'Sample mode: only the prepared questions can be answered. Nothing you type leaves this page.' : 'Your questions are sent to an AI service. Please don’t type personal information.';
+    $('mode').textContent = !SERVER || !pass ? 'Sample mode: only the prepared questions can be answered. Nothing you type leaves this page.' : 'Your questions are sent to an AI service, and kept with the answers for up to 90 days for quality checks. Please don’t type personal information.';
   }
   // the AI's text is shown as text: only **bold** and lists are turned into formatting
   function format(t) { const bold = (x) => esc(x).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); return t.split(/\n{2,}/).map((p) => { const L = p.split('\n'), li = L.filter((x) => /^\s*[-•*] /.test(x)); return li.length && li.length === L.length ? `<ul>${li.map((x) => `<li>${bold(x.replace(/^\s*[-•*] /, ''))}</li>`).join('')}</ul>` : L.map((x) => (/^\s*[-•*] /.test(x) ? `<ul><li>${bold(x.replace(/^\s*[-•*] /, ''))}</li></ul>` : `<p>${bold(x)}</p>`)).join(''); }).join(''); }
@@ -132,7 +133,7 @@
   function unchecked(text, seen) { const have = new Set(figures(seen)); return telling(text).filter((x) => !have.has(x)); }
   let seenText = '', earlier = [];
   async function askAI(text) {
-    busy = true; const d = bubble('it', '<p>Thinking…</p>'), used = []; let r = await post('/ask', { question: text, ...(conversation ? { conversation } : {}) }); seenText += ' ' + text;
+    busy = true; const d = bubble('it', '<p>Thinking…</p>'), used = []; let r = await post('/ask', { question: text, about: { notice: 1, page: PAGE_VERSION, ...DATA }, ...(conversation ? { conversation } : {}) }); seenText += ' ' + text;
     for (let i = 0; r.type === 'tools' && i < 10; i++) {
       d.innerHTML = '<p>Looking up the figures…</p>'; conversation = r.conversation; const results = [];
       for (const c of r.calls) { const out = await T(c.name, c.input); let content = JSON.stringify(out); if (content.length > 14000) content = JSON.stringify({ error: 'That result is too long. Ask for less at once.' }); results.push({ id: c.id, content, ...(out.error ? { error: true } : {}) }); seenText += ' ' + content; if (!out.error && out.source) { used.push(out); earlier.push(out); } }
@@ -146,7 +147,7 @@
     conversation = r.conversation || conversation; const odd = unchecked(r.text, seenText), nums = telling(r.text);
     // figures repeated from earlier in the conversation keep their source
     const before = used.length ? [] : earlier.filter((u) => { const have = new Set(figures(JSON.stringify({ ...u, source: 0 }))); return nums.some((x) => have.has(x)); }), src = [...new Map([...used, ...before].map((u) => [u.source.link + u.source.period + u.source.kpi + u.source.filters.join(), u])).values()];
-    d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">${odd.length ? 'Check the figures' : src.length && src.every((u) => u.profile) ? 'Persona profiles' : used.length ? 'Dashboard figures' : before.length ? 'Dashboard figures from earlier' : 'No figures used'}</span>${format(r.text)}${odd.length ? `<div class="src">Not found in the dashboard results: ${esc(odd.join(', '))}. The AI may have worked ${odd.length === 1 ? 'it' : 'them'} out; check the source.</div>` : ''}${chartNote(used)}<div class="charts"></div>${src.map((u) => source(u.source, u)).join('')}`; charts(d, used);
+    d.innerHTML = `<span class="sr-only">Answer. </span><span class="tag">${odd.length ? 'Check the figures' : src.length && src.every((u) => u.profile) ? 'Persona profiles' : used.length ? 'Dashboard figures' : before.length ? 'Dashboard figures from earlier' : 'No figures used'}</span>${format(r.text)}${odd.length ? `<div class="src">Not found in the dashboard results: ${esc(odd.join(', '))}. The AI may have worked ${odd.length === 1 ? 'it' : 'them'} out; check the source.</div>` : ''}${chartNote(used)}<div class="charts"></div>${src.map((u) => source(u.source, u)).join('')}${r.ref ? `<div class="src">Reference: ${esc(r.ref)}</div>` : ''}`; charts(d, used);
     showMode(); const q = d.previousElementSibling; if (q) q.scrollIntoView({ block: 'start' });
   }
   $('gate-form').addEventListener('submit', async (e) => { e.preventDefault(); const code = $('code').value.trim(); if (!code) return; $('gate-err').textContent = ''; $('code').removeAttribute('aria-invalid'); const r = await post('/login', { code }); $('code').value = ''; if (r.error) { $('gate-err').textContent = r.message; if (r.error === 'code') $('code').setAttribute('aria-invalid', 'true'); $('code').focus(); return; } pass = r.pass; store(pass); showMode(); $('q').focus(); });
@@ -156,7 +157,7 @@
   $('main').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) ask(PREPARED[+c.dataset.i].q, true); });
   $('form').addEventListener('submit', (e) => { e.preventDefault(); const t = $('q').value.trim(); if (!t) return; if (busy) return say('Still working on the last question.'); $('q').value = ''; ask(t); $('q').focus(); });
   showMode();
-  ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => Site.setDataThrough(x.data_through)); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data`; });
+  ChatTools.run('describe_data', { metric: 'csat' }).then((r) => { if (r.error) return; fetch('data/dashboards/cx/index.json').then((x) => x.json()).then((x) => { DATA.data_through = x.data_through; DATA.exported_at = x.generated_at; Site.setDataThrough(x.data_through); }); $('footer-generated').textContent = `Full months ${r.full_months} · Ask the data`; });
 })();
 </script>
 </body>
