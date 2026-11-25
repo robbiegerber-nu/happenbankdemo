@@ -47,7 +47,7 @@ node chat/qa/ticket.mjs
 
 Add a number to see one (`node chat/qa/ticket.mjs 1`), then `--status` and `--finding` to record your decision. `--issue` **previews** a public GitHub issue; it is only created with `--publish`. `--close "..."` previews closing it. **Readers are told a response will be posted within 5 business days.** The list shows when each is due (holidays aren't skipped), and a ticket can't be closed without an issue unless you add `--no-response`. The issue never holds the question, the answer or the reader's comment.
 
-`private_tickets.mjs` puts the **full ticket** (reason, comment, question, answer, check, SQL, checklist) in a private repository, for whoever handles it, and deletes it after 90 days. It previews unless you add `--publish`, and stops unless GitHub says the repository is private. `ticket.mjs` notes the public response there.
+`private_tickets.mjs` puts the **full ticket** (reason, comment, question, answer, check, SQL, checklist) in a private repository, for whoever handles it, and deletes it after 90 days. It checks new answers first, and previews unless you add `--publish`, and stops unless GitHub says the repository is private. `ticket.mjs` notes the public response there.
 
 `daily_check.ps1` copies, checks, adds new tickets to the private repository and shows a message when there is something to review. `-Install` runs it every day.
 
