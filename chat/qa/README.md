@@ -25,11 +25,13 @@ The SQL for each question is also written to a text file, outside this project b
 | **match** | Every comparison agrees with the source tables |
 | **mismatch** | At least one differs. Start here |
 | **no figure** | The chat gave no figure, or the page refused the request |
-| **not covered** | No template yet: launches, satisfaction by outcome, persona profiles |
+| **not covered** | A kind of request with no template yet |
 | **not finished** | The page was closed before the answer |
 | **error** | The check itself failed |
 
-What is compared: values, how they are shown, record counts, "too few", status against target, changes and their chance readings, shares, the groups listed and their order, trend months, highest and lowest, and the filters and months used.
+What is compared: values, how they are shown, record counts, "too few", status against target, changes and their chance readings, shares, the groups listed and their order, trend months, highest and lowest, and the filters and months used. For launches: contacts against expected, the peak, when it was back to normal, each change and its chance reading, and overlapping launches. For outcomes: both groups and whether the gap is beyond chance. For personas: every field of every profile.
+
+Not compared: the events listed beside a result, which come from `events.json`, and fixed notes.
 
 **A match means the figures the chat was given are right for what it asked for.** A person still has to judge whether it asked for the right thing and worded the answer fairly. Figures in the answer that weren't in the results are flagged separately (`unchecked`).
 
