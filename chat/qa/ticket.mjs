@@ -4,11 +4,12 @@
 //   node chat/qa/ticket.mjs 1 --status confirmed --finding "..."    record your decision (kept in Postgres only)
 //   node chat/qa/ticket.mjs 1 --issue                               PREVIEW the public response; nothing is sent
 //   node chat/qa/ticket.mjs 1 --issue --publish                     post it, with your own GitHub sign-in
-// Add --hide-question to leave the question out, or --show-question to publish one that was held for looking personal.
+// Add --hide-question to leave the question and comment out, or --show-question to publish ones that were held for looking personal.
 // Readers are told that a response will be posted, so every ticket gets one. To close one without it (a test, spam), add --no-response.
 //   node chat/qa/ticket.mjs 1 --close "..."                         PREVIEW closing the public response with a comment; add --publish to do it
 // statuses: new, confirmed, no_problem, more_info, duplicate, closed
-// The public response holds the question only if the reader was told it would (notice 2). It never holds the answer or the comment. The full ticket is in the private repository
+// The public response holds the question and comment only if the reader was told it would (notice 3; notice 2 is the question only).
+// It never holds the answer. The full ticket is in the private repository
 // (private_tickets.mjs); posting or closing the public response is noted there.
 import { PRIVATE, PUBLIC, REASON, STATUS, gh, json, lit, load, no, privateReady, publicIssue, questionChoice, safe, sqlFile, stop } from './ticket_lib.mjs'; import { psql } from './verify.mjs';
 const args = process.argv.slice(2), opt = (n) => { const i = args.indexOf(n); if (i < 0) return null; const v = args[i + 1]; if (v === undefined || v.startsWith('--')) stop(`${n} needs a value.`); return v; }, n = args[0] && !args[0].startsWith('--') ? args[0].replace(/^QA-0*/i, '') : null, privateUrl = (x) => `https://github.com/${PRIVATE}/issues/${x}`;
@@ -22,7 +23,7 @@ const get = () => { const t = load(`t.number = ${n}`)[0]; if (t) t.private_issue
 const status = opt('--status'), finding = opt('--finding'), close = opt('--close'), publish = args.includes('--publish');
 if (status !== null && !STATUS[status]) stop('Statuses: ' + Object.keys(STATUS).join(', '));
 if (status !== null || finding !== null) { psql(`UPDATE qa.chat_ticket SET ${[status !== null ? `status = '${status}'` : null, finding !== null ? `finding = ${lit(finding)}` : null, 'reviewed_at = now()'].filter(Boolean).join(', ')} WHERE number = ${n};`); t = get(); console.log(`${no(n)} saved: ${t.status}${t.finding ? ' - ' + t.finding : ''}`); }
-for (const [flag, v] of [['--hide-question', false], ['--show-question', true]]) if (args.includes(flag)) { if (v && !(t.notice >= 2)) stop('This reader was told their question would stay private, so it cannot be shown.'); if (t.issue) stop('The response is already posted. Edit the public issue on GitHub.'); psql(`UPDATE qa.chat_ticket SET show_question = ${v} WHERE number = ${n};`); t = get(); }
+for (const [flag, v] of [['--hide-question', false], ['--show-question', true]]) if (args.includes(flag)) { if (v && !(t.notice >= 2)) stop('This reader was told their report would stay private, so it cannot be shown.'); if (t.issue) stop('The response is already posted. Edit the public issue on GitHub.'); psql(`UPDATE qa.chat_ticket SET show_question = ${v} WHERE number = ${n};`); t = get(); }
 // keeps the private ticket in step; a problem there never undoes what was done
 function note(text, shut) { if (!t.private_issue || privateReady() !== 'private') return; const a = ['--repo', PRIVATE], i = String(t.private_issue), ok = gh(['issue', 'comment', i, ...a, '--body-file', '-'], safe(text), true) !== null && (!shut || gh(['issue', 'close', i, ...a], undefined, true) !== null); console.log(ok ? `Noted on the private ticket${shut ? ', which is closed' : ''}.` : 'The private ticket could not be updated; please do it on GitHub.'); }
 

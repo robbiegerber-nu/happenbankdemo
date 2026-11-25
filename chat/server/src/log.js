@@ -56,11 +56,11 @@ export async function record(env, t, c, status, answer) {
    Returns null when the answer is no longer in the log. Throws if it cannot be saved, so nobody is told it was. */
 export const REASONS = ['wrong', 'no_answer', 'more_info', 'other'];
 export const ticketNo = (n) => 'QA-' + String(n).padStart(4, '0');
-// notice 2 = the form showed that the question will be public. Anything else, such as a page left open, stays private.
+// notice 3 = the form said the question and comment will be public; 2 = the question only. Anything else stays private.
 export async function fileTicket(env, id, reason, comment, notice) {
   const d = await db(env); if (!d) throw new Error('no log');
   if (!(await d.prepare('SELECT 1 AS x FROM chat_log WHERE id = ?1').bind(id).first())) return null;
-  const r = await d.prepare('INSERT INTO chat_ticket (log_id, created_at, reason, comment, notice) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (log_id) DO NOTHING').bind(id, new Date().toISOString(), reason, clean(comment) || null, notice === 2 ? 2 : 1).run();
+  const r = await d.prepare('INSERT INTO chat_ticket (log_id, created_at, reason, comment, notice) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (log_id) DO NOTHING').bind(id, new Date().toISOString(), reason, clean(comment) || null, notice === 2 || notice === 3 ? notice : 1).run();
   const t = await d.prepare('SELECT number FROM chat_ticket WHERE log_id = ?1').bind(id).first(); return { number: ticketNo(t.number), already: !(r.meta && r.meta.changes) };
 }
 export async function tidy(env) {
