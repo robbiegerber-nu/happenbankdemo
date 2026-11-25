@@ -67,12 +67,13 @@ async function route(path, body, req, env) {
   }
   // a report about a logged answer: the ticket key was given with that answer, so nobody can report one they never saw
   if (path === '/report') {
-    const m = /^([0-9a-f-]{36})\.([0-9a-f]{64})$/.exec(body.ticket || ''); if (!m || !same(m[2], await mac(env.SESSION_SECRET, 'report|' + m[1]))) return no('ticket', 'That answer could not be found.');
+    const own = async (k) => { const m = /^([0-9a-f-]{36})\.([0-9a-f]{64})$/.exec(typeof k === 'string' ? k : ''); return m && same(m[2], await mac(env.SESSION_SECRET, 'report|' + m[1])) ? m[1] : null; }, main = await own(body.ticket); if (!main) return no('ticket', 'That answer could not be found.');
+    const list = Array.isArray(body.earlier) ? body.earlier : [], earlier = []; if (list.length > 9) return no('ticket', 'That conversation could not be read.'); for (const k of list) { const id = await own(k); if (!id) return no('ticket', 'That conversation could not be read.'); earlier.push(id); }
     if (!REASONS.includes(body.reason)) return no('reason', 'Please choose a reason.'); const comment = typeof body.comment === 'string' ? body.comment.trim() : ''; if (comment.length > num(env, 'COMMENT_CHARS')) return no('long', `Please keep comments to ${env.COMMENT_CHARS} characters.`);
     // a report without a comment cannot be answered
     if ((comment.match(/\p{L}/gu) || []).length < 10) return no('comment', 'Please add a comment, so we know what to look into.');
     if (!(await ledger.takeReport(who, num(env, 'VISITOR_REPORTS_PER_DAY'), num(env, 'REPORTS_PER_DAY')))) return no('reports', 'The limit for reports today has been reached. Please try again tomorrow.', 429);
-    let t; try { t = await fileTicket(env, m[1], body.reason, comment, body.notice); } catch (e) { console.error('ticket error', e && e.name); return no('save', 'Your report could not be saved. Please try again.', 500); }
+    let t; try { t = await fileTicket(env, main, body.reason, comment, body.notice, [...new Set(earlier)]); } catch (e) { console.error('ticket error', e && e.name); return no('save', 'Your report could not be saved. Please try again.', 500); }
     return t ? { status: 200, body: t } : no('gone', 'That answer is no longer kept, so it cannot be reported.', 410);
   }
   return no('path', 'Not found.', 404);
@@ -98,7 +99,7 @@ export class Conversation extends DurableObject {
     c.rounds = 0; c.asked++;
     const block = { type: 'text', text: q }, undo = JSON.stringify(c.messages);
     if (last && last.role === 'user') c.messages = [...c.messages.slice(0, -1), { role: 'user', content: [...last.content, block] }]; else c.messages.push({ role: 'user', content: [block] });
-    c.trace = seen ? { id: crypto.randomUUID(), group: id.slice(0, 8), at: Date.now(), question: q, about: seen, from: c.messages.length - 1, usd: 0 } : null; if (c.trace) c.trace.key = await mac(this.env.SESSION_SECRET, 'report|' + c.trace.id); await record(this.env, c.trace, c, 'asked', null);
+    c.trace = seen ? { id: crypto.randomUUID(), group: id.slice(0, 8), at: Date.now(), question: q, about: seen, from: c.messages.length - 1, usd: 0, position: c.asked } : null; if (c.trace) c.trace.key = await mac(this.env.SESSION_SECRET, 'report|' + c.trace.id); await record(this.env, c.trace, c, 'asked', null);
     return this.turn(c, undo);
   }
   async tools(owner, results) {

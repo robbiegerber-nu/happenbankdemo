@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS qa.chat_log (
   usd           numeric NOT NULL,
   seconds       numeric
 );
+ALTER TABLE qa.chat_log ADD COLUMN IF NOT EXISTS position int;
+COMMENT ON COLUMN qa.chat_log.position IS 'Which question of its conversation this was: 1 = the first.';
 COMMENT ON TABLE  qa.chat_log IS 'One row per question asked of the AI chat with an access code. Kept 90 days.';
 COMMENT ON COLUMN qa.chat_log.id IS 'The first 8 characters are the reference shown under the answer.';
 COMMENT ON COLUMN qa.chat_log.conversation IS 'Short code that groups follow-up questions. It does not identify anyone.';
@@ -81,7 +83,9 @@ CREATE TABLE IF NOT EXISTS qa.chat_ticket (
 ALTER TABLE qa.chat_ticket ADD COLUMN IF NOT EXISTS private_issue int;
 ALTER TABLE qa.chat_ticket ADD COLUMN IF NOT EXISTS notice int NOT NULL DEFAULT 1;
 ALTER TABLE qa.chat_ticket ADD COLUMN IF NOT EXISTS show_question boolean;
-COMMENT ON COLUMN qa.chat_ticket.notice IS '3 = the reader was told the question and comment would be public. 2 = the question only. 1 = neither.';
+ALTER TABLE qa.chat_ticket ADD COLUMN IF NOT EXISTS earlier jsonb NOT NULL DEFAULT '[]';
+COMMENT ON COLUMN qa.chat_ticket.earlier IS 'Earlier questions of the conversation the reader agreed to show.';
+COMMENT ON COLUMN qa.chat_ticket.notice IS '4 = the reader was told the conversation they chose, with answers, and the comment would be public. 3 = the question and comment. 2 = the question only. 1 = neither.';
 COMMENT ON COLUMN qa.chat_ticket.show_question IS 'Your choice for this ticket, if you made one.';
 COMMENT ON COLUMN qa.chat_ticket.private_issue IS 'The full ticket in the private repository (private_tickets.mjs).';
 COMMENT ON TABLE  qa.chat_ticket IS 'One row per reported answer. Deleted with the question after 90 days; a GitHub issue stays.';

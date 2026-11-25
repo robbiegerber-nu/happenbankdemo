@@ -22,9 +22,9 @@ for (let last = ''; ;) {
   const rows = cloud(`SELECT * FROM chat_log WHERE updated_at >= '${since}' AND id > '${last}' ORDER BY id LIMIT ${PAGE}`); if (!rows.length) break;
   // sent as base64, so nothing a visitor typed can be read as SQL
   const b64 = Buffer.from(JSON.stringify(rows)).toString('base64');
-  psql(`INSERT INTO qa.chat_log AS t (id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls, data_through, exported_at, page_version, rules_version, model, usd, seconds)
-    SELECT id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls::jsonb, data_through, exported_at, page_version, rules_version, model, usd, seconds
-    FROM json_to_recordset(convert_from(decode('${b64}', 'base64'), 'UTF8')::json) AS x(id uuid, conversation text, asked_at timestamptz, updated_at timestamptz, status text, question text, answer text, label text, unchecked text, calls text, data_through date, exported_at text, page_version text, rules_version text, model text, usd numeric, seconds numeric)
+  psql(`INSERT INTO qa.chat_log AS t (id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls, data_through, exported_at, page_version, rules_version, model, usd, seconds, position)
+    SELECT id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls::jsonb, data_through, exported_at, page_version, rules_version, model, usd, seconds, position
+    FROM json_to_recordset(convert_from(decode('${b64}', 'base64'), 'UTF8')::json) AS x(id uuid, conversation text, asked_at timestamptz, updated_at timestamptz, status text, question text, answer text, label text, unchecked text, calls text, data_through date, exported_at text, page_version text, rules_version text, model text, usd numeric, seconds numeric, position int)
     ON CONFLICT (id) DO UPDATE SET updated_at = excluded.updated_at, status = excluded.status, answer = excluded.answer, label = excluded.label, unchecked = excluded.unchecked, calls = excluded.calls, model = excluded.model, usd = excluded.usd, seconds = excluded.seconds
     WHERE t.updated_at <= excluded.updated_at;`);
   got += rows.length; last = rows[rows.length - 1].id; if (!/^[0-9a-f-]{36}$/.test(last)) stop('An unexpected id was found in the log.');
@@ -32,8 +32,8 @@ for (let last = ''; ;) {
 // readers' reports; your own review notes are never overwritten
 if (cloud("SELECT name FROM sqlite_master WHERE name = 'chat_ticket'").length) for (let last = 0; ;) {
   const rows = cloud(`SELECT * FROM chat_ticket WHERE number > ${last} ORDER BY number LIMIT 100`); if (!rows.length) break;
-  psql(`INSERT INTO qa.chat_ticket (number, log_id, created_at, reason, comment, notice) SELECT x.number, x.log_id, x.created_at, x.reason, x.comment, coalesce(x.notice, 1)
-    FROM json_to_recordset(convert_from(decode('${Buffer.from(JSON.stringify(rows)).toString('base64')}', 'base64'), 'UTF8')::json) AS x(number int, log_id uuid, created_at timestamptz, reason text, comment text, notice int) JOIN qa.chat_log l ON l.id = x.log_id
+  psql(`INSERT INTO qa.chat_ticket (number, log_id, created_at, reason, comment, notice, earlier) SELECT x.number, x.log_id, x.created_at, x.reason, x.comment, coalesce(x.notice, 1), coalesce(x.earlier::jsonb, '[]')
+    FROM json_to_recordset(convert_from(decode('${Buffer.from(JSON.stringify(rows)).toString('base64')}', 'base64'), 'UTF8')::json) AS x(number int, log_id uuid, created_at timestamptz, reason text, comment text, notice int, earlier text) JOIN qa.chat_log l ON l.id = x.log_id
     ON CONFLICT DO NOTHING;`);
   last = Number(rows[rows.length - 1].number); if (!Number.isInteger(last)) stop('An unexpected ticket number was found.');
 }

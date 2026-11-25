@@ -9,9 +9,9 @@ let ready = null;
 async function db(env) {
   if (!env.LOG) return null;
   ready = ready || env.LOG.prepare(`CREATE TABLE IF NOT EXISTS chat_log (id TEXT PRIMARY KEY, conversation TEXT NOT NULL, asked_at TEXT NOT NULL, updated_at TEXT NOT NULL, status TEXT NOT NULL, question TEXT NOT NULL, answer TEXT,
-    label TEXT, unchecked TEXT, calls TEXT NOT NULL DEFAULT '[]', data_through TEXT, exported_at TEXT, page_version TEXT, rules_version TEXT, model TEXT, usd REAL NOT NULL DEFAULT 0, seconds REAL)`).run().then(() => env.LOG.prepare(`CREATE TABLE IF NOT EXISTS chat_ticket (number INTEGER PRIMARY KEY AUTOINCREMENT, log_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, reason TEXT NOT NULL, comment TEXT, notice INTEGER NOT NULL DEFAULT 1)`).run())
-    // the table was first made without this column
-    .then(() => env.LOG.prepare('ALTER TABLE chat_ticket ADD COLUMN notice INTEGER NOT NULL DEFAULT 1').run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }));
+    label TEXT, unchecked TEXT, calls TEXT NOT NULL DEFAULT '[]', data_through TEXT, exported_at TEXT, page_version TEXT, rules_version TEXT, model TEXT, usd REAL NOT NULL DEFAULT 0, seconds REAL, position INTEGER)`).run().then(() => env.LOG.prepare(`CREATE TABLE IF NOT EXISTS chat_ticket (number INTEGER PRIMARY KEY AUTOINCREMENT, log_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL, reason TEXT NOT NULL, comment TEXT, notice INTEGER NOT NULL DEFAULT 1, earlier TEXT)`).run())
+    // columns added after the tables were first made
+    .then(async () => { for (const c of ['chat_ticket ADD COLUMN notice INTEGER NOT NULL DEFAULT 1', 'chat_ticket ADD COLUMN earlier TEXT', 'chat_log ADD COLUMN position INTEGER']) await env.LOG.prepare('ALTER TABLE ' + c).run().catch((e) => { if (!/duplicate column/i.test(String(e && e.message))) throw e; }); });
   try { await ready; } catch (e) { ready = null; throw e; }
   return env.LOG;
 }
@@ -46,21 +46,23 @@ export async function record(env, t, c, status, answer) {
     const d = await db(env); if (!d) return;
     const now = new Date(), l = status === 'answered' ? labelOf(answer, c.messages, t.from) : { label: status === 'asked' ? null : 'Not answered', odd: [] };
     let calls = JSON.stringify(callsFrom(c.messages, t.from)); if (calls.length > 600000) calls = JSON.stringify(callsFrom(c.messages, t.from).map((x) => ({ ...x, result: 'left out: too long' })));
-    await d.prepare(`INSERT INTO chat_log (id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls, data_through, exported_at, page_version, rules_version, model, usd, seconds)
-      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)
+    await d.prepare(`INSERT INTO chat_log (id, conversation, asked_at, updated_at, status, question, answer, label, unchecked, calls, data_through, exported_at, page_version, rules_version, model, usd, seconds, position)
+      VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
       ON CONFLICT (id) DO UPDATE SET updated_at = ?4, status = ?5, answer = ?7, label = ?8, unchecked = ?9, calls = ?10, model = ?15, usd = ?16, seconds = ?17`)
-      .bind(t.id, t.group, new Date(t.at).toISOString(), now.toISOString(), status, clean(t.question), clean(answer), l.label, l.odd.join(', ') || null, clean(calls), t.about.data_through, t.about.exported_at, t.about.page, RULES.version, t.model || null, +(t.usd || 0).toFixed(5), status === 'asked' ? null : (now - t.at) / 1000).run();
+      .bind(t.id, t.group, new Date(t.at).toISOString(), now.toISOString(), status, clean(t.question), clean(answer), l.label, l.odd.join(', ') || null, clean(calls), t.about.data_through, t.about.exported_at, t.about.page, RULES.version, t.model || null, +(t.usd || 0).toFixed(5), status === 'asked' ? null : (now - t.at) / 1000, t.position).run();
   } catch (e) { console.error('log error', e && e.name); }
 }
 /* A reader's report about one logged answer. One ticket per answer: a second report gets the first one's number.
    Returns null when the answer is no longer in the log. Throws if it cannot be saved, so nobody is told it was. */
 export const REASONS = ['wrong', 'no_answer', 'more_info', 'other'];
 export const ticketNo = (n) => 'QA-' + String(n).padStart(4, '0');
-// notice 3 = the form said the question and comment will be public; 2 = the question only. Anything else stays private.
-export async function fileTicket(env, id, reason, comment, notice) {
+// notice 4 = the conversation the reader agreed to show, with the chat's answers, and the comment will be public; 3 = the form said the question and comment will be public; 2 = the question only. Anything else stays private.
+// earlier = the earlier questions of the same conversation the reader agreed to show
+export async function fileTicket(env, id, reason, comment, notice, earlier) {
   const d = await db(env); if (!d) throw new Error('no log');
   if (!(await d.prepare('SELECT 1 AS x FROM chat_log WHERE id = ?1').bind(id).first())) return null;
-  const r = await d.prepare('INSERT INTO chat_ticket (log_id, created_at, reason, comment, notice) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (log_id) DO NOTHING').bind(id, new Date().toISOString(), reason, clean(comment) || null, notice === 2 || notice === 3 ? notice : 1).run();
+  let show = []; if (notice === 4 && earlier.length) { const x = await d.prepare(`SELECT e.id FROM chat_log e JOIN chat_log l ON l.id = ?1 WHERE e.conversation = l.conversation AND e.asked_at < l.asked_at AND e.id IN (${earlier.map((_, i) => '?' + (i + 2)).join(',')}) ORDER BY e.asked_at`).bind(id, ...earlier).all(); show = x.results.map((y) => y.id); }
+  const r = await d.prepare('INSERT INTO chat_ticket (log_id, created_at, reason, comment, notice, earlier) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (log_id) DO NOTHING').bind(id, new Date().toISOString(), reason, clean(comment) || null, [2, 3, 4].includes(notice) ? notice : 1, show.length ? JSON.stringify(show) : null).run();
   const t = await d.prepare('SELECT number FROM chat_ticket WHERE log_id = ?1').bind(id).first(); return { number: ticketNo(t.number), already: !(r.meta && r.meta.changes) };
 }
 export async function tidy(env) {
