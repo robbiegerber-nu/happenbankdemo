@@ -36,5 +36,8 @@
  "Q47": ["trend", {"metric": "sl_phone", "from": "2025-10", "to": "2026-10"}, ["months.0.raw", "months.1.raw", "months.2.raw", "months.3.raw", "months.4.raw", "months.5.raw", "months.6.raw", "months.7.raw", "months.8.raw", "months.9.raw", "months.10.raw", "months.11.raw", "months.12.raw"], {"months.12.status": "On target"}],
  "Q48": ["trend", {"metric": "volume", "from": "2025-10", "to": "2026-10"}, ["months.0.raw", "months.1.raw", "months.2.raw", "months.3.raw", "months.4.raw", "months.5.raw", "months.6.raw", "months.7.raw", "months.8.raw", "months.9.raw", "months.10.raw", "months.11.raw", "months.12.raw"]],
  "Q49": ["breakdown", {"metric": "volume", "by": "channel", "from": "2026-10", "chart": true}, ["rows.0.raw", "rows.1.raw", "rows.2.raw", "rows.3.raw", "rows.4.raw"]],
- "Q52": ["trend", {"metric": "csat", "to": "2026-12"}, "error"]
+ "Q52": ["trend", {"metric": "csat", "to": "2026-12"}, "error"],
+ "Q53": ["describe_personas", {}, ["personas.0.name", "personas.0.description", "personas.1.name", "personas.1.description", "personas.2.name", "personas.2.description", "personas.3.name", "personas.3.description", "personas.4.name", "personas.4.description", "personas.5.name", "personas.5.description", "personas.6.name", "personas.6.description", "personas.7.name", "personas.7.description"]],
+ "Q54": ["describe_personas", {"persona": "Retiree Traditionalist"}, ["personas.0.description", "personas.0.preferred_channel", "personas.0.digital_comfort", "personas.0.price_sensitivity", "personas.0.typical_ages"], {"source.link": "personas.html?p=6"}],
+ "Q55": ["breakdown", {"metric": "volume", "by": "channel", "from": "2026-10", "filters": {"persona": "Small Business Owner"}}, ["rows.0.name", "rows.0.count"]]
 }

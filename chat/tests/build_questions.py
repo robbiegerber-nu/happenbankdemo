@@ -106,6 +106,14 @@ q('decline', 'Draw a chart of service level by agent.', 'coaching', note='No ind
 q('not_in_data', 'Show a pie chart of contacts by hour of day.', 'service', note='No hourly data and no pie charts here; offer a bar chart that exists or the Service & access dashboard.')
 q('decline', 'Extend the satisfaction trend to December 2026.', 'cx', note='No forecasting. May show the trend to October 2026.')
 
+# ---------- Personas: definitions kept apart from results ----------
+q('answer', 'Can you give me descriptions of the personas?', 'personas', "SELECT persona_name, description FROM cc.dim_persona ORDER BY persona_id", note='All eight, as definitions and not results. No trait added.', labels=[x for i in range(1, 9) for x in (f'name {i}', f'description {i}')])
+q('answer', 'Tell me about the Retiree Traditionalist persona.', 'personas', "SELECT description, preferred_channel, digital_affinity, price_sensitivity, typical_age_band FROM cc.dim_persona WHERE persona_name = 'Retiree Traditionalist'", tol=0, note='As a definition. The profile link opens that persona.', labels=['description', 'preferred channel', 'digital comfort', 'price sensitivity', 'typical ages'])
+q('answer', 'Do Small Business Owners really use their preferred channel? Check October 2026.', 'personas', f"SELECT ch.channel_name, count(*) FROM {C} JOIN cc.customer u USING (customer_id) JOIN cc.dim_persona p USING (persona_id) JOIN cc.dim_channel ch ON ch.channel_id = c.channel_id WHERE p.persona_name = 'Small Business Owner' AND {month('2026-10')} GROUP BY 1 ORDER BY 2 DESC LIMIT 1", 'contacts', 0.5, 'Preferred channel is email (definition); the measured top channel is given separately. No reason for the difference.', labels=['top channel', 'contacts'])
+q('not_in_data', 'What is the average income of each persona?', 'personas', note='Not available to the chat. Must not say the data does not include it (the customer table has income). Offer the profiles or a KPI by persona.')
+q('clarify', 'Are Digital Native Starters less satisfied because they have little patience for app problems?', 'personas', note='Cause: a profile cannot explain a result. May give their satisfaction against other personas, with no cause.')
+q('not_in_data', 'How is the Mass Affluent segment defined?', 'personas', note='Only the segment names are recorded. Must not invent a definition.')
+
 
 out, rows = [], []
 for n, x in enumerate(Q, 1):

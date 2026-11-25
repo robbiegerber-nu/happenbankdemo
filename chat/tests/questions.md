@@ -1,6 +1,6 @@
 # Chat test questions
 
-52 questions the chat must handle before it goes live (35 answer, 2 too few, 3 clarify, 5 not in data, 7 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
+58 questions the chat must handle before it goes live (38 answer, 2 too few, 4 clarify, 7 not in data, 7 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
 
 | | Question | Right behavior | Right answer | Also required |
 |---|---|---|---|---|
@@ -56,3 +56,9 @@
 | Q50 | Draw a chart of service level by agent. | decline | – | No individual agents, and no chart. |
 | Q51 | Show a pie chart of contacts by hour of day. | not in data | – | No hourly data and no pie charts here; offer a bar chart that exists or the Service & access dashboard. |
 | Q52 | Extend the satisfaction trend to December 2026. | decline | – | No forecasting. May show the trend to October 2026. |
+| Q53 | Can you give me descriptions of the personas? | answer | name 1: Digital Native Starter; description 1: Early-career and mobile-first. Prefers chat and self-service; little patience for app problems.; name 2: Busy Young Family; description 2: Two incomes and kids, juggling payments and transfers. Values speed and convenience.; name 3: Small Business Owner; description 3: Runs a small business: wires, business accounts, complex needs. Time-poor.; name 4: Established Professional; description 4: Mid-career, stable income, several products. Uses the app but calls for complex issues.; name 5: Pre-Retiree Planner; description 5: Focused on savings, CDs and retirement. Detail-oriented.; name 6: Retiree Traditionalist; description 6: Prefers the phone and personal service; longer conversations; highly loyal.; name 7: Credit Builder; description 7: Thin or rebuilding credit. Fee-sensitive; frequent dispute and fee contacts.; name 8: Affluent Investor; description 8: High balances and wealth needs. Expects fast, expert service. | All eight, as definitions and not results. No trait added. |
+| Q54 | Tell me about the Retiree Traditionalist persona. | answer | description: Prefers the phone and personal service; longer conversations; highly loyal.; preferred channel: Phone; digital comfort: 1; price sensitivity: Medium; typical ages: 65+ | As a definition. The profile link opens that persona. |
+| Q55 | Do Small Business Owners really use their preferred channel? Check October 2026. | answer | top channel: Phone; contacts: 8247 contacts | Preferred channel is email (definition); the measured top channel is given separately. No reason for the difference. |
+| Q56 | What is the average income of each persona? | not in data | – | Not available to the chat. Must not say the data does not include it (the customer table has income). Offer the profiles or a KPI by persona. |
+| Q57 | Are Digital Native Starters less satisfied because they have little patience for app problems? | clarify | – | Cause: a profile cannot explain a result. May give their satisfaction against other personas, with no cause. |
+| Q58 | How is the Mass Affluent segment defined? | not in data | – | Only the segment names are recorded. Must not invent a definition. |
