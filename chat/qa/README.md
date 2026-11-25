@@ -1,6 +1,6 @@
 # Checking the chat's answers
 
-Copies the question log to Postgres, works out each figure again from the source tables, and compares. Needs the Cloudflare sign-in and the `happen_demo` database.
+Copies the question log and readers' reports to Postgres, works out each figure again from the source tables, and compares. Needs the Cloudflare sign-in and the `happen_demo` database.
 
 ```powershell
 node chat/qa/sync_log.mjs
@@ -36,5 +36,19 @@ Not compared: the events listed beside a result, which come from `events.json`, 
 **A match means the figures the chat was given are right for what it asked for.** A person still has to judge whether it asked for the right thing and worded the answer fairly. Figures in the answer that weren't in the results are flagged separately (`unchecked`).
 
 The SQL comes from fixed templates in [`verify.mjs`](verify.mjs) and never reads the `dash` tables behind the dashboards. It shares their rounding and target rules (`docs/assets/site.js`, `kpis.json`). Tests: `node chat/tests/verify.mjs`.
+
+## Readers' reports
+
+`sync_log.mjs` also copies reports (tickets). Review them with:
+
+```powershell
+node chat/qa/ticket.mjs
+```
+
+Add a number to see one (`node chat/qa/ticket.mjs 1`), then `--status` and `--finding` to record your decision. `--issue` **previews** a public GitHub issue; it is only created with `--publish`. `--close "..."` previews closing it. The issue never holds the question, the answer or the reader's comment.
+
+`daily_check.ps1` copies, checks and shows a message when there is something to review. `-Install` runs it every day.
+
+## Notes
 
 If data was corrected after a question was asked, a difference may be the correction. The dates are in `qa.v_chat_check`.

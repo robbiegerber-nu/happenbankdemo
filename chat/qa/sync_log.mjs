@@ -29,5 +29,13 @@ for (let last = ''; ;) {
     WHERE t.updated_at <= excluded.updated_at;`);
   got += rows.length; last = rows[rows.length - 1].id; if (!/^[0-9a-f-]{36}$/.test(last)) stop('An unexpected id was found in the log.');
 }
+// readers' reports; your own review notes are never overwritten
+if (cloud("SELECT name FROM sqlite_master WHERE name = 'chat_ticket'").length) for (let last = 0; ;) {
+  const rows = cloud(`SELECT * FROM chat_ticket WHERE number > ${last} ORDER BY number LIMIT 100`); if (!rows.length) break;
+  psql(`INSERT INTO qa.chat_ticket (number, log_id, created_at, reason, comment) SELECT x.number, x.log_id, x.created_at, x.reason, x.comment
+    FROM json_to_recordset(convert_from(decode('${Buffer.from(JSON.stringify(rows)).toString('base64')}', 'base64'), 'UTF8')::json) AS x(number int, log_id uuid, created_at timestamptz, reason text, comment text) JOIN qa.chat_log l ON l.id = x.log_id
+    ON CONFLICT DO NOTHING;`);
+  last = Number(rows[rows.length - 1].number); if (!Number.isInteger(last)) stop('An unexpected ticket number was found.');
+}
 const added = +psql('SELECT count(*) FROM qa.chat_log') - before, gone = +psql(`WITH d AS (DELETE FROM qa.chat_log WHERE asked_at < now() - interval '${KEEP_DAYS} days' RETURNING 1) SELECT count(*) FROM d`);
-console.log(`${got} read, ${added} new, ${gone} older than ${KEEP_DAYS} days deleted. See qa.v_chat_log and qa.v_chat_call in pgAdmin.`);
+console.log(`${got} read, ${added} new, ${gone} older than ${KEEP_DAYS} days deleted. ${psql("SELECT count(*) FROM qa.chat_ticket WHERE status = 'new'")} new tickets. See qa.v_chat_log, qa.v_chat_call and qa.v_chat_ticket in pgAdmin.`);

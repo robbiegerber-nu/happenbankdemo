@@ -21,6 +21,9 @@
     "KEEP_MINUTES": "30",
     "PASS_HOURS": "12",
     "KEEP_LOG_DAYS": "80",
+    "COMMENT_CHARS": "1000",
+    "VISITOR_REPORTS_PER_DAY": "10",
+    "REPORTS_PER_DAY": "30",
     "LOGIN_TRIES_PER_HOUR": "10"
   }
   // Secrets, set with "wrangler secret put" and never kept in a file here: ANTHROPIC_API_KEY, ACCESS_CODE, SESSION_SECRET

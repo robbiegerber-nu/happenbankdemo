@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'; import fs from 'node:fs'; import
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'), PSQL = 'C:\\Program Files\\PostgreSQL\\18\\bin\\psql.exe';
 const box = vm.createContext({ window: {}, document: { documentElement: {}, addEventListener() {} }, localStorage: { getItem() { return null; } }, matchMedia: () => ({ matches: false, addEventListener() {} }) }); box.window = box;
 vm.runInContext(fs.readFileSync(path.join(root, 'docs/assets/site.js'), 'utf8'), box); export const Site = box.Site;
-const kj = JSON.parse(fs.readFileSync(path.join(root, 'docs/data/dashboards/kpis.json'), 'utf8')), KPI = Object.fromEntries([...kj.kpis, ...kj.extra].map((k) => [k.id, k]));
+const kj = JSON.parse(fs.readFileSync(path.join(root, 'docs/data/dashboards/kpis.json'), 'utf8')); export const KPI = Object.fromEntries([...kj.kpis, ...kj.extra].map((k) => [k.id, k]));
 
 // ---------- The database ----------
 export function psql(sql, readOnly = false) {

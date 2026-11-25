@@ -66,12 +66,35 @@ SELECT left(l.id::text, 8) AS reference, l.asked_at AT TIME ZONE 'America/Chicag
 FROM qa.chat_check k JOIN qa.chat_log l ON l.id = k.log_id LEFT JOIN LATERAL (SELECT l.calls -> (k.request - 1) AS value) c ON true
 ORDER BY l.asked_at DESC, k.request;
 
+-- ---------- Readers' reports (ticket.mjs) ----------
+CREATE TABLE IF NOT EXISTS qa.chat_ticket (
+  number      int PRIMARY KEY,
+  log_id      uuid NOT NULL UNIQUE REFERENCES qa.chat_log (id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL,
+  reason      text NOT NULL,
+  comment     text,
+  status      text NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'confirmed', 'no_problem', 'more_info', 'duplicate', 'closed')),
+  finding     text,
+  issue       int,
+  reviewed_at timestamptz
+);
+COMMENT ON TABLE  qa.chat_ticket IS 'One row per reported answer. Deleted with the question after 90 days; a GitHub issue stays.';
+COMMENT ON COLUMN qa.chat_ticket.reason IS 'wrong, no_answer, more_info or other.';
+COMMENT ON COLUMN qa.chat_ticket.finding IS 'Your own words. Published if you create a GitHub issue.';
+
 -- one row per question, with what a person still needs to look at
 CREATE OR REPLACE VIEW qa.v_chat_verdict AS
 SELECT left(l.id::text, 8) AS reference, l.asked_at AT TIME ZONE 'America/Chicago' AS asked_central, l.status, l.label, l.question, l.answer,
        CASE WHEN count(k.*) = 0 THEN 'not checked yet' WHEN bool_or(k.verdict = 'mismatch') THEN 'mismatch' WHEN bool_or(k.verdict = 'error') THEN 'error' WHEN bool_or(k.verdict = 'not finished') THEN 'not finished'
             WHEN bool_or(k.verdict = 'not covered') AND bool_or(k.verdict = 'match') THEN 'match, partly covered' WHEN bool_or(k.verdict = 'not covered') THEN 'not covered' WHEN bool_or(k.verdict = 'match') THEN 'match' ELSE 'no figure' END AS verdict,
        sum(k.agreed) AS agreed, sum(k.differed) AS differed,
-       CASE WHEN l.status <> 'answered' THEN 'Not answered: read it' WHEN bool_or(k.verdict IN ('mismatch', 'error')) THEN 'Figure differs: investigate' WHEN l.label = 'Check the figures' THEN 'Figure in the answer not in the results: ' || coalesce(l.unchecked, '')
+       CASE WHEN EXISTS (SELECT 1 FROM qa.chat_ticket t WHERE t.log_id = l.id AND t.status <> 'closed') THEN 'Reported by a reader: review the ticket' WHEN l.status <> 'answered' THEN 'Not answered: read it' WHEN bool_or(k.verdict IN ('mismatch', 'error')) THEN 'Figure differs: investigate' WHEN l.label = 'Check the figures' THEN 'Figure in the answer not in the results: ' || coalesce(l.unchecked, '')
             WHEN bool_or(k.verdict = 'match') AND NOT bool_or(k.verdict IN ('not covered', 'not finished')) THEN 'Figures agree: wording only' ELSE 'Read the answer' END AS for_a_person, l.id
 FROM qa.chat_log l LEFT JOIN qa.chat_check k ON k.log_id = l.id GROUP BY l.id ORDER BY l.asked_at DESC;
+
+CREATE OR REPLACE VIEW qa.v_chat_ticket AS
+SELECT t.number, 'QA-' || lpad(t.number::text, 4, '0') AS ticket, t.created_at, t.reason, t.comment, t.status, t.finding, t.issue, v.reference, v.question, v.answer, v.label, v.verdict,
+       (SELECT string_agg(k.differences, E'\n' ORDER BY k.request) FROM qa.v_chat_check k WHERE k.id = t.log_id) AS differences,
+       (SELECT json_agg(json_build_object('request', k.request, 'verdict', k.verdict, 'agreed', k.agreed, 'differed', k.differed) ORDER BY k.request) FROM qa.chat_check k WHERE k.log_id = t.log_id) AS checks,
+       t.reviewed_at, t.log_id
+FROM qa.chat_ticket t JOIN qa.v_chat_verdict v ON v.id = t.log_id ORDER BY t.number DESC;

@@ -3,11 +3,11 @@
    - holds the instructions, tools, model and limits, so it cannot be used as a general AI
    - keeps each conversation for 30 minutes, then deletes it; visitors send only their question and tool results
    - counts questions and spending, and stops at the limits
-   - keeps a log of questions and answers for quality checks (log.js), with nothing that identifies a visitor
+   - keeps a log of questions, answers and readers' reports for quality checks (log.js), with nothing that identifies a visitor
    Nothing about questions or visitors goes to Cloudflare's own logs. Secrets: ANTHROPIC_API_KEY, ACCESS_CODE, SESSION_SECRET. */
 import { DurableObject } from 'cloudflare:workers';
 import { askClaude, costOf, textOf, MAX_COST } from './claude.js';
-import { about, record, tidy } from './log.js';
+import { about, fileTicket, REASONS, record, tidy } from './log.js';
 
 const J = (data, status = 200, headers = {}) => new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers } });
 const no = (code, message, status = 400) => ({ status, body: { error: code, message } });
@@ -65,6 +65,14 @@ async function route(path, body, req, env) {
     if (!/^[0-9a-f-]{36}$/.test(body.conversation || '')) return no('conversation', 'That conversation is not valid.');
     const r = await env.CONVERSATION.get(env.CONVERSATION.idFromName(body.conversation)).tools(pass.s, body.results); if (r.status === 200) r.body.conversation = body.conversation; return r;
   }
+  // a report about a logged answer: the ticket key was given with that answer, so nobody can report one they never saw
+  if (path === '/report') {
+    const m = /^([0-9a-f-]{36})\.([0-9a-f]{64})$/.exec(body.ticket || ''); if (!m || !same(m[2], await mac(env.SESSION_SECRET, 'report|' + m[1]))) return no('ticket', 'That answer could not be found.');
+    if (!REASONS.includes(body.reason)) return no('reason', 'Please choose a reason.'); const comment = typeof body.comment === 'string' ? body.comment.trim() : ''; if (comment.length > num(env, 'COMMENT_CHARS')) return no('long', `Please keep comments to ${env.COMMENT_CHARS} characters.`);
+    if (!(await ledger.takeReport(who, num(env, 'VISITOR_REPORTS_PER_DAY'), num(env, 'REPORTS_PER_DAY')))) return no('reports', 'The limit for reports today has been reached. Please try again tomorrow.', 429);
+    let t; try { t = await fileTicket(env, m[1], body.reason, comment); } catch (e) { console.error('ticket error', e && e.name); return no('save', 'Your report could not be saved. Please try again.', 500); }
+    return t ? { status: 200, body: t } : no('gone', 'That answer is no longer kept, so it cannot be reported.', 410);
+  }
   return no('path', 'Not found.', 404);
 }
 
@@ -88,7 +96,7 @@ export class Conversation extends DurableObject {
     c.rounds = 0; c.asked++;
     const block = { type: 'text', text: q }, undo = JSON.stringify(c.messages);
     if (last && last.role === 'user') c.messages = [...c.messages.slice(0, -1), { role: 'user', content: [...last.content, block] }]; else c.messages.push({ role: 'user', content: [block] });
-    c.trace = seen ? { id: crypto.randomUUID(), group: id.slice(0, 8), at: Date.now(), question: q, about: seen, from: c.messages.length - 1, usd: 0 } : null; await record(this.env, c.trace, c, 'asked', null);
+    c.trace = seen ? { id: crypto.randomUUID(), group: id.slice(0, 8), at: Date.now(), question: q, about: seen, from: c.messages.length - 1, usd: 0 } : null; if (c.trace) c.trace.key = await mac(this.env.SESSION_SECRET, 'report|' + c.trace.id); await record(this.env, c.trace, c, 'asked', null);
     return this.turn(c, undo);
   }
   async tools(owner, results) {
@@ -102,11 +110,12 @@ export class Conversation extends DurableObject {
   }
   async turn(c, undo) {
     // the reference lets a reader point to this answer; it is only given when the question was logged
-    const answered = (text) => ({ status: 200, body: { type: 'answer', text, left: num(this.env, 'QUESTIONS_PER_CONVERSATION') - c.asked, ...(c.trace && this.env.LOG ? { ref: c.trace.id.slice(0, 8) } : {}) } });
-    const env = this.env, ledger = env.LEDGER.get(env.LEDGER.idFromName('main')), reserved = await ledger.reserve(MAX_COST, num(env, 'MONTHLY_USD')); if (!reserved) { await record(env, c.trace, c, 'limit', null); c.messages = JSON.parse(undo); await this.save(c); return no('spend', 'The chat has reached its limit for this month.', 429); }
+    const tag = c.trace && this.env.LOG ? { ref: c.trace.id.slice(0, 8), ticket: `${c.trace.id}.${c.trace.key}` } : {}, failed = (r) => { Object.assign(r.body, tag); return r; };
+    const answered = (text) => ({ status: 200, body: { type: 'answer', text, left: num(this.env, 'QUESTIONS_PER_CONVERSATION') - c.asked, ...tag } });
+    const env = this.env, ledger = env.LEDGER.get(env.LEDGER.idFromName('main')), reserved = await ledger.reserve(MAX_COST, num(env, 'MONTHLY_USD')); if (!reserved) { await record(env, c.trace, c, 'limit', null); c.messages = JSON.parse(undo); await this.save(c); return failed(no('spend', 'The chat has reached its limit for this month.', 429)); }
     c.busy = Date.now() + 9e4; await this.save(c); let msg, cost = MAX_COST;
     try { msg = await askClaude(env, c.messages, c.rounds < num(env, 'TOOL_ROUNDS')); cost = costOf(msg); if (env.ALLOWED_ORIGINS.startsWith('http://localhost')) console.error('usage', JSON.stringify({ stop: msg.stop_reason, model: msg.model, in: msg.usage.input_tokens, out: msg.usage.output_tokens, cw: msg.usage.cache_creation_input_tokens, cr: msg.usage.cache_read_input_tokens, usd: +cost.toFixed(4) })); }
-    catch (e) { console.error('claude error', e && e.name, e && e.status); if (e && e.status >= 400 && e.status !== 408) cost = 0; if (c.trace) c.trace.usd += cost; await record(env, c.trace, c, 'ai_error', null); c.messages = JSON.parse(undo); c.busy = 0; await this.save(c); await ledger.settle(MAX_COST, cost); return no(e && e.status === 429 ? 'ai_busy' : 'ai', 'The AI could not answer just now. Please try again.', 502); }
+    catch (e) { console.error('claude error', e && e.name, e && e.status); if (e && e.status >= 400 && e.status !== 408) cost = 0; if (c.trace) c.trace.usd += cost; await record(env, c.trace, c, 'ai_error', null); c.messages = JSON.parse(undo); c.busy = 0; await this.save(c); await ledger.settle(MAX_COST, cost); return failed(no(e && e.status === 429 ? 'ai_busy' : 'ai', 'The AI could not answer just now. Please try again.', 502)); }
     await ledger.settle(MAX_COST, cost); if (c.trace) { c.trace.usd += cost; c.trace.model = msg.model; }
     const calls = msg.content.filter((b) => b.type === 'tool_use');
     c.busy = 0;
@@ -123,6 +132,7 @@ export class Ledger extends DurableObject {
   async month() { const m = (await this.ctx.storage.get('month')) || {}, on = today().slice(0, 7); return m.on === on ? m : { on, spent: 0, held: {} }; }
   heldNow(m) { for (const k in m.held) if (m.held[k].until < Date.now()) { m.spent += m.held[k].usd; delete m.held[k]; } return Object.values(m.held).reduce((s, h) => s + h.usd, 0); }
   async attempt(who, max) { const d = await this.day(), hour = new Date().getUTCHours(), t = d.tries[who] && d.tries[who].h === hour ? d.tries[who] : { h: hour, n: 0 }; t.n++; d.tries[who] = t; await this.ctx.storage.put('day', d); return t.n <= max; }
+  async takeReport(who, perVisitor, perDay) { const d = await this.day(); d.rep = d.rep || { all: 0, who: {} }; if (d.rep.all >= perDay || (d.rep.who[who] || 0) >= perVisitor) return false; d.rep.all++; d.rep.who[who] = (d.rep.who[who] || 0) + 1; await this.ctx.storage.put('day', d); return true; }
   async takeQuestion(who, perVisitor, perDay, usd) {
     const d = await this.day(), m = await this.month(); if (m.spent + this.heldNow(m) >= usd) return no('spend', 'The chat has reached its limit for this month.', 429);
     if (d.all >= perDay) return no('day', 'The chat has reached its limit for today. Please try again tomorrow.', 429);
