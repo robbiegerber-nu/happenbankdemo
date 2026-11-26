@@ -114,6 +114,11 @@ q('not_in_data', 'What is the average income of each persona?', 'personas', note
 q('clarify', 'Are Digital Native Starters less satisfied because they have little patience for app problems?', 'personas', note='Cause: a profile cannot explain a result. May give their satisfaction against other personas, with no cause.')
 q('not_in_data', 'How is the Mass Affluent segment defined?', 'personas', note='Only the segment names are recorded. Must not invent a definition.')
 
+# ---------- Launches: service level, comparing, and one that does not exist ----------
+q('answer', 'What happened to service level after the Mobile App Re-platform launch for the contact reasons it affected?', 'launch', f"SELECT round(100.0 * count(*) FILTER (WHERE c.met_service_level AND d.full_date >= '2026-02-09') / count(*) FILTER (WHERE {EL} AND d.full_date >= '2026-02-09'), 1), round(100.0 * count(*) FILTER (WHERE c.met_service_level AND d.full_date < '2026-02-09') / count(*) FILTER (WHERE {EL} AND d.full_date < '2026-02-09'), 1) FROM {C} JOIN cc.dim_date d USING (date_key) JOIN cc.launch_reason_impact i ON i.reason_id = c.reason_id AND i.launch_id = 12 WHERE d.full_date BETWEEN '2025-12-15' AND '2026-01-25' OR d.full_date BETWEEN '2026-02-09' AND '2026-03-08'", '%', labels=['weeks 0–3', 'baseline'], note='All channels together, so no target. No cause claimed.')
+q('clarify', 'What product launch in 2026 had the biggest impact on service level?', 'launch', note='Compares the five 2026 launches, before and after, saying which changes are beyond chance. Biggest change after a launch, never the cause. Points to the Product launch impact dashboard.')
+q('not_in_data', 'How did the student checking account launch do?', 'launch', note='There is no such launch. Says so and lists launches that exist. Must not invent one.')
+
 
 out, rows = [], []
 for n, x in enumerate(Q, 1):

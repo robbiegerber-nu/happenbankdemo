@@ -1120,5 +1120,47 @@
   "tolerance": 0.05,
   "must": "Only the segment names are recorded. Must not invent a definition.",
   "sql": null
+ },
+ {
+  "id": "Q59",
+  "kind": "answer",
+  "question": "What happened to service level after the Mobile App Re-platform launch for the contact reasons it affected?",
+  "dashboard": "launch",
+  "expected": [
+   {
+    "label": "weeks 0–3",
+    "value": 61.6
+   },
+   {
+    "label": "baseline",
+    "value": 78.1
+   }
+  ],
+  "unit": "%",
+  "tolerance": 0.05,
+  "must": "All channels together, so no target. No cause claimed.",
+  "sql": "SELECT round(100.0 * count(*) FILTER (WHERE c.met_service_level AND d.full_date >= '2026-02-09') / count(*) FILTER (WHERE (c.answered OR (c.abandoned AND NOT c.short_abandon)) AND d.full_date >= '2026-02-09'), 1), round(100.0 * count(*) FILTER (WHERE c.met_service_level AND d.full_date < '2026-02-09') / count(*) FILTER (WHERE (c.answered OR (c.abandoned AND NOT c.short_abandon)) AND d.full_date < '2026-02-09'), 1) FROM cc.contact c JOIN cc.dim_date d USING (date_key) JOIN cc.launch_reason_impact i ON i.reason_id = c.reason_id AND i.launch_id = 12 WHERE d.full_date BETWEEN '2025-12-15' AND '2026-01-25' OR d.full_date BETWEEN '2026-02-09' AND '2026-03-08'"
+ },
+ {
+  "id": "Q60",
+  "kind": "clarify",
+  "question": "What product launch in 2026 had the biggest impact on service level?",
+  "dashboard": "launch",
+  "expected": [],
+  "unit": "",
+  "tolerance": 0.05,
+  "must": "Compares the five 2026 launches, before and after, saying which changes are beyond chance. Biggest change after a launch, never the cause. Points to the Product launch impact dashboard.",
+  "sql": null
+ },
+ {
+  "id": "Q61",
+  "kind": "not_in_data",
+  "question": "How did the student checking account launch do?",
+  "dashboard": "launch",
+  "expected": [],
+  "unit": "",
+  "tolerance": 0.05,
+  "must": "There is no such launch. Says so and lists launches that exist. Must not invent one.",
+  "sql": null
  }
 ]

@@ -126,7 +126,8 @@ days AS (
 )`;
 const launchPart = `count(*) AS contacts, count(*) FILTER (WHERE c.answered) AS answered, coalesce(sum(c.handle_sec) FILTER (WHERE c.answered), 0) AS handle_sec,
        count(*) FILTER (WHERE c.answered AND c.first_contact_resolved) AS resolved, count(c.customer_id) AS identified,
-       count(*) FILTER (WHERE c.customer_id IS NOT NULL AND c.repeat_within_7d) AS repeated, count(v.survey_id) AS surveys, count(*) FILTER (WHERE v.csat >= 4) AS satisfied`;
+       count(*) FILTER (WHERE c.customer_id IS NOT NULL AND c.repeat_within_7d) AS repeated, count(v.survey_id) AS surveys, count(*) FILTER (WHERE v.csat >= 4) AS satisfied,
+       count(*) FILTER (WHERE c.met_service_level) AS met, count(*) FILTER (WHERE c.answered OR (c.abandoned AND NOT c.short_abandon)) AS eligible`;
 const launchFrom = `FROM cc.contact c JOIN days USING (date_key) LEFT JOIN cc.survey_response v USING (contact_id)
 WHERE (c.reason_id IN (SELECT reason_id FROM affected) OR c.reason_id NOT IN (SELECT reason_id FROM touched))`, side = `CASE WHEN c.reason_id IN (SELECT reason_id FROM affected) THEN 'affected' ELSE 'other' END`;
 export const launchInfoSql = (name) => `WITH ${launchCte(name)}
@@ -145,11 +146,14 @@ x AS (
     AND (days.week BETWEEN -8 AND -3 OR days.week BETWEEN 0 AND 3)
   GROUP BY 1, 2
 )
-SELECT x.*, handle_sec::numeric / nullif(answered, 0) AS aht, resolved::numeric / nullif(answered, 0) * 100 AS fcr, satisfied::numeric / nullif(surveys, 0) * 100 AS csat, repeated::numeric / nullif(identified, 0) * 100 AS repeat
+SELECT x.*, handle_sec::numeric / nullif(answered, 0) AS aht, resolved::numeric / nullif(answered, 0) * 100 AS fcr, satisfied::numeric / nullif(surveys, 0) * 100 AS csat, repeated::numeric / nullif(identified, 0) * 100 AS repeat,
+       met::numeric / nullif(eligible, 0) * 100 AS sl
 FROM x ORDER BY 1, 2`;
 
 // What the weekly counts say. Written separately from docs/assets/launch.js.
-const LR = { aht: ['handle_sec', 'answered', 1], fcr: ['resolved', 'answered', 100], csat: ['satisfied', 'surveys', 100], repeat: ['repeated', 'identified', 100] };
+const LR = { aht: ['handle_sec', 'answered', 1], fcr: ['resolved', 'answered', 100], csat: ['satisfied', 'surveys', 100], repeat: ['repeated', 'identified', 100], sl: ['met', 'eligible', 100] };
+// as on the launch page: all channels together, no target
+const LAUNCH_SL = { name: 'Service level, all channels', format: 'pct', better: 'higher', minN: 50 };
 function launchVolume(weeks) {
   const at = (s, w) => { const r = weeks.find((x) => x.reasons === s && x.week === w); return r ? +r.contacts : 0; }, has = [...new Set(weeks.filter((x) => x.reasons === 'affected').map((x) => x.week))].sort((a, b) => a - b), base = has.filter((w) => w >= -8 && w <= -3), mean = (s) => base.reduce((t, w) => t + at(s, w), 0) / base.length;
   const A = mean('affected'), O = mean('other'), expected = (w) => A * (O > 0 ? at('other', w) / O : 1), gap = base.map((w) => at('affected', w) / expected(w) - 1), sd = Math.max(Math.sqrt(gap.reduce((t, x) => t + x * x, 0) / (gap.length - 1)), 1 / Math.sqrt(A));
@@ -194,9 +198,9 @@ export function verifyCall(call) {
     const wk = ask('Week by week', launchWeekSql(info.launch_name)), rt = ask('Weeks 0-3 against the baseline', launchRateSql(info.launch_name)), v = launchVolume(wk), one = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(1) + '%', whole = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + Site.fmt.count(Math.abs(n)), c = r.contacts;
     same('extra contacts', c.extra_first_weeks, whole(v.extra)); same('against expected', c.against_expected, one(v.pct)); same('weeks counted', c.weeks_counted, v.weeks); same('peak', c.peak, `${one(v.peak)} in week ${v.peakWeek}`); same('back to normal', c.back_to_normal, !v.any ? 'never above the normal range' : v.back != null ? `week ${v.back}` : `not for two weeks in a row by week ${v.last}`);
     const row = (s, p) => rt.find((x) => x.reasons === s && x.period === p) || {}, A = row('affected', 'weeks 0-3'), B = row('affected', 'baseline'), P = row('other', 'weeks 0-3'), Q = row('other', 'baseline');
-    same('measures given', Object.keys(r.changes).sort().join(', '), Object.keys(LR).filter((m) => A[m] != null && B[m] != null).sort().join(', '));
+    same('measures given', Object.keys(r.changes).sort().join(', '), Object.keys(LR).filter((m) => A[m] != null && B[m] != null && (m !== 'sl' || r.service_level_is !== undefined)).sort().join(', '));
     for (const [m, s] of Object.entries(r.changes)) {
-      const kp = KPI[m], [, d, sc] = LR[m] || []; if (!d) { add(m, s.value, 'no such measure', false); continue; } const a = +A[m], b = +B[m], ch = Site.fmt.change(a, b, kp.format), vr = (p, n) => (n ? (p / sc) * (1 - p / sc) / n : 0);
+      const kp = m === 'sl' ? LAUNCH_SL : KPI[m], [, d, sc] = LR[m] || []; if (!d) { add(m, s.value, 'no such measure', false); continue; } const a = +A[m], b = +B[m], ch = Site.fmt.change(a, b, kp.format), vr = (p, n) => (n ? (p / sc) * (1 - p / sc) / n : 0);
       const sure = m === 'aht' ? Math.abs(a - b) >= 3 * Math.max(launchSpread(wk, 'aht') / Math.sqrt(v.weeks), 1e-9) : Math.abs(a - b) / sc >= 3 * Math.sqrt(vr(a, +A[d]) + vr(b, +B[d])), other = P[m] == null || Q[m] == null ? null : Site.fmt.change(b + (P[m] - Q[m]), b, kp.format);
       same(m + ', name', s.metric, kp.name); add(m, s.raw, a, near(s.raw, a, kp.format)); same(m + ', as shown', s.value, Site.fmt.value(a, kp.format, true)); add(m + ', baseline', s.raw_baseline, b, near(s.raw_baseline, b, kp.format)); same(m + ', baseline as shown', s.baseline, Site.fmt.value(b, kp.format, true)); same(m + ', change', s.change, ch.flat ? 'no change' : ch.text); same(m + ', too few', s.too_few, +A[d] < kp.minN);
       same(m + ', reading', s.reading, sure ? 'beyond chance' : 'within chance, so it can’t be told apart from no change'); same(m + ', other reasons', s.other_reasons_changed, other == null ? null : other.flat ? 'no change' : other.text);

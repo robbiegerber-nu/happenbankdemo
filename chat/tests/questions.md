@@ -1,6 +1,6 @@
 # Chat test questions
 
-58 questions the chat must handle before it goes live (38 answer, 2 too few, 4 clarify, 7 not in data, 7 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
+61 questions the chat must handle before it goes live (39 answer, 2 too few, 5 clarify, 8 not in data, 7 decline). Answers are worked out from the database by `build_questions.py`, separately from the dashboards.
 
 | | Question | Right behavior | Right answer | Also required |
 |---|---|---|---|---|
@@ -62,3 +62,6 @@
 | Q56 | What is the average income of each persona? | not in data | – | Not available to the chat. Must not say the data does not include it (the customer table has income). Offer the profiles or a KPI by persona. |
 | Q57 | Are Digital Native Starters less satisfied because they have little patience for app problems? | clarify | – | Cause: a profile cannot explain a result. May give their satisfaction against other personas, with no cause. |
 | Q58 | How is the Mass Affluent segment defined? | not in data | – | Only the segment names are recorded. Must not invent a definition. |
+| Q59 | What happened to service level after the Mobile App Re-platform launch for the contact reasons it affected? | answer | weeks 0–3: 61.6; baseline: 78.1 % | All channels together, so no target. No cause claimed. |
+| Q60 | What product launch in 2026 had the biggest impact on service level? | clarify | – | Compares the five 2026 launches, before and after, saying which changes are beyond chance. Biggest change after a launch, never the cause. Points to the Product launch impact dashboard. |
+| Q61 | How did the student checking account launch do? | not in data | – | There is no such launch. Says so and lists launches that exist. Must not invent one. |
