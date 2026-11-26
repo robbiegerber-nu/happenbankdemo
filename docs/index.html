@@ -142,7 +142,7 @@ if ([...new URLSearchParams(location.search).keys()].some((k) => /^(run|tab|rang
     <div class="body"><h3><a class="go" href="${f}.html">${esc(name)}</a></h3><p class="q">${esc(q)}</p><p class="d">${esc(d)}</p>
       <p class="inc" id="i-${f}">${label}</p><ul class="links" aria-labelledby="i-${f}">${links.map(metric(f)).join('')}</ul>
       <p class="open" aria-hidden="true">Open ${f === 'chat' ? name : 'dashboard'} →</p></div>
-    <div class="shot"><img src="${IMG}${f}.jpg?v=2.1" alt="" width="1120" height="664"${f === 'executive' || f === 'chat' ? '' : ' loading="lazy"'}></div></article>`;
+    <div class="shot"><img src="${IMG}${f}.jpg?v=2.3" alt="" width="1120" height="664"${f === 'executive' || f === 'chat' ? '' : ' loading="lazy"'}></div></article>`;
   document.getElementById('groups').innerHTML = G.map(([g, sub, cls, items]) => `<section class="group" aria-labelledby="g-${g}"><h2 id="g-${g}">${g}</h2><p>${esc(sub)}</p><div class="cards ${cls}">${items.map(card).join('')}</div></section>`).join('');
 
   // Explanation on hover, keyboard focus or tap. It stays while the pointer is on it; Esc closes it.
