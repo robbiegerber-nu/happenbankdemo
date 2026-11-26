@@ -65,6 +65,7 @@
   .cell-sel { fill: none; stroke: var(--text-primary); stroke-width: 2.5; } .cell-cur { fill: none; stroke: var(--off-ink); stroke-width: 2; }
   .dow { fill: var(--text-secondary); font-size: 12.5px; font-family: var(--font); cursor: pointer; } .dow.sel { font-weight: 700; fill: var(--brand-blue); }
   .gap { fill: var(--off-wash); fill-opacity: .18; }
+  .closed { fill: var(--text-muted); fill-opacity: .12; } .closed-lab { fill: var(--text-muted); font-size: 10.5px; font-family: var(--font); text-anchor: middle; }
   @media (max-width: 767px) {
     .phone-f { display: inline-flex; align-items: center; }
     .ctls { display: none; flex-basis: 100%; flex-direction: column; gap: 8px; }
@@ -152,7 +153,7 @@
     if (p.get('iv') && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
     if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day'); S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.2`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.3`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The service data could not be loaded. ' + e.message; }
@@ -272,10 +273,15 @@
     const m = S.metric, k = kpi(m), host = $('c-day'), map = G(['day'], (b) => b.day);
     const pts = [...map].map(([d, p]) => ({ d, t: ts(d), p, v: SV.value(m, p), low: low(m, p) })).filter((x) => x.v != null).sort((a, b) => a.t - b.t);
     cur.day = pts;
+    // closed: no contacts on the channel at all that day, whatever the other filters
+    const open = new Set([...SV.group(B, tester(['q', 'dow', 'iv', 'day']), (b) => b.day)].filter(([, p]) => p.o > 0).map(([d]) => d)), closed = [];
+    for (let t = W.s; t <= W.e; t += DAY) if (!open.has(iso(t))) closed.push(t);
     $('t-day').textContent = `${k.name} by day, ${chan().name.toLowerCase()}`;
-    $('s-day').textContent = `${k.short}, daily, ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))}${k.target == null ? '' : ' · target ' + k.targetLabel} · the line breaks on closed days`;
+    $('s-day').textContent = `${k.short}, daily, ${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))}${k.target == null ? '' : ' · target ' + k.targetLabel}${closed.length ? ' · gray days are closed, so the line breaks there' : ''}`;
     $('ax-day').hidden = true; host.hidden = $('lg-day').hidden = tblDay; $('tbl-day').hidden = $('csv-day').hidden = !tblDay; $('tb-day').textContent = tblDay ? 'View as chart' : 'View as table'; $('tb-day').setAttribute('aria-pressed', tblDay);
-    if (tblDay) { $('tbl-day').innerHTML = `<table><thead><tr><th scope="col">Day</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">Offered</th><th scope="col">Forecast</th></tr></thead><tbody>${pts.slice().reverse().map((x) => `<tr><td>${DOW[new Date(x.t).getUTCDay()].slice(0, 3)}, ${fmt.date(x.d)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v, true)}</td>${k.target == null ? '' : `<td>${badge(m, x.p)}</td>`}<td>${fmt.count(x.p.o)}</td><td>${fmt.count(x.p.f)}</td></tr>`).join('')}</tbody></table>`; return; }
+    const dayName = (t) => `${DOW[new Date(t).getUTCDay()].slice(0, 3)}, ${fmt.date(iso(t))}`;
+    if (tblDay) { const rows = [...pts.map((x) => ({ t: x.t, h: `<tr><td>${dayName(x.t)}</td><td class="${x.low ? 'low' : ''}">${V(m, x.v, true)}</td>${k.target == null ? '' : `<td>${badge(m, x.p)}</td>`}<td>${fmt.count(x.p.o)}</td><td>${fmt.count(x.p.f)}</td></tr>` })), ...closed.map((t) => ({ t, h: `<tr><td>${dayName(t)}</td><td class="low">Closed</td>${k.target == null ? '' : '<td></td>'}<td>–</td><td>–</td></tr>` }))].sort((p, q) => q.t - p.t);
+      $('tbl-day').innerHTML = `<table><thead><tr><th scope="col">Day</th><th scope="col">${esc(k.name)}</th>${k.target == null ? '' : '<th scope="col">Status</th>'}<th scope="col">Offered</th><th scope="col">Forecast</th></tr></thead><tbody>${rows.map((r) => r.h).join('')}</tbody></table>`; return; }
     host.innerHTML = ''; if (!pts.length) { host.textContent = 'No contacts for these filters.'; $('lg-day').innerHTML = ''; return; }
     const w = host.clientWidth || 800, narrow = w < 560, H = 280, M = { t: 44, r: narrow ? 10 : 92, b: 28, l: 56 }, iw = w - M.l - M.r, ih = H - M.t - M.b, fc = m === 'volume';
     const tg = k.target == null ? [] : [].concat(k.target), wb = k.target == null ? [] : [].concat(k.watch), ok = pts.filter((x) => !x.low), src = ok.length ? ok : pts, vals = [...pts.map((x) => x.v), ...tg, ...wb, ...(fc ? pts.map((x) => x.p.f) : [])];
@@ -283,6 +289,11 @@
     const x = (t) => M.l + (t - W.s + DAY / 2) / (W.e - W.s + DAY) * iw, y = (v) => M.t + (b - v) / (b - a) * ih, step = iw / +S.days;
     const s = el('svg', { viewBox: `0 0 ${w} ${H}`, height: H, role: 'group', 'aria-label': `${k.name} by day. ${scale} Use View as table for values.` }, host), g = el('g', { class: 'g' }, s), ax = el('g', { class: 'ax' }, s);
     for (const t of ticks(a, b, 5, k.format)) { el('line', { x1: M.l, x2: M.l + iw, y1: y(t), y2: y(t) }, g); text(ax, M.l - 8, y(t) + 4, tick(m, t), '', 'end'); }
+    for (const t of closed) {
+      const r = el('rect', { class: 'closed', x: x(t) - step / 2, y: M.t, width: step, height: ih }, s); s.insertBefore(r, g);
+      tip(r, () => `<b>${DOW[new Date(t).getUTCDay()]}, ${fmt.date(iso(t))}</b><br>Closed: no ${chan().name.toLowerCase()} contacts`);
+      if (step >= 36) text(s, x(t), M.t + 12, 'Closed', 'closed-lab');
+    }
     let lx = -99; for (let t = W.s; t <= W.e; t += DAY) { if (+S.days > 7 && new Date(t).getUTCDay() !== 0) continue; if (x(t) - lx < (narrow ? 54 : 48)) continue; text(ax, x(t), H - 8, +S.days > 7 ? fmt.dateShort(iso(t)) : DOW[new Date(t).getUTCDay()].slice(0, 3) + ' ' + new Date(t).getUTCDate(), '', 'middle'); lx = x(t); }
     const marks = [];
     if (events) { let n = 0; for (const e of EV) { const p = ts(e.start), q = ts(e.end); if (q < W.s || p > W.e) continue; n++; const ea = Math.max(M.l, x(p) - step / 2), eb = Math.min(M.l + iw, x(q) + step / 2); if (e.span === 'Period') el('rect', { class: 'evb', x: ea, y: M.t, width: eb - ea, height: ih }, s); else el('line', { class: 'evl', x1: x(p), x2: x(p), y1: M.t, y2: M.t + ih }, s); marks.push([e, n, e.span === 'Period' ? ea : x(p)]); } }
@@ -300,7 +311,7 @@
     arrows(s, '.hit');
     for (const [e, n, ex] of marks) { const q = el('g', { class: 'ev', transform: `translate(${ex},${M.t - 14})`, tabindex: 0, role: 'img', 'aria-label': `${e.name}, ${fmt.date(e.start)}` }, s); el('circle', { r: 12, style: 'fill:transparent;stroke:none' }, q); el('circle', { r: 8 }, q); text(q, 0, 3.5, n); tip(q, () => `<b>${n}. ${esc(e.name)}</b><br>${fmt.date(e.start)}${e.end !== e.start ? ' – ' + fmt.date(e.end) : ''}<br><span class="muted">${esc(e.description)}</span>`); }
     Site.eventKey(host, marks.map(([e, n]) => ({ n, e })));
-    $('lg-day').innerHTML = !fc && !tg.length && !pts.some((q) => q.low) ? '' : leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(fc ? [['<line class="l2" x2="20" y1="7" y2="7"/>', 'Forecast']] : []), ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : []), ...(pts.some((q) => q.low) ? [['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few to rate']] : [])]);
+    $('lg-day').innerHTML = !fc && !tg.length && !pts.some((q) => q.low) && !closed.length ? '' : leg([['<line class="l1" x2="20" y1="7" y2="7"/>', k.short], ...(fc ? [['<line class="l2" x2="20" y1="7" y2="7"/>', 'Forecast']] : []), ...(tg.length ? [['<line class="tg" x2="20" y1="7" y2="7"/>', 'Target'], ['<rect class="wb" style="fill-opacity:.35" width="20" height="14"/>', 'Watch range']] : []), ...(pts.some((q) => q.low) ? [['<circle class="pt low" cx="10" cy="7" r="4"/>', 'Too few to rate']] : []), ...(closed.length ? [['<rect class="closed" style="fill-opacity:.3" width="20" height="14"/>', 'Closed']] : [])]);
   }
   // one Tab stop per chart; arrows move between marks
   function arrows(svg, sel) {
