@@ -154,7 +154,7 @@
     if (p.get('iv') && +p.get('iv') >= 0 && +p.get('iv') < 96) S.iv = +p.get('iv');
     if (/^\d{4}-\d\d-\d\d$/.test(p.get('day') || '')) S.day = p.get('day'); S.sort = p.get('sort') || ''; if (p.get('scale') === 'zero') S.scale = 'zero'; if (p.get('avg') === 'week') S.avg = 'week';
     Site.setDataThrough(i.data_through);
-    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.4`;
+    $('footer-generated').textContent = `Data through ${fmt.date(i.data_through)} · exported ${fmt.date(i.generated_at)}, ${fmt.time(i.generated_at)} CT · Service & access operations v1.5`;
     return update();
   }).catch(fail);
   function fail(e) { $('loading').hidden = false; $('loading').textContent = 'The service data could not be loaded. ' + e.message; }
@@ -360,7 +360,7 @@
     const cells = [...map].map(([key, p]) => ({ dow: Math.floor(key / 100), i: key % 100, p, v: f(p, dayset.get(Math.floor(key / 100)) || 1), low: m === 'forecast' ? p.f <= 0 : low(m, p) })).filter((c) => c.v != null && isFinite(c.v) && (c.p.o > 0 || c.p.f > 0));
     cur.cells = cells;
     $('t-heat').textContent = `${name} by day of week and 15 minutes, ${chan().name.toLowerCase()}`;
-    $('s-heat').textContent = `${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))} · stronger color is ${m === 'volume' ? 'busier' : 'less favorable'} · click a cell to filter to that time, or a day name to filter to that day`;
+    $('s-heat').textContent = `${fmt.date(iso(W.s))} – ${fmt.date(iso(W.e))} · stronger color is ${m === 'volume' ? 'busier' : 'less favorable'} · click a cell to filter the page to that day and time, or a day name to filter to that day; the table below follows`;
     host.innerHTML = ''; $('lg-heat').innerHTML = ''; worst(cells);
     const ok = cells.filter((c) => !c.low); if (!cells.length) { host.textContent = 'No contacts for these filters.'; return; }
     const i0 = Math.min(...cells.map((c) => c.i)), i1 = Math.max(...cells.map((c) => c.i)), n = i1 - i0 + 1, rows = [1, 2, 3, 4, 5, 6, 0].filter((d) => cells.some((c) => c.dow === d)), order = [0, 1, 2, 3, 4, 5, 6].filter((d) => rows.includes(d));
@@ -404,12 +404,19 @@
   }
   // the weekly time slots where the most customers missed the threshold
   function worst(cells) {
-    cur.cells = cells; const rows = cells.map((c) => ({ ...c, miss: SV.eligible(c.p) - c.p.w })).filter((c) => c.miss > 0), tot = rows.reduce((s, c) => s + c.miss, 0);
+    // The heatmap shows every day, but this list follows a picked day (from a day name or a cell), and marks a picked time.
+    cur.cells = cells; const all = cells.map((c) => ({ ...c, miss: SV.eligible(c.p) - c.p.w })).filter((c) => c.miss > 0), tot = all.reduce((s, c) => s + c.miss, 0);
+    const days = S.dow.length ? new Set(S.dow) : null, rows = days ? all.filter((c) => days.has(c.dow)) : all, dayNames = S.dow.map((d) => DOW[d]).join(', ');
     cur.worst = rows; const L = live(), by = (m, d) => [(c) => d * SV.value(m, c.p), (c) => low(m, c.p) || SV.value(m, c.p) == null];
     cur.worstBy = Site.sortList($('f-sort'), S.sort, { d: ['Past threshold, most first', (c) => c.miss], sl: ['Service level, lowest first', ...by('sl', -1)], ...(L ? { asa: ['ASA, longest first', ...by('asa', 1)], abandon: ['Abandon rate, highest first', ...by('abandon', 1)], staffing: ['Staffing gap, shortest of staff first', ...by('staffing', -1)] } : {}) }, rows);
-    $('t-worst').textContent = 'Time slots with contacts past the threshold'; $('s-worst').textContent = cur.worstBy.charAt(0).toUpperCase() + cur.worstBy.slice(1);
-    $('tbl-worst').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Day and time</th><th scope="col">Past threshold</th><th scope="col">Share of all</th><th scope="col">Service level</th>${L ? '<th scope="col">ASA</th><th scope="col">Abandon rate</th><th scope="col">Staffing gap</th>' : ''}<th scope="col">vs forecast</th></tr></thead><tbody>${rows.slice(0, 10).map((c, i) => `<tr><td><button type="button" class="name" data-k="worst|${c.dow}|${c.i}" data-i="${i}">${DOW[c.dow]}, ${slot(c.i)}</button></td><td>${fmt.count(c.miss)}</td><td>${(c.miss / tot * 100).toFixed(1)}%</td>${['sl', ...(L ? ['asa', 'abandon', 'staffing'] : []), 'forecast'].map((m) => `<td class="${low(m, c.p) ? 'low' : ''}">${V(m, SV.value(m, c.p), true)}${low(m, c.p) ? ' (too few)' : ''}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<p class="note" style="padding:12px">No contacts past the threshold for these filters.</p>';
-    $('n-worst').textContent = rows.length ? `The ${Math.min(10, rows.length)} shown, of ${rows.length} slots, hold ${(rows.slice(0, 10).reduce((s, c) => s + c.miss, 0) / tot * 100).toFixed(1)}% of the ${fmt.count(tot)} contacts past the threshold. Abandons over 5 seconds count as past it.` : '';
+    const picked = (c) => S.iv === c.i && (!days || days.has(c.dow)), at = rows.findIndex(picked), shown = rows.slice(0, 10);
+    if (at >= 10) shown.push(rows[at]);
+    const ord = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
+    $('t-worst').textContent = 'Time slots with contacts past the threshold' + (days ? ', ' + dayNames : '');
+    $('s-worst').textContent = (days ? `${dayNames} only; the heatmap still shows every day · ` : '') + cur.worstBy.charAt(0).toUpperCase() + cur.worstBy.slice(1);
+    $('tbl-worst').innerHTML = rows.length ? `<table><thead><tr><th scope="col">Day and time</th><th scope="col">Past threshold</th><th scope="col">Share of all</th><th scope="col">Service level</th>${L ? '<th scope="col">ASA</th><th scope="col">Abandon rate</th><th scope="col">Staffing gap</th>' : ''}<th scope="col">vs forecast</th></tr></thead><tbody>${shown.map((c) => { const i = rows.indexOf(c), on = picked(c); return `<tr class="${on ? 'sel' : ''}"><td><button type="button" class="name" data-k="worst|${c.dow}|${c.i}" data-i="${i}" aria-pressed="${on}">${DOW[c.dow]}, ${slot(c.i)}${i >= 10 ? ` <span class="muted">(${ord(i + 1)})</span>` : ''}</button></td><td>${fmt.count(c.miss)}</td><td>${(c.miss / tot * 100).toFixed(1)}%</td>${['sl', ...(L ? ['asa', 'abandon', 'staffing'] : []), 'forecast'].map((m) => `<td class="${low(m, c.p) ? 'low' : ''}">${V(m, SV.value(m, c.p), true)}${low(m, c.p) ? ' (too few)' : ''}</td>`).join('')}</tr>`; }).join('')}</tbody></table>` : `<p class="note" style="padding:12px">No contacts past the threshold${days ? ' on ' + dayNames : ''} for these filters.</p>`;
+    const top = rows.slice(0, 10), pickNote = S.iv == null ? '' : at >= 0 ? ` The selected time, ${slot(S.iv)}${days ? '' : ' (every day)'}, is outlined${at >= 10 ? ` and ranks ${ord(at + 1)}, shown last` : ''}.` : ` ${slot(S.iv)} has no contacts past the threshold${days ? ' on ' + dayNames : ''}.`;
+    $('n-worst').textContent = rows.length ? `The ${top.length} shown, of ${rows.length} ${days ? dayNames + ' ' : ''}slots, hold ${(top.reduce((s, c) => s + c.miss, 0) / tot * 100).toFixed(1)}% of the ${fmt.count(tot)} contacts past the threshold${days ? ' on all days' : ''}.${pickNote} Abandons over 5 seconds count as past it.` : pickNote.trim();
   }
 
   // ---------- Average day: forecast and staffing ----------
@@ -460,7 +467,7 @@
   $('f-dow').addEventListener('change', (e) => { if (e.target.value !== '*') { S.dow = e.target.value ? [+e.target.value] : []; go(); } });
   $('chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; const k = b.dataset.q; if (k === 'q' || k === 'dow') S[k] = S[k].filter((x) => x !== +b.dataset.v); else S[k] = null; go(); });
   $('tbl-q').addEventListener('click', (e) => { const b = e.target.closest('[data-id]'); if (b) toggle('q', +b.dataset.id, e.ctrlKey || e.metaKey); });
-  $('tbl-worst').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const c = cur.worst[+b.dataset.i]; S.iv = c.i; S.dow = [c.dow]; go(); } });
+  $('tbl-worst').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { const c = cur.worst[+b.dataset.i], same = S.iv === c.i && S.dow.length === 1 && S.dow[0] === c.dow; S.iv = same ? null : c.i; S.dow = same ? [] : [c.dow]; go(); } });
   $('f-sort').addEventListener('change', (e) => { S.sort = e.target.selectedIndex ? e.target.value : ''; writeUrl(); if (cur.cells) worst(cur.cells); });
   $('f-reset').addEventListener('click', () => { Object.assign(S, DEF, { q: [], dow: [] }); carried(null); events = $('t-events').checked = true; go(); });
   $('copy-link').addEventListener('click', (e) => Site.copyLink(e.currentTarget));
